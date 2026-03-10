@@ -6,6 +6,7 @@ import { createSkill } from './commands/skill-create.js';
 import { lintDirectory, printLintResults } from './commands/lint.js';
 import { runDoctor, printDoctorReport } from './commands/doctor.js';
 import { traceFile } from './commands/trace.js';
+import { runBuild, printBuildResult } from './commands/build.js';
 
 const program = new Command();
 
@@ -71,6 +72,18 @@ program
   .argument('<file>', 'trace file path (JSONL format)')
   .action((file: string) => {
     traceFile(file);
+  });
+
+program
+  .command('build')
+  .description('Generate Claude Code skills and agents from AX definitions')
+  .option('-s, --skills <dir>', 'skills directory', 'skills')
+  .option('-a, --agents <dir>', 'agents directory', 'agents')
+  .option('-o, --output <dir>', 'output directory', '.claude')
+  .action((opts: { skills: string; agents: string; output: string }) => {
+    const result = runBuild(opts.skills, opts.agents, opts.output);
+    printBuildResult(result);
+    process.exit(result.success ? 0 : 1);
   });
 
 program.parse();
