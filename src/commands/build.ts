@@ -8,15 +8,27 @@ import { generateAgentMd } from '../generators/agent-generator.js';
 
 const WORD_LIMIT = 500;
 
+export type BuildTarget = 'claude';
+
+const TARGET_DEFAULTS: Record<BuildTarget, string> = {
+  claude: '.claude',
+};
+
+export function getOutputDir(target: BuildTarget, override?: string): string {
+  return override ?? TARGET_DEFAULTS[target];
+}
+
 export interface BuildResult {
   success: boolean;
   error?: string;
+  target: BuildTarget;
+  outputDir: string;
   skillsGenerated: number;
   agentsGenerated: number;
   warnings: string[];
 }
 
-export function runBuild(skillsDir: string, agentsDir: string, outputDir: string): BuildResult {
+export function runBuild(skillsDir: string, agentsDir: string, outputDir: string, target: BuildTarget = 'claude'): BuildResult {
   const warnings: string[] = [];
 
   // 1. Parse and lint all skills
@@ -34,7 +46,7 @@ export function runBuild(skillsDir: string, agentsDir: string, outputDir: string
     const content = readFileSync(join(skillsDir, file), 'utf-8');
     const parsed = parseSkillYaml(content);
     if (!parsed.success) {
-      return { success: false, error: `Parse error in ${file}: ${parsed.error}`, skillsGenerated: 0, agentsGenerated: 0, warnings };
+      return { success: false, error: `Parse error in ${file}: ${parsed.error}`, target, outputDir, skillsGenerated: 0, agentsGenerated: 0, warnings };
     }
     const lintResults = lintSkill(parsed.data);
     const errors = lintResults.filter((r) => r.severity === 'error');
@@ -44,7 +56,7 @@ export function runBuild(skillsDir: string, agentsDir: string, outputDir: string
   }
 
   if (hasLintErrors) {
-    return { success: false, error: 'Build failed: lint errors found. Fix errors before building.', skillsGenerated: 0, agentsGenerated: 0, warnings };
+    return { success: false, error: 'Build failed: lint errors found. Fix errors before building.', target, outputDir, skillsGenerated: 0, agentsGenerated: 0, warnings };
   }
 
   // 2. Generate skills
@@ -83,7 +95,7 @@ export function runBuild(skillsDir: string, agentsDir: string, outputDir: string
     agentsGenerated++;
   }
 
-  return { success: true, skillsGenerated, agentsGenerated, warnings };
+  return { success: true, target, outputDir, skillsGenerated, agentsGenerated, warnings };
 }
 
 export function printBuildResult(result: BuildResult): void {
@@ -92,7 +104,8 @@ export function printBuildResult(result: BuildResult): void {
     return;
   }
 
-  console.log(chalk.green(`Build complete:`));
+  console.log(chalk.green(`Build complete (target: ${result.target}):`));
+  console.log(`  Output: ${result.outputDir}`);
   console.log(`  Skills generated: ${result.skillsGenerated}`);
   console.log(`  Agents generated: ${result.agentsGenerated}`);
 
