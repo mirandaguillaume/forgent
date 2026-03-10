@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { initProject } from './commands/init.js';
 import { createSkill } from './commands/skill-create.js';
+import { lintDirectory, printLintResults } from './commands/lint.js';
 
 const program = new Command();
 
@@ -40,6 +41,16 @@ skill
     } else {
       console.log(chalk.red(result.error));
     }
+  });
+
+program
+  .command('lint')
+  .description('Lint skill files for AX best practices')
+  .argument('[path]', 'skills directory', 'skills')
+  .action((path: string) => {
+    const result = lintDirectory(path);
+    printLintResults(result);
+    process.exit(result.errors > 0 ? 1 : 0);
   });
 
 program.parse();
