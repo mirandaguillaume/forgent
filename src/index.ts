@@ -4,6 +4,7 @@ import chalk from 'chalk';
 import { initProject } from './commands/init.js';
 import { createSkill } from './commands/skill-create.js';
 import { lintDirectory, printLintResults } from './commands/lint.js';
+import { runDoctor, printDoctorReport } from './commands/doctor.js';
 
 const program = new Command();
 
@@ -51,6 +52,16 @@ program
     const result = lintDirectory(path);
     printLintResults(result);
     process.exit(result.errors > 0 ? 1 : 0);
+  });
+
+program
+  .command('doctor')
+  .description('Run full diagnostic on all skills')
+  .argument('[path]', 'skills directory', 'skills')
+  .action((path: string) => {
+    const report = runDoctor(path);
+    printDoctorReport(report);
+    process.exit(report.score < 50 ? 1 : 0);
   });
 
 program.parse();
