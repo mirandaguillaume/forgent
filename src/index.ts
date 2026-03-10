@@ -5,6 +5,7 @@ import { initProject } from './commands/init.js';
 import { createSkill } from './commands/skill-create.js';
 import { lintDirectory, printLintResults } from './commands/lint.js';
 import { runDoctor, printDoctorReport } from './commands/doctor.js';
+import { traceFile } from './commands/trace.js';
 
 const program = new Command();
 
@@ -62,6 +63,14 @@ program
     const report = runDoctor(path);
     printDoctorReport(report);
     process.exit(report.score < 50 ? 1 : 0);
+  });
+
+program
+  .command('trace')
+  .description('Analyze a JSONL trace file')
+  .argument('<file>', 'trace file path (JSONL format)')
+  .action((file: string) => {
+    traceFile(file);
   });
 
 program.parse();
