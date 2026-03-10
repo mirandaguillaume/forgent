@@ -6,7 +6,7 @@ import { createSkill } from './commands/skill-create.js';
 import { lintDirectory, printLintResults } from './commands/lint.js';
 import { runDoctor, printDoctorReport } from './commands/doctor.js';
 import { traceFile } from './commands/trace.js';
-import { runBuild, printBuildResult } from './commands/build.js';
+import { runBuild, printBuildResult, getOutputDir, type BuildTarget } from './commands/build.js';
 
 const program = new Command();
 
@@ -76,12 +76,19 @@ program
 
 program
   .command('build')
-  .description('Generate Claude Code skills and agents from AX definitions')
+  .description('Generate skills and agents for a target framework')
+  .option('-t, --target <target>', 'target framework', 'claude')
   .option('-s, --skills <dir>', 'skills directory', 'skills')
   .option('-a, --agents <dir>', 'agents directory', 'agents')
-  .option('-o, --output <dir>', 'output directory', '.claude')
-  .action((opts: { skills: string; agents: string; output: string }) => {
-    const result = runBuild(opts.skills, opts.agents, opts.output);
+  .option('-o, --output <dir>', 'output directory (overrides target default)')
+  .action((opts: { target: string; skills: string; agents: string; output?: string }) => {
+    const target = opts.target as BuildTarget;
+    if (target !== 'claude') {
+      console.log(chalk.red(`Unknown target "${opts.target}". Available: claude`));
+      process.exit(1);
+    }
+    const outputDir = getOutputDir(target, opts.output);
+    const result = runBuild(opts.skills, opts.agents, outputDir, target);
     printBuildResult(result);
     process.exit(result.success ? 0 : 1);
   });
