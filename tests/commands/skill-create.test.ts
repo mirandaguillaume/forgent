@@ -5,13 +5,13 @@ import { tmpdir } from 'os';
 import { createSkill } from '../../src/commands/skill-create.js';
 import { parseSkillYaml } from '../../src/utils/yaml-loader.js';
 
-describe('ax skill create', () => {
+describe('forgent skill create', () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), 'ax-test-'));
+    tempDir = mkdtempSync(join(tmpdir(), 'forgent-test-'));
     mkdirSync(join(tempDir, 'skills'));
-    writeFileSync(join(tempDir, 'ax.yaml'), 'version: "0.1.0"\nskills_dir: skills');
+    writeFileSync(join(tempDir, 'forgent.yaml'), 'version: "0.1.0"\nskills_dir: skills');
   });
 
   afterEach(() => {

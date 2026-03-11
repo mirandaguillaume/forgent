@@ -1,8 +1,8 @@
-# AX CLI — Agent Experience CLI
+# Forgent — Forge agents from composable skill specs
 
 ## Context
 
-Standalone TypeScript CLI that improves Agent Experience (AX) across AI agent frameworks (Claude Code, CrewAI, LangGraph, OpenAI Agents SDK).
+Standalone TypeScript CLI that forges AI agents from composable skill specs across frameworks (Claude Code, CrewAI, LangGraph, OpenAI Agents SDK).
 
 Core concept: agents are **compositions of Skill Behaviors** — reusable behavioral units with 6 facets (Context, Strategy, Guardrails, Dependencies, Observability, Security).
 
@@ -18,11 +18,13 @@ Core concept: agents are **compositions of Skill Behaviors** — reusable behavi
 ## Commands (MVP)
 
 ```bash
-ax init                    # Initialize AX project
-ax skill create <name>     # Scaffold a new skill
-ax lint [path]             # Lint skills for AX best practices
-ax doctor [path]           # Full diagnostic (lint + dependency + loop analysis)
-ax trace <file>            # Analyze JSONL trace files
+forgent init                    # Initialize Forgent project
+forgent skill create <name>     # Scaffold a new skill
+forgent lint [path]             # Lint skills for best practices
+forgent doctor [path]           # Full diagnostic (lint + dependency + loop analysis)
+forgent trace <file>            # Analyze JSONL trace files
+forgent build [path]            # Generate skills/agents for a target framework
+forgent score [path]            # Score design quality
 ```
 
 ## Dev Commands

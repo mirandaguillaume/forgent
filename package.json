@@ -1,10 +1,10 @@
 {
-  "name": "ax-cli",
+  "name": "forgent",
   "version": "0.1.0",
-  "description": "Agent Experience CLI — diagnose, lint, and compose AI agent skills",
+  "description": "Forge agents from composable skill specs — build, lint, and diagnose across frameworks",
   "type": "module",
   "bin": {
-    "ax": "./dist/index.js"
+    "forgent": "./dist/index.js"
   },
   "scripts": {
     "build": "tsc",
@@ -25,6 +25,25 @@
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
   },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mirandaguillaume/forgent.git"
+  },
+  "homepage": "https://github.com/mirandaguillaume/forgent",
+  "keywords": [
+    "ai-agents",
+    "agent-builder",
+    "skill-behavior",
+    "agent-spec",
+    "cli",
+    "linter",
+    "claude-code",
+    "crewai",
+    "langgraph",
+    "agent-composition",
+    "forgent"
+  ],
   "engines": {
     "node": ">=20.0.0"
   }
