@@ -17,11 +17,17 @@ Skills are defined in YAML, validated against a schema, and compiled to framewor
 
 ## Install
 
+### Binary download
+
+Download the latest binary from [GitHub Releases](https://github.com/mirandaguillaume/forgent/releases).
+
+### From source
+
 ```bash
-npm install -g forgent
+go install github.com/mirandaguillaume/forgent/cmd/forgent@latest
 ```
 
-Requires Node.js >= 20.
+Requires Go 1.22+.
 
 ## Commands
 
@@ -31,8 +37,10 @@ forgent skill create <name>       # Scaffold a new skill
 forgent lint [path]               # Lint skills for best practices
 forgent doctor [path]             # Full diagnostic (lint + deps + loops)
 forgent trace <file>              # Analyze JSONL trace files
-forgent build [path]              # Generate skills/agents for a target framework
 forgent score [path]              # Score design quality
+forgent build                     # Build for Claude Code (default)
+forgent build --target copilot    # Build for GitHub Copilot
+forgent build --watch             # Watch and rebuild on changes
 ```
 
 ## Quick Start
@@ -50,7 +58,7 @@ This creates a skill YAML, validates it, and compiles it to Claude Code format (
 ## Skill Anatomy
 
 ```yaml
-name: search-web
+skill: search-web
 version: "1.0"
 
 context:
@@ -63,23 +71,23 @@ strategy:
   approach: "Search, filter, summarize"
 
 guardrails:
-  rules:
-    - "Max 5 search queries per invocation"
-  limits:
-    max_tokens: 4000
-    timeout: 30
+  - "Max 5 search queries per invocation"
+  - "timeout: 30s"
 
-dependencies:
-  depends_on: []
-  provides: [search_results]
+depends_on: []
 
 observability:
-  traces: true
+  trace_level: standard
   metrics: [latency, token_usage]
 
 security:
-  network: [https://*]
-  sandbox: strict
+  filesystem: none
+  network: full
+  secrets: []
+
+negotiation:
+  file_conflicts: yield
+  priority: 0
 ```
 
 ## Build Targets
@@ -89,13 +97,15 @@ security:
 | Target | Output | Status |
 |--------|--------|--------|
 | Claude Code | `.claude/` (SKILL.md + agent.md) | Available |
+| GitHub Copilot | `.github/` (SKILL.md + agent.md + instructions) | Available |
 | CrewAI | — | Planned |
 | LangGraph | — | Planned |
-| OpenAI Agents SDK | — | Planned |
 
 ```bash
-forgent build --target claude         # default
+forgent build --target claude           # default
+forgent build --target copilot
 forgent build --target claude -o out/
+forgent build --watch                   # rebuilds on changes
 ```
 
 ## Development
@@ -103,10 +113,9 @@ forgent build --target claude -o out/
 ```bash
 git clone https://github.com/mirandaguillaume/forgent.git
 cd forgent
-npm install
-npm test          # 166 tests
-npm run build     # compile TypeScript
-npm run dev       # run via tsx
+go test ./...           # run tests
+go build ./cmd/forgent  # compile
+go vet ./...            # static analysis
 ```
 
 ## License
