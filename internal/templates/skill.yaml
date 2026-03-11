@@ -1,0 +1,29 @@
+skill: my-skill
+version: "0.1.0"
+
+context:
+  consumes: []
+  produces: []
+  memory: short-term
+
+strategy:
+  tools: []
+  approach: sequential
+  steps: []
+
+guardrails: []
+
+depends_on: []
+
+observability:
+  trace_level: minimal
+  metrics: []
+
+security:
+  filesystem: none
+  network: none
+  secrets: []
+
+negotiation:
+  file_conflicts: yield
+  priority: 0
