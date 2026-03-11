@@ -2,57 +2,66 @@
 
 ## Context
 
-Standalone TypeScript CLI that forges AI agents from composable skill specs across frameworks (Claude Code, CrewAI, LangGraph, OpenAI Agents SDK).
+Standalone Go CLI that forges AI agents from composable skill specs across frameworks (Claude Code, GitHub Copilot, and more).
 
 Core concept: agents are **compositions of Skill Behaviors** — reusable behavioral units with 6 facets (Context, Strategy, Guardrails, Dependencies, Observability, Security).
 
 ## Tech Stack
 
-- TypeScript 5.x, Node.js 20+, ESM
-- CLI: Commander.js
-- Validation: ajv (JSON Schema)
-- YAML: yaml (npm)
-- Testing: vitest
-- Output: chalk
+- Go 1.22+
+- CLI: Cobra (github.com/spf13/cobra)
+- YAML: gopkg.in/yaml.v3
+- Testing: testify (github.com/stretchr/testify)
+- Output: fatih/color
+- File watching: fsnotify (github.com/fsnotify/fsnotify)
 
-## Commands (MVP)
+## Commands
 
 ```bash
-forgent init                    # Initialize Forgent project
-forgent skill create <name>     # Scaffold a new skill
-forgent lint [path]             # Lint skills for best practices
-forgent doctor [path]           # Full diagnostic (lint + dependency + loop analysis)
-forgent trace <file>            # Analyze JSONL trace files
-forgent build [path]            # Generate skills/agents for a target framework
-forgent score [path]            # Score design quality
+forgent init                           # Initialize Forgent project
+forgent skill create <name>           # Scaffold a new skill
+forgent lint [path]                    # Lint skills for best practices
+forgent doctor [path]                  # Full diagnostic (lint + dependency + loop analysis)
+forgent trace <file>                   # Analyze JSONL trace files
+forgent score [path]                   # Score design quality
+forgent build --target claude          # Generate skills/agents for Claude Code
+forgent build --target copilot         # Generate skills/agents for GitHub Copilot
+forgent build --watch                  # Watch and rebuild on changes
 ```
 
 ## Dev Commands
 
 ```bash
-npm run dev                # Run CLI via tsx
-npm test                   # Run vitest
-npm run build              # Compile TypeScript
-npm run lint               # Type-check only
+go test ./...                # Run all tests
+go build ./cmd/forgent       # Compile binary
+go vet ./...                 # Static analysis
 ```
 
 ## Architecture
 
 ```
-src/
-  index.ts                 # CLI entry point
-  commands/                # CLI command handlers
-  model/                   # Skill Behavior Model types + schema
-  analyzers/               # Dependency checker, loop detector, trace parser
-  linters/                 # AX quality rules
-  utils/                   # YAML loader
-templates/                 # Skill/agent YAML templates
-tests/                     # Mirrors src/ structure
-docs/plans/                # Design doc + implementation plan
+cmd/
+  forgent/
+    main.go                  # CLI entry point
+pkg/
+  model/                     # SkillBehavior, AgentComposition, validation
+  spec/                      # TargetGenerator interface + registry
+internal/
+  cmd/                       # CLI command handlers (Cobra)
+  analyzer/                  # Dependency checker, loop detector, trace parser, score, ordering
+  linter/                    # Lint rules
+  yaml/                      # YAML loader
+  generator/
+    claude/                  # Claude Code generator (skill, agent, toolmap)
+    copilot/                 # GitHub Copilot generator (skill, agent, instructions, toolmap)
+templates/                   # Skill/agent YAML templates
 ```
 
-## Implementation Plan
+## Build Targets
 
-See `docs/plans/2026-03-10-ax-cli-implementation-plan.md` — 13 tasks, TDD, bite-sized.
+Generators implement `pkg/spec.TargetGenerator` and register via `init()`.
 
-Use `superpowers:executing-plans` or `superpowers:subagent-driven-development` to execute.
+| Target | Output Dir | Files |
+|--------|-----------|-------|
+| claude | `.claude/` | `skills/<name>/SKILL.md`, `agents/<name>.md` |
+| copilot | `.github/` | `skills/<name>/SKILL.md`, `agents/<name>.agent.md`, `copilot-instructions.md` |
