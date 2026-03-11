@@ -1,17 +1,13 @@
 version: 2
-
 builds:
   - main: ./cmd/forgent
     binary: forgent
-    goos:
-      - linux
-      - darwin
-      - windows
-    goarch:
-      - amd64
-      - arm64
     ldflags:
       - -s -w -X github.com/mirandaguillaume/forgent/internal/cmd.version={{.Version}}
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    env:
+      - CGO_ENABLED=0
 
 archives:
   - format: tar.gz
@@ -21,9 +17,7 @@ archives:
         format: zip
 
 checksum:
-  name_template: checksums.txt
+  name_template: "checksums.txt"
 
-release:
-  github:
-    owner: mirandaguillaume
-    name: forgent
+changelog:
+  use: github-native
