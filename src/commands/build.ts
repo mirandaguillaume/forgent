@@ -3,21 +3,18 @@ import { join } from 'path';
 import chalk from 'chalk';
 import { parseSkillYaml, parseAgentYaml } from '../utils/yaml-loader.js';
 import { lintSkill } from '../linters/rules.js';
-import { generateSkillMd, countWords } from '../generators/skill-generator.js';
-import { generateAgentMd } from '../generators/agent-generator.js';
+import { countWords } from '../generators/skill-generator.js';
 import { checkSkillOrdering } from '../analyzers/skill-ordering.js';
+import { getGenerator, type BuildTarget } from '../generators/target-generator.js';
 import type { SkillBehavior } from '../model/skill-behavior.js';
+import type { AgentComposition } from '../model/agent.js';
+
+export type { BuildTarget } from '../generators/target-generator.js';
 
 const WORD_LIMIT = 500;
 
-export type BuildTarget = 'claude';
-
-const TARGET_DEFAULTS: Record<BuildTarget, string> = {
-  claude: '.claude',
-};
-
 export function getOutputDir(target: BuildTarget, override?: string): string {
-  return override ?? TARGET_DEFAULTS[target];
+  return override ?? getGenerator(target).defaultOutputDir;
 }
 
 export interface BuildResult {
@@ -31,6 +28,7 @@ export interface BuildResult {
 }
 
 export function runBuild(skillsDir: string, agentsDir: string, outputDir: string, target: BuildTarget = 'claude'): BuildResult {
+  const generator = getGenerator(target);
   const warnings: string[] = [];
 
   // 1. Parse all skills upfront (single pass)
@@ -66,20 +64,23 @@ export function runBuild(skillsDir: string, agentsDir: string, outputDir: string
   // 2. Generate skills from already-parsed data
   let skillsGenerated = 0;
   for (const skill of skillMap.values()) {
-    const md = generateSkillMd(skill);
+    const md = generator.generateSkill(skill);
     const wordCount = countWords(md);
     if (wordCount > WORD_LIMIT) {
       warnings.push(`Skill "${skill.skill}" generates ${wordCount} words (limit: ${WORD_LIMIT}). Consider simplifying.`);
     }
 
-    const skillOutDir = join(outputDir, 'skills', skill.skill);
+    const skillRelPath = generator.getSkillPath(skill.skill);
+    const skillOutDir = join(outputDir, ...skillRelPath.split('/').slice(0, -1));
     mkdirSync(skillOutDir, { recursive: true });
-    writeFileSync(join(skillOutDir, 'SKILL.md'), md);
+    writeFileSync(join(outputDir, ...skillRelPath.split('/')), md);
     skillsGenerated++;
   }
 
   // 3. Generate agents with resolved skill tools
   let agentsGenerated = 0;
+  const allAgents: AgentComposition[] = [];
+
   for (const file of agentFiles) {
     const content = readFileSync(join(agentsDir, file), 'utf-8');
     const parsed = parseAgentYaml(content);
@@ -87,6 +88,8 @@ export function runBuild(skillsDir: string, agentsDir: string, outputDir: string
       warnings.push(`Agent ${file}: ${parsed.error}`);
       continue;
     }
+
+    allAgents.push(parsed.data);
 
     // Resolve referenced skills for tool mapping
     const resolvedSkills = parsed.data.skills
@@ -104,11 +107,24 @@ export function runBuild(skillsDir: string, agentsDir: string, outputDir: string
       warnings.push(`Agent "${parsed.data.agent}": ${issue.message}`);
     }
 
-    const md = generateAgentMd(parsed.data, resolvedSkills, outputDir);
-    const agentOutDir = join(outputDir, 'agents');
+    const md = generator.generateAgent(parsed.data, resolvedSkills, outputDir);
+    const agentRelPath = generator.getAgentPath(parsed.data.agent);
+    const agentOutDir = join(outputDir, ...agentRelPath.split('/').slice(0, -1));
     mkdirSync(agentOutDir, { recursive: true });
-    writeFileSync(join(agentOutDir, `${parsed.data.agent}.md`), md);
+    writeFileSync(join(outputDir, ...agentRelPath.split('/')), md);
     agentsGenerated++;
+  }
+
+  // 4. Generate instructions if the target supports it
+  const instructions = generator.generateInstructions([...skillMap.values()], allAgents);
+  const instructionsPath = generator.getInstructionsPath();
+  if (instructions && instructionsPath) {
+    const instrFullPath = join(outputDir, ...instructionsPath.split('/'));
+    const instrDir = join(outputDir, ...instructionsPath.split('/').slice(0, -1));
+    if (instrDir !== outputDir) {
+      mkdirSync(instrDir, { recursive: true });
+    }
+    writeFileSync(instrFullPath, instructions);
   }
 
   return { success: true, target, outputDir, skillsGenerated, agentsGenerated, warnings };

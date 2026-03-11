@@ -33,3 +33,6 @@ export function getGenerator(target: BuildTarget): TargetGenerator {
 export function getAvailableTargets(): BuildTarget[] {
   return [...registry.keys()];
 }
+
+// Auto-register built-in targets (dynamic import avoids circular dependency)
+await import('./claude-generator.js');
