@@ -1,13 +1,17 @@
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import chalk from 'chalk';
 import { parseTrace, summarizeTrace } from '../analyzers/trace-parser.js';
 
 export function traceFile(tracePath: string): void {
+  if (!existsSync(tracePath)) {
+    console.log(chalk.red(`Trace file not found: ${tracePath}`));
+    process.exit(1);
+  }
   const content = readFileSync(tracePath, 'utf-8');
   const events = parseTrace(content);
   const summary = summarizeTrace(events);
 
-  console.log(chalk.bold('\n=== AX Trace Summary ===\n'));
+  console.log(chalk.bold('\n=== Forgent Trace Summary ===\n'));
   console.log(`Total duration: ${summary.totalDuration_ms}ms`);
   console.log(`Total tokens: ${summary.totalTokens}`);
   console.log(`Tool calls: ${summary.toolCalls}`);

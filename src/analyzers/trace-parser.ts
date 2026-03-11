@@ -30,10 +30,16 @@ export interface TraceSummary {
 const LOOP_THRESHOLD = 5;
 
 export function parseTrace(jsonl: string): TraceEvent[] {
-  return jsonl
-    .split('\n')
-    .filter((line) => line.trim().length > 0)
-    .map((line) => JSON.parse(line) as TraceEvent);
+  const events: TraceEvent[] = [];
+  for (const line of jsonl.split('\n')) {
+    if (line.trim().length === 0) continue;
+    try {
+      events.push(JSON.parse(line) as TraceEvent);
+    } catch {
+      // Skip malformed lines
+    }
+  }
+  return events;
 }
 
 export function summarizeTrace(events: TraceEvent[]): TraceSummary {

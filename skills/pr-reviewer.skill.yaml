@@ -1,0 +1,36 @@
+skill: pr-reviewer
+version: "1.0.0"
+context:
+  consumes: [git_diff, test_results, lint_results]
+  produces: [review_comments, risk_score]
+  memory: conversation
+strategy:
+  tools: [read_file, grep, search]
+  approach: diff-first
+  steps:
+    - read the git diff
+    - cross-reference with test results
+    - cross-reference with lint results
+    - identify risky changes and anti-patterns
+    - write actionable review comments
+    - assign risk score (0-10)
+guardrails:
+  - max_comments: 15
+  - timeout: 5min
+  - no_approve_without_tests
+  - require_risk_score
+depends_on:
+  - skill: tdd-runner
+    provides: test_results
+  - skill: ts-linter
+    provides: lint_results
+observability:
+  trace_level: detailed
+  metrics: [tokens, latency, comment_count]
+security:
+  filesystem: read-only
+  network: none
+  secrets: []
+negotiation:
+  file_conflicts: yield
+  priority: 3
