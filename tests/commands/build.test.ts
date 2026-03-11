@@ -216,3 +216,64 @@ description: "Reviews code"
     expect(existsSync(outputDir)).toBe(true);
   });
 });
+
+describe('forgent build --target copilot', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'forgent-copilot-build-'));
+    mkdirSync(join(tempDir, 'skills'));
+    mkdirSync(join(tempDir, 'agents'));
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
+  it('should generate Copilot skills in .github/', () => {
+    writeFileSync(join(tempDir, 'skills', 'code-review.skill.yaml'), goodSkill);
+    const result = runBuild(join(tempDir, 'skills'), join(tempDir, 'agents'), join(tempDir, '.github'), 'copilot');
+    expect(result.success).toBe(true);
+    expect(result.target).toBe('copilot');
+    expect(existsSync(join(tempDir, '.github', 'skills', 'code-review', 'SKILL.md'))).toBe(true);
+  });
+
+  it('should generate Copilot agent with .agent.md extension', () => {
+    writeFileSync(join(tempDir, 'skills', 'code-review.skill.yaml'), goodSkill);
+    writeFileSync(join(tempDir, 'agents', 'reviewer.agent.yaml'), goodAgent);
+    const result = runBuild(join(tempDir, 'skills'), join(tempDir, 'agents'), join(tempDir, '.github'), 'copilot');
+    expect(result.success).toBe(true);
+    expect(existsSync(join(tempDir, '.github', 'agents', 'reviewer.agent.md'))).toBe(true);
+  });
+
+  it('should generate copilot-instructions.md', () => {
+    writeFileSync(join(tempDir, 'skills', 'code-review.skill.yaml'), goodSkill);
+    const result = runBuild(join(tempDir, 'skills'), join(tempDir, 'agents'), join(tempDir, '.github'), 'copilot');
+    expect(result.success).toBe(true);
+    expect(existsSync(join(tempDir, '.github', 'copilot-instructions.md'))).toBe(true);
+    const content = readFileSync(join(tempDir, '.github', 'copilot-instructions.md'), 'utf-8');
+    expect(content).toContain('Code Review');
+  });
+
+  it('should use Copilot tool aliases in agent', () => {
+    writeFileSync(join(tempDir, 'skills', 'code-review.skill.yaml'), goodSkill);
+    writeFileSync(join(tempDir, 'agents', 'reviewer.agent.yaml'), goodAgent);
+    runBuild(join(tempDir, 'skills'), join(tempDir, 'agents'), join(tempDir, '.github'), 'copilot');
+    const content = readFileSync(join(tempDir, '.github', 'agents', 'reviewer.agent.md'), 'utf-8');
+    // Should have Copilot aliases
+    expect(content).toContain('"read"');
+    expect(content).toContain('"search"');
+    // Should NOT have Claude-specific tool names in the frontmatter tools line
+    const toolsLine = content.split('\n').find((l: string) => l.startsWith('tools:'));
+    expect(toolsLine).toBeDefined();
+    expect(toolsLine).not.toMatch(/\bRead\b/);
+    expect(toolsLine).not.toMatch(/\bGrep\b/);
+    expect(toolsLine).not.toMatch(/\bGlob\b/);
+  });
+
+  it('should not generate copilot-instructions.md for empty build', () => {
+    const result = runBuild(join(tempDir, 'skills'), join(tempDir, 'agents'), join(tempDir, '.github'), 'copilot');
+    expect(result.success).toBe(true);
+    expect(existsSync(join(tempDir, '.github', 'copilot-instructions.md'))).toBe(false);
+  });
+});
