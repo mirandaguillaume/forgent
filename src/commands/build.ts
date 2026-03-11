@@ -6,6 +6,9 @@ import { lintSkill } from '../linters/rules.js';
 import { countWords } from '../generators/skill-generator.js';
 import { checkSkillOrdering } from '../analyzers/skill-ordering.js';
 import { getGenerator, type BuildTarget } from '../generators/target-generator.js';
+// Register built-in targets
+import '../generators/claude-generator.js';
+import '../generators/copilot-generator.js';
 import type { SkillBehavior } from '../model/skill-behavior.js';
 import type { AgentComposition } from '../model/agent.js';
 
