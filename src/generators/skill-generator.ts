@@ -1,14 +1,8 @@
 import type { SkillBehavior } from '../model/skill-behavior.js';
+import { toTitle } from '../utils/to-title.js';
 
 export function countWords(text: string): number {
   return text.split(/\s+/).filter((w) => w.length > 0).length;
-}
-
-function toTitle(slug: string): string {
-  return slug
-    .split('-')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
 }
 
 function formatGuardrail(g: string | Record<string, string | number>): string {

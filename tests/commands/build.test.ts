@@ -63,11 +63,11 @@ negotiation:
   priority: 0
 `;
 
-describe('ax build command', () => {
+describe('forgent build command', () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), 'ax-build-'));
+    tempDir = mkdtempSync(join(tmpdir(), 'forgent-build-'));
     mkdirSync(join(tempDir, 'skills'));
     mkdirSync(join(tempDir, 'agents'));
   });
@@ -99,13 +99,29 @@ describe('ax build command', () => {
     expect(existsSync(join(tempDir, '.claude', 'agents', 'reviewer.md'))).toBe(true);
   });
 
-  it('should generate valid agent.md content', () => {
+  it('should generate valid agent.md content without model: inherit', () => {
     writeFileSync(join(tempDir, 'agents', 'reviewer.agent.yaml'), goodAgent);
     runBuild(join(tempDir, 'skills'), join(tempDir, 'agents'), join(tempDir, '.claude'));
     const content = readFileSync(join(tempDir, '.claude', 'agents', 'reviewer.md'), 'utf-8');
     expect(content).toContain('name: reviewer');
-    expect(content).toContain('model: inherit');
+    expect(content).not.toContain('model: inherit');
     expect(content).toContain('code-review');
+  });
+
+  it('should resolve skill tools into agent frontmatter', () => {
+    writeFileSync(join(tempDir, 'skills', 'code-review.skill.yaml'), goodSkill);
+    writeFileSync(join(tempDir, 'agents', 'reviewer.agent.yaml'), goodAgent);
+    runBuild(join(tempDir, 'skills'), join(tempDir, 'agents'), join(tempDir, '.claude'));
+    const content = readFileSync(join(tempDir, '.claude', 'agents', 'reviewer.md'), 'utf-8');
+    // code-review skill uses read_file + grep → Read, Grep; read-only fs → Glob, Grep, Read
+    expect(content).toContain('tools: Glob, Grep, Read');
+  });
+
+  it('should warn when agent references unresolved skills', () => {
+    writeFileSync(join(tempDir, 'agents', 'reviewer.agent.yaml'), goodAgent);
+    // No skills dir content — code-review skill not available
+    const result = runBuild(join(tempDir, 'skills'), join(tempDir, 'agents'), join(tempDir, '.claude'));
+    expect(result.warnings.some((w) => w.includes('unresolved skills'))).toBe(true);
   });
 
   it('should refuse build when lint has errors', () => {
@@ -127,6 +143,69 @@ describe('ax build command', () => {
     expect(result.success).toBe(true);
     expect(result.skillsGenerated).toBe(0);
     expect(result.agentsGenerated).toBe(0);
+  });
+
+  it('should warn on data-flow ordering mismatch in sequential agent', () => {
+    const consumerFirst = `
+skill: code-review
+version: "1.0.0"
+context:
+  consumes: [test_results]
+  produces: [review_comments]
+  memory: conversation
+strategy:
+  tools: [read_file]
+  approach: diff-first
+guardrails:
+  - timeout: 5min
+depends_on: []
+observability:
+  trace_level: standard
+  metrics: [tokens]
+security:
+  filesystem: read-only
+  network: none
+  secrets: []
+negotiation:
+  file_conflicts: yield
+  priority: 1
+`;
+    const producer = `
+skill: test-runner
+version: "1.0.0"
+context:
+  consumes: []
+  produces: [test_results]
+  memory: short-term
+strategy:
+  tools: [bash]
+  approach: execute
+guardrails:
+  - timeout: 3min
+depends_on: []
+observability:
+  trace_level: standard
+  metrics: [duration]
+security:
+  filesystem: read-only
+  network: none
+  secrets: []
+negotiation:
+  file_conflicts: yield
+  priority: 0
+`;
+    const badOrderAgent = `
+agent: reviewer
+skills: [code-review, test-runner]
+orchestration: sequential
+description: "Reviews code"
+`;
+    writeFileSync(join(tempDir, 'skills', 'code-review.skill.yaml'), consumerFirst);
+    writeFileSync(join(tempDir, 'skills', 'test-runner.skill.yaml'), producer);
+    writeFileSync(join(tempDir, 'agents', 'reviewer.agent.yaml'), badOrderAgent);
+    const result = runBuild(join(tempDir, 'skills'), join(tempDir, 'agents'), join(tempDir, '.claude'));
+    expect(result.success).toBe(true);
+    expect(result.warnings.some((w) => w.includes('test_results'))).toBe(true);
   });
 
   it('should create output directories if they do not exist', () => {

@@ -1,0 +1,4 @@
+agent: ci-reviewer
+skills: [ts-linter, tdd-runner, pr-reviewer]
+orchestration: sequential
+description: "Runs type-checking, then tests, then reviews the PR diff with all results"

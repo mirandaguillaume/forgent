@@ -12,11 +12,17 @@ export type CreateSkillResult =
   | { success: true; path: string }
   | { success: false; error: string };
 
+const VALID_NAME = /^[a-z0-9][a-z0-9_-]*$/;
+
 export function createSkill(
   projectDir: string,
   name: string,
   options: CreateSkillOptions = {},
 ): CreateSkillResult {
+  if (!VALID_NAME.test(name)) {
+    return { success: false, error: `Invalid skill name "${name}". Use lowercase letters, numbers, hyphens, and underscores only.` };
+  }
+
   const skillPath = join(projectDir, 'skills', `${name}.skill.yaml`);
 
   if (existsSync(skillPath)) {
