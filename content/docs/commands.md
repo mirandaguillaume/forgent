@@ -69,19 +69,6 @@ Reports:
 - Loop risks (self-referencing I/O, missing timeouts)
 - Health score (0-100)
 
-## `forgent trace`
-
-Analyze JSONL trace files for execution patterns.
-
-```bash
-forgent trace <file>
-```
-
-Parses agent execution traces and reports:
-- Total events and unique skills
-- Average duration per skill
-- Loop detection (threshold: 5 repeated calls)
-
 ## `forgent score`
 
 Score design quality of skills and agents.

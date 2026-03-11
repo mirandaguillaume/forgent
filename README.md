@@ -36,7 +36,6 @@ forgent init                      # Initialize a Forgent project
 forgent skill create <name>       # Scaffold a new skill
 forgent lint [path]               # Lint skills for best practices
 forgent doctor [path]             # Full diagnostic (lint + deps + loops)
-forgent trace <file>              # Analyze JSONL trace files
 forgent score [path]              # Score design quality
 forgent build                     # Build for Claude Code (default)
 forgent build --target copilot    # Build for GitHub Copilot

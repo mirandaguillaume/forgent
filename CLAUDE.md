@@ -22,7 +22,6 @@ forgent init                           # Initialize Forgent project
 forgent skill create <name>           # Scaffold a new skill
 forgent lint [path]                    # Lint skills for best practices
 forgent doctor [path]                  # Full diagnostic (lint + dependency + loop analysis)
-forgent trace <file>                   # Analyze JSONL trace files
 forgent score [path]                   # Score design quality
 forgent build --target claude          # Generate skills/agents for Claude Code
 forgent build --target copilot         # Generate skills/agents for GitHub Copilot
@@ -48,7 +47,7 @@ pkg/
   spec/                      # TargetGenerator interface + registry
 internal/
   cmd/                       # CLI command handlers (Cobra)
-  analyzer/                  # Dependency checker, loop detector, trace parser, score, ordering
+  analyzer/                  # Dependency checker, loop detector, score, ordering
   linter/                    # Lint rules
   yaml/                      # YAML loader
   generator/

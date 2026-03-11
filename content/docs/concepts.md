@@ -92,4 +92,3 @@ Forgent includes built-in analysis tools:
 - **Lint** — checks for common design issues (missing guardrails, empty tools, security gaps)
 - **Score** — rates skill quality across 5 weighted facets (0-100 scale)
 - **Doctor** — full diagnostic: lint + dependency analysis + loop detection
-- **Trace** — analyzes JSONL execution traces for loop patterns
