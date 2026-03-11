@@ -1,4 +1,19 @@
-node_modules/
-dist/
-*.tsbuildinfo
+# Go
+bin/
+/forgent
+*.exe
+vendor/
+
+# Local plans
 docs/plans/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+
+# Claude
+.claude/
