@@ -6,7 +6,8 @@ import { createSkill } from './commands/skill-create.js';
 import { lintDirectory, printLintResults } from './commands/lint.js';
 import { runDoctor, printDoctorReport } from './commands/doctor.js';
 import { traceFile } from './commands/trace.js';
-import { runBuild, printBuildResult, getOutputDir, type BuildTarget } from './commands/build.js';
+import { runBuild, printBuildResult, getOutputDir } from './commands/build.js';
+import { getAvailableTargets, type BuildTarget } from './generators/target-generator.js';
 import { createWatcher } from './commands/watch.js';
 import { runScore, printScoreReport } from './commands/score.js';
 
@@ -87,8 +88,9 @@ program
   .option('-w, --watch', 'watch for changes and rebuild automatically')
   .action((opts: { target: string; skills: string; agents: string; output?: string; watch?: boolean }) => {
     const target = opts.target as BuildTarget;
-    if (target !== 'claude') {
-      console.log(chalk.red(`Unknown target "${opts.target}". Available: claude`));
+    const available = getAvailableTargets();
+    if (!available.includes(target)) {
+      console.log(chalk.red(`Unknown target "${opts.target}". Available: ${available.join(', ')}`));
       process.exit(1);
     }
     const outputDir = getOutputDir(target, opts.output);
