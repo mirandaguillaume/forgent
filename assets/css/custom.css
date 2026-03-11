@@ -1,0 +1,699 @@
+/* ═══════════════════════════════════════════════════
+   THE FORGE — Custom theme for Forgent
+   Industrial warmth meets precision engineering
+   ═══════════════════════════════════════════════════ */
+
+/* ─── 1. Custom Properties ─── */
+
+:root {
+  --fg-bg: #faf7f2;
+  --fg-surface: #efe9e0;
+  --fg-card: #ffffff;
+  --fg-card-hover: #faf7f2;
+  --fg-accent: #c45520;
+  --fg-accent-hover: #e87a3a;
+  --fg-accent-subtle: rgba(196, 85, 32, 0.07);
+  --fg-text: #1c1510;
+  --fg-text-2: #5c514a;
+  --fg-text-3: #8a7e74;
+  --fg-border: #d5cdc0;
+  --fg-code-bg: #f0ebe3;
+  --fg-ember: rgba(232, 122, 58, 0.10);
+  --fg-ember-strong: rgba(232, 122, 58, 0.22);
+  --fg-hero-bg: #0b0e13;
+  --fg-hero-surface: #12161d;
+  --fg-hero-text: #e4dfda;
+  --fg-hero-text-2: #8a919b;
+}
+
+.dark {
+  --fg-bg: #0b0e13;
+  --fg-surface: #12161d;
+  --fg-card: #181d27;
+  --fg-card-hover: #1e2433;
+  --fg-accent: #e87a3a;
+  --fg-accent-hover: #f2a060;
+  --fg-accent-subtle: rgba(232, 122, 58, 0.06);
+  --fg-text: #e4dfda;
+  --fg-text-2: #8a919b;
+  --fg-text-3: #5a6370;
+  --fg-border: #222936;
+  --fg-code-bg: #0f1319;
+  --fg-ember: rgba(232, 122, 58, 0.07);
+  --fg-ember-strong: rgba(232, 122, 58, 0.16);
+  --fg-hero-bg: #070a0e;
+  --fg-hero-surface: #0e1118;
+  --fg-hero-text: #e4dfda;
+  --fg-hero-text-2: #8a919b;
+}
+
+/* ─── 2. Base Typography ─── */
+
+body {
+  font-family: 'Figtree', system-ui, -apple-system, sans-serif;
+}
+
+h1, h2, h3, h4, h5, h6,
+article h1, article h2, article h3, article h4 {
+  font-family: 'Syne', system-ui, sans-serif;
+  letter-spacing: -0.025em;
+}
+
+code, pre, pre code,
+.code, [class*="language-"] {
+  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+  font-feature-settings: "liga" 1;
+}
+
+/* ─── 3. Navbar ─── */
+
+nav.nextra-nav-container,
+header nav,
+.hx-nav {
+  backdrop-filter: blur(12px) saturate(150%);
+}
+
+/* ─── 4. Content links ─── */
+
+article a,
+.hx-content a {
+  color: var(--fg-accent);
+  text-decoration-color: var(--fg-accent-subtle);
+  text-underline-offset: 3px;
+  transition: color 0.2s ease, text-decoration-color 0.2s ease;
+}
+
+article a:hover,
+.hx-content a:hover {
+  color: var(--fg-accent-hover);
+  text-decoration-color: var(--fg-accent-hover);
+}
+
+/* ─── 5. Hero Section ─── */
+
+.forge-hero {
+  position: relative;
+  background: var(--fg-hero-bg);
+  padding: 5rem 1.5rem 4rem;
+  margin: -1.5rem -1.5rem 0;
+  overflow: hidden;
+  border-bottom: 1px solid rgba(232, 122, 58, 0.15);
+}
+
+@media (min-width: 768px) {
+  .forge-hero {
+    padding: 7rem 2rem 5rem;
+    margin: -2rem -2rem 0;
+  }
+}
+
+@media (min-width: 1024px) {
+  .forge-hero {
+    padding: 8rem 2rem 6rem;
+  }
+}
+
+/* Ember glow background */
+.forge-hero::before {
+  content: '';
+  position: absolute;
+  top: -40%;
+  left: -20%;
+  width: 140%;
+  height: 180%;
+  background:
+    radial-gradient(ellipse at 25% 50%, rgba(232, 122, 58, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 75% 30%, rgba(196, 85, 32, 0.04) 0%, transparent 45%);
+  animation: emberFloat 20s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Subtle grid overlay */
+.forge-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(232, 122, 58, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(232, 122, 58, 0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none;
+}
+
+.forge-hero-inner {
+  position: relative;
+  z-index: 1;
+  max-width: 72rem;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+}
+
+@media (min-width: 1024px) {
+  .forge-hero-inner {
+    flex-direction: row;
+    align-items: center;
+    gap: 4rem;
+  }
+}
+
+.forge-hero-text {
+  flex: 1;
+  text-align: center;
+}
+
+@media (min-width: 1024px) {
+  .forge-hero-text {
+    text-align: left;
+  }
+}
+
+.forge-badge {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #e87a3a;
+  border: 1px solid rgba(232, 122, 58, 0.3);
+  background: rgba(232, 122, 58, 0.06);
+  padding: 0.35rem 0.85rem;
+  border-radius: 100px;
+  margin-bottom: 1.5rem;
+}
+
+.forge-title {
+  font-family: 'Syne', system-ui, sans-serif;
+  font-weight: 800;
+  font-size: clamp(2.75rem, 6vw, 4.5rem);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+  color: var(--fg-hero-text);
+  margin: 0 0 1rem;
+}
+
+.forge-gradient {
+  background: linear-gradient(135deg, #e87a3a 0%, #f2a060 40%, #e87a3a 80%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.forge-tagline {
+  font-family: 'Figtree', sans-serif;
+  font-size: clamp(1.1rem, 2.2vw, 1.35rem);
+  color: var(--fg-hero-text-2);
+  line-height: 1.6;
+  margin: 0 0 2rem;
+  max-width: 460px;
+}
+
+@media (min-width: 1024px) {
+  .forge-tagline {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 1023px) {
+  .forge-tagline {
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+.forge-ctas {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+@media (min-width: 1024px) {
+  .forge-ctas {
+    justify-content: flex-start;
+  }
+}
+
+.forge-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: 'Syne', sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #fff !important;
+  background: linear-gradient(135deg, #c45520, #e87a3a);
+  padding: 0.7rem 1.5rem;
+  border-radius: 8px;
+  text-decoration: none !important;
+  transition: transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 12px rgba(232, 122, 58, 0.25);
+}
+
+.forge-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(232, 122, 58, 0.35);
+  color: #fff !important;
+}
+
+.forge-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: 'Syne', sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--fg-hero-text-2) !important;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 0.7rem 1.5rem;
+  border-radius: 8px;
+  text-decoration: none !important;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.forge-btn-secondary:hover {
+  border-color: rgba(232, 122, 58, 0.4);
+  color: var(--fg-hero-text) !important;
+  background: rgba(232, 122, 58, 0.06);
+}
+
+/* ─── 6. Terminal Mockup ─── */
+
+.forge-terminal-wrap {
+  flex: 1;
+  max-width: 540px;
+  width: 100%;
+}
+
+.forge-terminal {
+  background: #0f1319;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.4),
+    0 0 60px rgba(232, 122, 58, 0.04);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.82rem;
+  line-height: 1.7;
+}
+
+.forge-terminal-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.forge-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.forge-dot-red { background: #ff5f57; }
+.forge-dot-yellow { background: #febc2e; }
+.forge-dot-green { background: #28c840; }
+
+.forge-terminal-title {
+  flex: 1;
+  text-align: center;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.25);
+  margin-right: 36px;
+}
+
+.forge-terminal-body {
+  padding: 16px 20px 20px;
+}
+
+.forge-line {
+  color: #c8c3bc;
+  opacity: 0;
+  animation: lineReveal 0.5s ease forwards;
+  animation-delay: var(--delay, 0s);
+}
+
+.forge-line + .forge-line {
+  margin-top: 2px;
+}
+
+.forge-line-gap {
+  margin-top: 12px !important;
+}
+
+.forge-prompt {
+  color: #e87a3a;
+  margin-right: 8px;
+  user-select: none;
+}
+
+.forge-cmd {
+  color: #e4dfda;
+}
+
+.forge-flag {
+  color: #8a919b;
+}
+
+.forge-check {
+  color: #4fd18b;
+  margin-right: 4px;
+}
+
+.forge-output {
+  color: #8a919b;
+}
+
+.forge-output-bright {
+  color: #b8b3ac;
+}
+
+@keyframes lineReveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ─── 7. Feature Cards ─── */
+
+.forge-section {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 4rem 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .forge-section {
+    padding: 5rem 2rem;
+  }
+}
+
+.forge-section-title {
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  letter-spacing: -0.03em;
+  color: var(--fg-text);
+  text-align: center;
+  margin: 0 0 0.5rem;
+}
+
+.forge-section-sub {
+  font-size: 1rem;
+  color: var(--fg-text-2);
+  text-align: center;
+  margin: 0 0 3rem;
+  max-width: 520px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.forge-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 640px) {
+  .forge-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .forge-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.forge-card {
+  background: var(--fg-card);
+  border: 1px solid var(--fg-border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.forge-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 0;
+  background: linear-gradient(to top, var(--fg-ember-strong), transparent);
+  transition: height 0.3s ease;
+  pointer-events: none;
+}
+
+.forge-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--fg-accent);
+  box-shadow: 0 8px 30px -8px var(--fg-ember-strong);
+}
+
+.forge-card:hover::after {
+  height: 40%;
+}
+
+.forge-card-icon {
+  font-size: 1.5rem;
+  margin-bottom: 0.75rem;
+  display: block;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--fg-accent-subtle);
+  border-radius: 8px;
+}
+
+.forge-card h3 {
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+  color: var(--fg-text);
+  margin: 0 0 0.5rem;
+}
+
+.forge-card p {
+  font-size: 0.9rem;
+  color: var(--fg-text-2);
+  line-height: 1.55;
+  margin: 0;
+}
+
+/* ─── 8. Pipeline Section ─── */
+
+.forge-pipeline {
+  background: var(--fg-surface);
+  border-top: 1px solid var(--fg-border);
+  border-bottom: 1px solid var(--fg-border);
+}
+
+.forge-pipeline-flow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .forge-pipeline-flow {
+    flex-direction: row;
+    justify-content: center;
+    gap: 0;
+  }
+}
+
+.forge-pipeline-step {
+  background: var(--fg-card);
+  border: 1px solid var(--fg-border);
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+  text-align: center;
+  min-width: 160px;
+}
+
+.forge-pipeline-step-label {
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--fg-text);
+  margin-bottom: 0.35rem;
+}
+
+.forge-pipeline-step-detail {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--fg-text-3);
+}
+
+.forge-pipeline-step.forge-step-accent {
+  border-color: var(--fg-accent);
+  box-shadow: 0 0 20px var(--fg-ember);
+}
+
+.forge-pipeline-step.forge-step-accent .forge-pipeline-step-label {
+  color: var(--fg-accent);
+}
+
+.forge-pipeline-arrow {
+  font-size: 1.2rem;
+  color: var(--fg-text-3);
+  transform: rotate(90deg);
+}
+
+@media (min-width: 768px) {
+  .forge-pipeline-arrow {
+    transform: none;
+    padding: 0 0.75rem;
+  }
+}
+
+.forge-pipeline-branch {
+  display: flex;
+  gap: 1rem;
+  flex-direction: column;
+}
+
+@media (min-width: 640px) {
+  .forge-pipeline-branch {
+    flex-direction: row;
+  }
+}
+
+/* ─── 9. Code Blocks in Docs ─── */
+
+article pre {
+  border: 1px solid var(--fg-border);
+  border-radius: 8px;
+}
+
+article code:not(pre code) {
+  background: var(--fg-accent-subtle);
+  color: var(--fg-accent);
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+  font-size: 0.88em;
+}
+
+/* ─── 10. Sidebar active state ─── */
+
+aside nav a[aria-current="true"],
+aside nav a.active,
+.sidebar-nav a[aria-current="true"] {
+  color: var(--fg-accent) !important;
+  font-weight: 600;
+}
+
+/* ─── 11. Tables in docs ─── */
+
+article table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--fg-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+article table th {
+  background: var(--fg-surface);
+  font-family: 'Syne', sans-serif;
+  font-weight: 600;
+  font-size: 0.85rem;
+  letter-spacing: -0.01em;
+}
+
+article table td,
+article table th {
+  border-color: var(--fg-border);
+}
+
+/* ─── 12. Footer ─── */
+
+footer {
+  border-top: 1px solid var(--fg-border);
+}
+
+/* ─── 13. Animations ─── */
+
+@keyframes emberFloat {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  33% { transform: translate(2%, 1%) rotate(0.5deg); }
+  66% { transform: translate(-1%, 2%) rotate(-0.5deg); }
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.forge-animate {
+  opacity: 0;
+  animation: fadeUp 0.6s ease forwards;
+}
+
+.forge-delay-1 { animation-delay: 0.1s; }
+.forge-delay-2 { animation-delay: 0.2s; }
+.forge-delay-3 { animation-delay: 0.3s; }
+.forge-delay-4 { animation-delay: 0.4s; }
+.forge-delay-5 { animation-delay: 0.5s; }
+.forge-delay-6 { animation-delay: 0.6s; }
+
+/* ─── 14. Responsive ─── */
+
+@media (max-width: 640px) {
+  .forge-terminal {
+    font-size: 0.72rem;
+  }
+
+  .forge-terminal-body {
+    padding: 12px 14px 16px;
+  }
+
+  .forge-card {
+    padding: 1.25rem;
+  }
+}
+
+/* ─── 15. Scrollbar (dark mode) ─── */
+
+.dark ::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: var(--fg-bg);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--fg-border);
+  border-radius: 3px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--fg-text-3);
+}

@@ -34,8 +34,10 @@ params:
     displayTitle: true
     displayLogo: false
   theme:
-    default: system
+    default: dark
     displayToggle: true
+  page:
+    width: wide
   search:
     enable: true
     type: flexsearch
