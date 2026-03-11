@@ -1,0 +1,46 @@
+baseURL: https://mirandaguillaume.github.io/forgent/
+title: Forgent
+languageCode: en
+
+enableGitInfo: true
+
+markup:
+  goldmark:
+    renderer:
+      unsafe: true
+
+module:
+  imports:
+    - path: github.com/imfing/hextra
+
+menu:
+  main:
+    - name: Docs
+      pageRef: /docs
+      weight: 1
+    - name: Search
+      weight: 2
+      params:
+        type: search
+    - name: GitHub
+      weight: 3
+      url: "https://github.com/mirandaguillaume/forgent"
+      params:
+        icon: github
+
+params:
+  description: Forge agents from composable skill specs
+  navbar:
+    displayTitle: true
+    displayLogo: false
+  theme:
+    default: system
+    displayToggle: true
+  search:
+    enable: true
+    type: flexsearch
+  editURL:
+    enable: true
+    base: "https://github.com/mirandaguillaume/forgent/edit/main/content"
+  footer:
+    displayPoweredBy: false
