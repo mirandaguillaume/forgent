@@ -7,25 +7,27 @@ import { lintDirectory, printLintResults } from './commands/lint.js';
 import { runDoctor, printDoctorReport } from './commands/doctor.js';
 import { traceFile } from './commands/trace.js';
 import { runBuild, printBuildResult, getOutputDir, type BuildTarget } from './commands/build.js';
+import { createWatcher } from './commands/watch.js';
+import { runScore, printScoreReport } from './commands/score.js';
 
 const program = new Command();
 
 program
-  .name('ax')
-  .description('AX — Agent Experience CLI')
+  .name('forgent')
+  .description('Forgent — Forge agents from composable skill specs')
   .version('0.1.0');
 
 program
   .command('init')
-  .description('Initialize an AX project in the current directory')
+  .description('Initialize a Forgent project in the current directory')
   .argument('[path]', 'target directory', '.')
   .action((path: string) => {
     const result = initProject(path);
     if (result.alreadyInitialized) {
-      console.log(chalk.yellow('AX project already initialized.'));
+      console.log(chalk.yellow('Forgent project already initialized.'));
     } else {
-      console.log(chalk.green('AX project initialized at'), result.path);
-      console.log('  Created: ax.yaml, skills/, agents/');
+      console.log(chalk.green('Forgent project initialized at'), result.path);
+      console.log('  Created: forgent.yaml, skills/, agents/');
     }
   });
 
@@ -48,7 +50,7 @@ skill
 
 program
   .command('lint')
-  .description('Lint skill files for AX best practices')
+  .description('Lint skill files for best practices')
   .argument('[path]', 'skills directory', 'skills')
   .action((path: string) => {
     const result = lintDirectory(path);
@@ -58,10 +60,11 @@ program
 
 program
   .command('doctor')
-  .description('Run full diagnostic on all skills')
+  .description('Run full diagnostic on all skills and agents')
   .argument('[path]', 'skills directory', 'skills')
-  .action((path: string) => {
-    const report = runDoctor(path);
+  .option('-a, --agents <dir>', 'agents directory', 'agents')
+  .action((path: string, opts: { agents: string }) => {
+    const report = runDoctor(path, opts.agents);
     printDoctorReport(report);
     process.exit(report.score < 50 ? 1 : 0);
   });
@@ -81,16 +84,43 @@ program
   .option('-s, --skills <dir>', 'skills directory', 'skills')
   .option('-a, --agents <dir>', 'agents directory', 'agents')
   .option('-o, --output <dir>', 'output directory (overrides target default)')
-  .action((opts: { target: string; skills: string; agents: string; output?: string }) => {
+  .option('-w, --watch', 'watch for changes and rebuild automatically')
+  .action((opts: { target: string; skills: string; agents: string; output?: string; watch?: boolean }) => {
     const target = opts.target as BuildTarget;
     if (target !== 'claude') {
       console.log(chalk.red(`Unknown target "${opts.target}". Available: claude`));
       process.exit(1);
     }
     const outputDir = getOutputDir(target, opts.output);
+
+    if (opts.watch) {
+      const controller = createWatcher({
+        skillsDir: opts.skills,
+        agentsDir: opts.agents,
+        outputDir,
+        target,
+      });
+      process.on('SIGINT', () => {
+        controller.stop();
+        console.log('\nStopped watching.');
+        process.exit(0);
+      });
+      return;
+    }
+
     const result = runBuild(opts.skills, opts.agents, outputDir, target);
     printBuildResult(result);
     process.exit(result.success ? 0 : 1);
+  });
+
+program
+  .command('score')
+  .description('Score design quality of skills and agents')
+  .argument('[path]', 'skills directory', 'skills')
+  .option('-a, --agents <dir>', 'agents directory', 'agents')
+  .action((path: string, opts: { agents: string }) => {
+    const report = runScore(path, opts.agents);
+    printScoreReport(report);
   });
 
 program.parse();

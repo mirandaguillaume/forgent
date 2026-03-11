@@ -10,7 +10,7 @@ export interface InitResult {
 }
 
 export function initProject(targetDir: string): InitResult {
-  const configPath = join(targetDir, 'ax.yaml');
+  const configPath = join(targetDir, 'forgent.yaml');
 
   if (existsSync(configPath)) {
     return { alreadyInitialized: true, path: targetDir };
@@ -21,7 +21,7 @@ export function initProject(targetDir: string): InitResult {
   mkdirSync(join(targetDir, 'agents'), { recursive: true });
 
   // Write config
-  const config = `# AX Project Configuration
+  const config = `# Forgent Project Configuration
 version: "0.1.0"
 skills_dir: skills
 agents_dir: agents

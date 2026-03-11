@@ -53,11 +53,11 @@ negotiation:
   priority: 0
 `;
 
-describe('ax lint command', () => {
+describe('forgent lint command', () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), 'ax-lint-'));
+    tempDir = mkdtempSync(join(tmpdir(), 'forgent-lint-'));
     mkdirSync(join(tempDir, 'skills'));
   });
 

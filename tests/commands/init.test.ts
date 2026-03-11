@@ -4,20 +4,20 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { initProject } from '../../src/commands/init.js';
 
-describe('ax init', () => {
+describe('forgent init', () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), 'ax-test-'));
+    tempDir = mkdtempSync(join(tmpdir(), 'forgent-test-'));
   });
 
   afterEach(() => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it('should create ax.yaml config file', () => {
+  it('should create forgent.yaml config file', () => {
     initProject(tempDir);
-    expect(existsSync(join(tempDir, 'ax.yaml'))).toBe(true);
+    expect(existsSync(join(tempDir, 'forgent.yaml'))).toBe(true);
   });
 
   it('should create skills/ directory', () => {
@@ -38,19 +38,19 @@ describe('ax init', () => {
     expect(content).toContain('skill:');
   });
 
-  it('should write valid ax.yaml config', () => {
+  it('should write valid forgent.yaml config', () => {
     initProject(tempDir);
-    const content = readFileSync(join(tempDir, 'ax.yaml'), 'utf-8');
+    const content = readFileSync(join(tempDir, 'forgent.yaml'), 'utf-8');
     expect(content).toContain('version:');
     expect(content).toContain('skills_dir: skills');
     expect(content).toContain('agents_dir: agents');
   });
 
-  it('should not overwrite existing ax.yaml', () => {
-    writeFileSync(join(tempDir, 'ax.yaml'), 'existing: true');
+  it('should not overwrite existing forgent.yaml', () => {
+    writeFileSync(join(tempDir, 'forgent.yaml'), 'existing: true');
     const result = initProject(tempDir);
     expect(result.alreadyInitialized).toBe(true);
-    const content = readFileSync(join(tempDir, 'ax.yaml'), 'utf-8');
+    const content = readFileSync(join(tempDir, 'forgent.yaml'), 'utf-8');
     expect(content).toBe('existing: true');
   });
 
