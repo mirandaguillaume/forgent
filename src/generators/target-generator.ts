@@ -36,3 +36,4 @@ export function getAvailableTargets(): BuildTarget[] {
 
 // Auto-register built-in targets (dynamic import avoids circular dependency)
 await import('./claude-generator.js');
+await import('./copilot-generator.js');
