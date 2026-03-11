@@ -61,6 +61,19 @@ func ValidateSkill(s SkillBehavior) []string {
 		))
 	}
 
+	// Validate enum: sandbox type (optional — empty is valid)
+	if s.Security.Sandbox != "" {
+		switch s.Security.Sandbox {
+		case SandboxNone, SandboxContainer, SandboxVM:
+			// valid
+		default:
+			errs = append(errs, fmt.Sprintf(
+				"invalid sandbox type %q: must be one of none, container, vm",
+				s.Security.Sandbox,
+			))
+		}
+	}
+
 	// Validate enum: negotiation strategy
 	switch s.Negotiation.FileConflicts {
 	case NegotiationYield, NegotiationOverride, NegotiationMerge:

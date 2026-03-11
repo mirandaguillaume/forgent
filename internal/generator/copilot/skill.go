@@ -85,7 +85,7 @@ func GenerateCopilotSkillMd(skill model.SkillBehavior) string {
 		lines = append(lines, "- Secrets: "+strings.Join(skill.Security.Secrets, ", "))
 	}
 	if skill.Security.Sandbox != "" {
-		lines = append(lines, "- Sandbox: "+skill.Security.Sandbox)
+		lines = append(lines, "- Sandbox: "+string(skill.Security.Sandbox))
 	}
 	lines = append(lines, "")
 

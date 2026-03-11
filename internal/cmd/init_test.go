@@ -12,13 +12,14 @@ import (
 func TestInitProject_CreatesStructure(t *testing.T) {
 	dir := t.TempDir()
 
-	result := InitProject(dir)
+	result, err := InitProject(dir)
+	require.NoError(t, err)
 
 	assert.False(t, result.AlreadyInitialized)
 	assert.Equal(t, dir, result.Path)
 
 	// forgent.yaml should exist
-	_, err := os.Stat(filepath.Join(dir, "forgent.yaml"))
+	_, err = os.Stat(filepath.Join(dir, "forgent.yaml"))
 	require.NoError(t, err)
 
 	// skills/ directory should exist
@@ -43,7 +44,8 @@ func TestInitProject_DetectsAlreadyInitialized(t *testing.T) {
 	err := os.WriteFile(filepath.Join(dir, "forgent.yaml"), []byte("version: 0.1.0\n"), 0644)
 	require.NoError(t, err)
 
-	result := InitProject(dir)
+	result, err := InitProject(dir)
+	require.NoError(t, err)
 
 	assert.True(t, result.AlreadyInitialized)
 	assert.Equal(t, dir, result.Path)

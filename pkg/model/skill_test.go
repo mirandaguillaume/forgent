@@ -83,7 +83,7 @@ negotiation:
 	assert.Equal(t, model.AccessReadOnly, sb.Security.Filesystem)
 	assert.Equal(t, model.NetworkAllowlist, sb.Security.Network)
 	assert.Equal(t, []string{"GITHUB_TOKEN"}, sb.Security.Secrets)
-	assert.Equal(t, "container", sb.Security.Sandbox)
+	assert.Equal(t, model.SandboxContainer, sb.Security.Sandbox)
 
 	// Negotiation
 	assert.Equal(t, model.NegotiationMerge, sb.Negotiation.FileConflicts)
