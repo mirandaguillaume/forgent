@@ -1,0 +1,159 @@
+package copilot_test
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/mirandaguillaume/forgent/internal/generator/copilot"
+	"github.com/mirandaguillaume/forgent/pkg/model"
+	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
+)
+
+func makeGuardrailString(s string) model.GuardrailRule {
+	var g model.GuardrailRule
+	node := &yaml.Node{Kind: yaml.ScalarNode, Value: s}
+	_ = g.UnmarshalYAML(node)
+	return g
+}
+
+func testSkill() model.SkillBehavior {
+	return model.SkillBehavior{
+		Skill:   "code-review",
+		Version: "1.0",
+		Context: model.ContextFacet{
+			Consumes: []string{"source-code", "diff"},
+			Produces: []string{"review-report"},
+			Memory:   model.MemoryConversation,
+		},
+		Strategy: model.StrategyFacet{
+			Approach: "analytical",
+			Tools:    []string{"read", "grep"},
+			Steps:    []string{"Read the code", "Analyze patterns", "Write report"},
+		},
+		Guardrails: []model.GuardrailRule{
+			makeGuardrailString("Never modify source files directly"),
+			makeGuardrailString("Always explain reasoning"),
+		},
+		DependsOn: []model.Dependency{
+			{Skill: "file-reader", Provides: "source-code"},
+		},
+		Security: model.SecurityFacet{
+			Filesystem: model.AccessReadOnly,
+			Network:    model.NetworkNone,
+			Secrets:    []string{"GITHUB_TOKEN"},
+			Sandbox:    "docker",
+		},
+	}
+}
+
+func TestGenerateCopilotSkillMd_Frontmatter(t *testing.T) {
+	md := copilot.GenerateCopilotSkillMd(testSkill())
+	assert.Contains(t, md, "---\nname: code-review\n")
+	assert.Contains(t, md, "description: analytical-based skill")
+}
+
+func TestGenerateCopilotSkillMd_Title(t *testing.T) {
+	md := copilot.GenerateCopilotSkillMd(testSkill())
+	assert.Contains(t, md, "# Code Review")
+}
+
+func TestGenerateCopilotSkillMd_GuardrailsBeforeContext(t *testing.T) {
+	md := copilot.GenerateCopilotSkillMd(testSkill())
+	guardrailIdx := strings.Index(md, "## Guardrails")
+	contextIdx := strings.Index(md, "## Context")
+	assert.Greater(t, contextIdx, guardrailIdx, "Guardrails should appear before Context")
+}
+
+func TestGenerateCopilotSkillMd_SecurityLast(t *testing.T) {
+	md := copilot.GenerateCopilotSkillMd(testSkill())
+	securityIdx := strings.Index(md, "## Security")
+	strategyIdx := strings.Index(md, "## Strategy")
+	assert.Greater(t, securityIdx, strategyIdx, "Security should appear after Strategy")
+}
+
+func TestGenerateCopilotSkillMd_ContextSection(t *testing.T) {
+	md := copilot.GenerateCopilotSkillMd(testSkill())
+	assert.Contains(t, md, "Consumes: source-code, diff")
+	assert.Contains(t, md, "Produces: review-report")
+	assert.Contains(t, md, "Memory: conversation")
+}
+
+func TestGenerateCopilotSkillMd_StrategySection(t *testing.T) {
+	md := copilot.GenerateCopilotSkillMd(testSkill())
+	assert.Contains(t, md, "Approach: analytical")
+	assert.Contains(t, md, "Tools: read, grep")
+}
+
+func TestGenerateCopilotSkillMd_StepsNumbered(t *testing.T) {
+	md := copilot.GenerateCopilotSkillMd(testSkill())
+	assert.Contains(t, md, "1. Read the code")
+	assert.Contains(t, md, "2. Analyze patterns")
+	assert.Contains(t, md, "3. Write report")
+}
+
+func TestGenerateCopilotSkillMd_Dependencies(t *testing.T) {
+	md := copilot.GenerateCopilotSkillMd(testSkill())
+	assert.Contains(t, md, "## Dependencies")
+	assert.Contains(t, md, "**file-reader** provides `source-code`")
+}
+
+func TestGenerateCopilotSkillMd_Security(t *testing.T) {
+	md := copilot.GenerateCopilotSkillMd(testSkill())
+	assert.Contains(t, md, "- Filesystem: read-only")
+	assert.Contains(t, md, "- Network: none")
+	assert.Contains(t, md, "- Secrets: GITHUB_TOKEN")
+	assert.Contains(t, md, "- Sandbox: docker")
+}
+
+func TestGenerateCopilotSkillMd_NoGuardrails(t *testing.T) {
+	skill := testSkill()
+	skill.Guardrails = nil
+	md := copilot.GenerateCopilotSkillMd(skill)
+	assert.NotContains(t, md, "## Guardrails")
+}
+
+func TestGenerateCopilotSkillMd_NoDependencies(t *testing.T) {
+	skill := testSkill()
+	skill.DependsOn = nil
+	md := copilot.GenerateCopilotSkillMd(skill)
+	assert.NotContains(t, md, "## Dependencies")
+}
+
+func TestGenerateCopilotSkillMd_DescriptionTruncation(t *testing.T) {
+	skill := testSkill()
+	// Create a skill whose description will exceed 1024 chars
+	longItems := make([]string, 200)
+	for i := range longItems {
+		longItems[i] = strings.Repeat("x", 10)
+	}
+	skill.Context.Consumes = longItems
+	skill.Context.Produces = longItems
+	md := copilot.GenerateCopilotSkillMd(skill)
+
+	// Extract the description from frontmatter
+	parts := strings.SplitN(md, "---", 3)
+	frontmatter := parts[1]
+	for _, line := range strings.Split(frontmatter, "\n") {
+		if strings.HasPrefix(line, "description: ") {
+			desc := strings.TrimPrefix(line, "description: ")
+			assert.LessOrEqual(t, len(desc), 1024)
+			assert.True(t, strings.HasSuffix(desc, "..."))
+			break
+		}
+	}
+}
+
+func TestGenerateCopilotSkillMd_ShortDescriptionNotTruncated(t *testing.T) {
+	md := copilot.GenerateCopilotSkillMd(testSkill())
+
+	parts := strings.SplitN(md, "---", 3)
+	frontmatter := parts[1]
+	for _, line := range strings.Split(frontmatter, "\n") {
+		if strings.HasPrefix(line, "description: ") {
+			desc := strings.TrimPrefix(line, "description: ")
+			assert.False(t, strings.HasSuffix(desc, "..."))
+			break
+		}
+	}
+}
