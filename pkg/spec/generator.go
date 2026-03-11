@@ -3,6 +3,7 @@ package spec
 import (
 	"fmt"
 	"sort"
+	"sync"
 
 	"github.com/mirandaguillaume/forgent/pkg/model"
 )
@@ -23,24 +24,37 @@ type TargetGenerator interface {
 // GeneratorFactory creates a new TargetGenerator instance.
 type GeneratorFactory func() TargetGenerator
 
-var registry = map[string]GeneratorFactory{}
+var (
+	mu       sync.RWMutex
+	registry = map[string]GeneratorFactory{}
+)
 
 // Register adds a generator factory for a build target.
 func Register(name string, factory GeneratorFactory) {
+	mu.Lock()
+	defer mu.Unlock()
 	registry[name] = factory
 }
 
 // Get returns a new TargetGenerator for the given target name.
 func Get(name string) (TargetGenerator, error) {
+	mu.RLock()
+	defer mu.RUnlock()
 	factory, ok := registry[name]
 	if !ok {
-		return nil, fmt.Errorf("unknown build target: %q. Available targets: %v", name, Available())
+		return nil, fmt.Errorf("unknown build target: %q. Available targets: %v", name, availableLocked())
 	}
 	return factory(), nil
 }
 
 // Available returns sorted list of registered target names.
 func Available() []string {
+	mu.RLock()
+	defer mu.RUnlock()
+	return availableLocked()
+}
+
+func availableLocked() []string {
 	keys := make([]string, 0, len(registry))
 	for k := range registry {
 		keys = append(keys, k)
@@ -51,5 +65,7 @@ func Available() []string {
 
 // Reset clears the registry. Used only in tests.
 func Reset() {
+	mu.Lock()
+	defer mu.Unlock()
 	registry = map[string]GeneratorFactory{}
 }

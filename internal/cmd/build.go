@@ -3,8 +3,10 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/fatih/color"
 	"github.com/mirandaguillaume/forgent/internal/analyzer"
@@ -245,8 +247,10 @@ func init() {
 					Target:    target,
 				})
 				defer controller.Stop()
-				// Block until interrupted
-				select {}
+				sigCh := make(chan os.Signal, 1)
+				signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+				<-sigCh
+				return
 			}
 
 			result := RunBuild(skillsDir, agentsDir, outputDir, target)

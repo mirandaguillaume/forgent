@@ -2,6 +2,7 @@ package analyzer
 
 import (
 	"math"
+	"strings"
 
 	"github.com/mirandaguillaume/forgent/pkg/model"
 )
@@ -125,14 +126,9 @@ func scoreGuardrails(skill model.SkillBehavior) int {
 	// Has timeout (critical for agent safety)
 	hasTimeout := false
 	for _, g := range skill.Guardrails {
-		if s, ok := g.StringValue(); ok {
-			if indexOf([]string{"timeout"}, "") != -1 || len(s) > 0 {
-				// Check if string contains "timeout"
-				if containsSubstring(s, "timeout") {
-					hasTimeout = true
-					break
-				}
-			}
+		if s, ok := g.StringValue(); ok && strings.Contains(s, "timeout") {
+			hasTimeout = true
+			break
 		}
 		if g.HasKey("timeout") {
 			hasTimeout = true
@@ -149,20 +145,6 @@ func scoreGuardrails(skill model.SkillBehavior) int {
 	}
 
 	return clampRound(score, weightGuardrails)
-}
-
-// containsSubstring checks if s contains substr (case-sensitive).
-func containsSubstring(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || findSubstring(s, substr))
-}
-
-func findSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }
 
 func scoreObservability(skill model.SkillBehavior) int {
@@ -224,7 +206,7 @@ func scoreSecurity(skill model.SkillBehavior) int {
 	}
 
 	// Sandbox bonus
-	if skill.Security.Sandbox == "container" || skill.Security.Sandbox == "vm" {
+	if skill.Security.Sandbox == model.SandboxContainer || skill.Security.Sandbox == model.SandboxVM {
 		score += max * 0.1
 	}
 
@@ -272,17 +254,7 @@ func scoreDescription(agent model.AgentComposition) int {
 }
 
 func countWords(s string) int {
-	count := 0
-	inWord := false
-	for _, ch := range s {
-		if ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' {
-			inWord = false
-		} else if !inWord {
-			inWord = true
-			count++
-		}
-	}
-	return count
+	return len(strings.Fields(s))
 }
 
 func scoreComposition(agent model.AgentComposition) int {

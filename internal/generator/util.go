@@ -2,6 +2,7 @@ package generator
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/mirandaguillaume/forgent/pkg/model"
@@ -29,9 +30,14 @@ func FormatGuardrail(g model.GuardrailRule) string {
 		return "- " + s
 	}
 	if m, ok := g.MapValue(); ok {
+		keys := make([]string, 0, len(m))
+		for k := range m {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
 		var lines []string
-		for k, v := range m {
-			lines = append(lines, fmt.Sprintf("- %s: %v", k, v))
+		for _, k := range keys {
+			lines = append(lines, fmt.Sprintf("- %s: %v", k, m[k]))
 		}
 		return strings.Join(lines, "\n")
 	}

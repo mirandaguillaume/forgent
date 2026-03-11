@@ -44,6 +44,15 @@ const (
 	NetworkFull      NetworkAccess = "full"
 )
 
+// SandboxType represents the sandboxing level.
+type SandboxType string
+
+const (
+	SandboxNone      SandboxType = "none"
+	SandboxContainer SandboxType = "container"
+	SandboxVM        SandboxType = "vm"
+)
+
 // NegotiationStrategy represents how file conflicts are resolved.
 type NegotiationStrategy string
 
@@ -144,7 +153,7 @@ type SecurityFacet struct {
 	Filesystem AccessLevel   `yaml:"filesystem"`
 	Network    NetworkAccess `yaml:"network"`
 	Secrets    []string      `yaml:"secrets"`
-	Sandbox    string        `yaml:"sandbox,omitempty"`
+	Sandbox    SandboxType   `yaml:"sandbox,omitempty"`
 }
 
 // NegotiationFacet defines conflict resolution behavior.
