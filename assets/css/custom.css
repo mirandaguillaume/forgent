@@ -47,6 +47,15 @@
   --fg-hero-text-2: #8a919b;
 }
 
+/* ─── 1b. Force dark on landing page wrapper ─── */
+
+/* The hextra-home layout wrapper must be dark to avoid white gaps */
+.hextra-home-container,
+body:has(.forge-hero) main,
+body:has(.forge-hero) .hx-mx-auto {
+  background: #0b0e13;
+}
+
 /* ─── 2. Base Typography ─── */
 
 body {
@@ -388,10 +397,33 @@ article a:hover,
 
 /* ─── 7. Feature Cards ─── */
 
+/* Force dark palette on all landing page sections */
 .forge-section {
-  max-width: 72rem;
-  margin: 0 auto;
+  --fg-bg: #0b0e13;
+  --fg-surface: #12161d;
+  --fg-card: #181d27;
+  --fg-card-hover: #1e2433;
+  --fg-accent: #e87a3a;
+  --fg-accent-hover: #f2a060;
+  --fg-accent-subtle: rgba(232, 122, 58, 0.06);
+  --fg-text: #e4dfda;
+  --fg-text-2: #8a919b;
+  --fg-text-3: #5a6370;
+  --fg-border: #222936;
+  --fg-code-bg: #0f1319;
+  --fg-ember: rgba(232, 122, 58, 0.07);
+  --fg-ember-strong: rgba(232, 122, 58, 0.16);
+
+  background: var(--fg-bg);
+  color: var(--fg-text);
+  max-width: none;
   padding: 4rem 1.5rem;
+}
+
+.forge-section > * {
+  max-width: 72rem;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 @media (min-width: 768px) {
@@ -416,8 +448,14 @@ article a:hover,
   text-align: center;
   margin: 0 0 3rem;
   max-width: 520px;
-  margin-left: auto;
-  margin-right: auto;
+}
+
+.forge-card code {
+  background: rgba(232, 122, 58, 0.1);
+  color: #e87a3a;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  font-size: 0.85em;
 }
 
 .forge-grid {
@@ -502,9 +540,9 @@ article a:hover,
 /* ─── 8. Pipeline Section ─── */
 
 .forge-pipeline {
-  background: var(--fg-surface);
-  border-top: 1px solid var(--fg-border);
-  border-bottom: 1px solid var(--fg-border);
+  background: #12161d;
+  border-top: 1px solid #222936;
+  border-bottom: 1px solid #222936;
 }
 
 .forge-pipeline-flow {
