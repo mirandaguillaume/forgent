@@ -1,0 +1,170 @@
+package model
+
+import (
+	"fmt"
+	"strings"
+
+	"gopkg.in/yaml.v3"
+)
+
+// MemoryType represents the type of memory a skill uses.
+type MemoryType string
+
+const (
+	MemoryShortTerm    MemoryType = "short-term"
+	MemoryConversation MemoryType = "conversation"
+	MemoryLongTerm     MemoryType = "long-term"
+)
+
+// TraceLevel represents the verbosity of observability tracing.
+type TraceLevel string
+
+const (
+	TraceLevelMinimal  TraceLevel = "minimal"
+	TraceLevelStandard TraceLevel = "standard"
+	TraceLevelDetailed TraceLevel = "detailed"
+)
+
+// AccessLevel represents filesystem access permissions.
+type AccessLevel string
+
+const (
+	AccessNone      AccessLevel = "none"
+	AccessReadOnly  AccessLevel = "read-only"
+	AccessReadWrite AccessLevel = "read-write"
+	AccessFull      AccessLevel = "full"
+)
+
+// NetworkAccess represents network access permissions.
+type NetworkAccess string
+
+const (
+	NetworkNone      NetworkAccess = "none"
+	NetworkAllowlist NetworkAccess = "allowlist"
+	NetworkFull      NetworkAccess = "full"
+)
+
+// NegotiationStrategy represents how file conflicts are resolved.
+type NegotiationStrategy string
+
+const (
+	NegotiationYield    NegotiationStrategy = "yield"
+	NegotiationOverride NegotiationStrategy = "override"
+	NegotiationMerge    NegotiationStrategy = "merge"
+)
+
+// ContextFacet defines what data a skill consumes and produces.
+type ContextFacet struct {
+	Consumes []string   `yaml:"consumes"`
+	Produces []string   `yaml:"produces"`
+	Memory   MemoryType `yaml:"memory"`
+}
+
+// StrategyFacet defines the tools and approach a skill uses.
+type StrategyFacet struct {
+	Tools    []string `yaml:"tools"`
+	Approach string   `yaml:"approach"`
+	Steps    []string `yaml:"steps,omitempty"`
+}
+
+// GuardrailRule can be either a plain string or a map[string]interface{}.
+type GuardrailRule struct {
+	stringVal *string
+	mapVal    map[string]interface{}
+}
+
+// UnmarshalYAML implements custom YAML unmarshaling for GuardrailRule.
+func (g *GuardrailRule) UnmarshalYAML(value *yaml.Node) error {
+	switch value.Kind {
+	case yaml.ScalarNode:
+		g.stringVal = &value.Value
+		return nil
+	case yaml.MappingNode:
+		m := make(map[string]interface{})
+		if err := value.Decode(&m); err != nil {
+			return err
+		}
+		g.mapVal = m
+		return nil
+	default:
+		return fmt.Errorf("guardrail rule must be a string or a mapping, got %v", value.Kind)
+	}
+}
+
+// StringValue returns the string value if this rule is a string.
+func (g GuardrailRule) StringValue() (string, bool) {
+	if g.stringVal != nil {
+		return *g.stringVal, true
+	}
+	return "", false
+}
+
+// MapValue returns the map value if this rule is a mapping.
+func (g GuardrailRule) MapValue() (map[string]interface{}, bool) {
+	if g.mapVal != nil {
+		return g.mapVal, true
+	}
+	return nil, false
+}
+
+// HasKey returns true if this rule is a mapping and contains the given key.
+func (g GuardrailRule) HasKey(key string) bool {
+	if g.mapVal == nil {
+		return false
+	}
+	_, ok := g.mapVal[key]
+	return ok
+}
+
+// ContainsString returns true if this rule is a string and contains the substring.
+func (g GuardrailRule) ContainsString(substr string) bool {
+	if g.stringVal == nil {
+		return false
+	}
+	return strings.Contains(*g.stringVal, substr)
+}
+
+// Dependency represents a skill dependency.
+type Dependency struct {
+	Skill    string `yaml:"skill"`
+	Provides string `yaml:"provides"`
+}
+
+// DependencyFacet is a list of dependencies.
+type DependencyFacet = []Dependency
+
+// ObservabilityFacet defines tracing and metrics configuration.
+type ObservabilityFacet struct {
+	TraceLevel TraceLevel `yaml:"trace_level"`
+	Metrics    []string   `yaml:"metrics"`
+}
+
+// SecurityFacet defines access and sandboxing constraints.
+type SecurityFacet struct {
+	Filesystem AccessLevel   `yaml:"filesystem"`
+	Network    NetworkAccess `yaml:"network"`
+	Secrets    []string      `yaml:"secrets"`
+	Sandbox    string        `yaml:"sandbox,omitempty"`
+}
+
+// NegotiationFacet defines conflict resolution behavior.
+type NegotiationFacet struct {
+	FileConflicts NegotiationStrategy `yaml:"file_conflicts"`
+	Priority      int                 `yaml:"priority"`
+}
+
+// GuardrailsFacet is a list of guardrail rules.
+type GuardrailsFacet = []GuardrailRule
+
+// SkillBehavior is the complete skill specification with all facets.
+type SkillBehavior struct {
+	Skill         string           `yaml:"skill"`
+	Version       string           `yaml:"version"`
+	Context       ContextFacet     `yaml:"context"`
+	Strategy      StrategyFacet    `yaml:"strategy"`
+	Guardrails    GuardrailsFacet  `yaml:"guardrails"`
+	DependsOn     DependencyFacet  `yaml:"depends_on"`
+	Observability ObservabilityFacet `yaml:"observability"`
+	Security      SecurityFacet    `yaml:"security"`
+	Negotiation   NegotiationFacet `yaml:"negotiation"`
+}
