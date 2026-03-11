@@ -20,5 +20,8 @@ public/
 resources/_gen/
 .hugo_build.lock
 
+# GoReleaser
+dist/
+
 # Claude
 .claude/
