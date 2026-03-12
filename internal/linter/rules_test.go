@@ -16,7 +16,8 @@ func minimalSkill() model.SkillBehavior {
 		Skill:   "test-skill",
 		Version: "0.1.0",
 		Context: model.ContextFacet{
-			Memory: model.MemoryShortTerm,
+			Produces: []string{"output"},
+			Memory:   model.MemoryShortTerm,
 		},
 		Strategy: model.StrategyFacet{
 			Tools:    []string{"Read"},
@@ -155,6 +156,41 @@ func TestHasWhenToUse_WithTriggers_NoIssue(t *testing.T) {
 	skill.WhenToUse = model.WhenToUseFacet{Triggers: []string{"bug"}}
 
 	result := hasWhenToUse(skill)
+
+	assert.Nil(t, result)
+}
+
+func TestSingleProducesOutput_ZeroProduces_Error(t *testing.T) {
+	skill := minimalSkill()
+	skill.Context.Produces = nil
+
+	result := singleProducesOutput(skill)
+
+	assert.NotNil(t, result)
+	assert.Equal(t, "single-produces-output", result.Rule)
+	assert.Equal(t, SeverityError, result.Severity)
+	assert.Equal(t, "context", result.Facet)
+	assert.Contains(t, result.Message, "test-skill")
+	assert.Contains(t, result.Message, "0")
+}
+
+func TestSingleProducesOutput_MultipleProduces_Error(t *testing.T) {
+	skill := minimalSkill()
+	skill.Context.Produces = []string{"output1", "output2"}
+
+	result := singleProducesOutput(skill)
+
+	assert.NotNil(t, result)
+	assert.Equal(t, "single-produces-output", result.Rule)
+	assert.Equal(t, SeverityError, result.Severity)
+	assert.Contains(t, result.Message, "test-skill")
+	assert.Contains(t, result.Message, "2")
+}
+
+func TestSingleProducesOutput_OneProduces_NoIssue(t *testing.T) {
+	skill := minimalSkill()
+
+	result := singleProducesOutput(skill)
 
 	assert.Nil(t, result)
 }

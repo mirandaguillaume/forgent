@@ -86,12 +86,26 @@ func hasWhenToUse(skill model.SkillBehavior) *LintResult {
 	return nil
 }
 
+func singleProducesOutput(skill model.SkillBehavior) *LintResult {
+	count := len(skill.Context.Produces)
+	if count != 1 {
+		return &LintResult{
+			Rule:     "single-produces-output",
+			Severity: SeverityError,
+			Message:  fmt.Sprintf("Skill %q must produce exactly 1 output, got %d. SRP: one skill = one deliverable.", skill.Skill, count),
+			Facet:    "context",
+		}
+	}
+	return nil
+}
+
 var allRules = []lintRule{
 	noEmptyTools,
 	hasGuardrails,
 	observableOutputs,
 	securityNeedsGuardrails,
 	hasWhenToUse,
+	singleProducesOutput,
 }
 
 // LintSkill runs all lint rules against a skill and returns findings.
