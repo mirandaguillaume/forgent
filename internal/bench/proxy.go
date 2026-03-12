@@ -10,22 +10,6 @@ import (
 	"github.com/mirandaguillaume/forgent/internal/scanner"
 )
 
-// sourceExts mirrors the scanner's source extensions for consistent counting.
-var sourceExts = map[string]bool{
-	".go": true, ".ts": true, ".tsx": true, ".js": true, ".jsx": true,
-	".py": true, ".rs": true, ".java": true, ".rb": true, ".cs": true,
-	".cpp": true, ".c": true, ".swift": true, ".kt": true,
-	".php": true, ".scala": true, ".ex": true, ".exs": true,
-}
-
-// skipDirs mirrors the scanner's skip list.
-var skipDirs = map[string]bool{
-	".git": true, "vendor": true, "node_modules": true, "__pycache__": true,
-	".next": true, "dist": true, "build": true, ".claude": true,
-	".github": true, "public": true, ".venv": true, "venv": true,
-	"env": true, ".tox": true, "coverage": true, ".nyc_output": true,
-	"target": true,
-}
 
 // RunProxy runs the proxy reachability benchmark.
 // It scans the codebase, samples N random source files, and checks what
@@ -95,13 +79,13 @@ func collectSourceFiles(root string) ([]string, error) {
 			return nil
 		}
 		if d.IsDir() {
-			if skipDirs[d.Name()] {
+			if scanner.SkipDirs[d.Name()] {
 				return filepath.SkipDir
 			}
 			return nil
 		}
 		ext := filepath.Ext(d.Name())
-		if sourceExts[ext] {
+		if scanner.SourceExts[ext] {
 			rel, _ := filepath.Rel(root, path)
 			files = append(files, rel)
 		}

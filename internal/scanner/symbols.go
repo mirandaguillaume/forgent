@@ -23,7 +23,7 @@ func ExtractSymbols(root string) ([]SymbolEntry, error) {
 		}
 		if d.IsDir() {
 			name := d.Name()
-			if skipDirs[name] || name == "testdata" {
+			if SkipDirs[name] || name == "testdata" {
 				return filepath.SkipDir
 			}
 			return nil
