@@ -13,11 +13,11 @@ weight: 2
 
 ## Abstract
 
-AI agents are becoming critical infrastructure in software engineering workflows. Yet most agent definitions today are monolithic prompt files — brittle, untestable, and locked to a single framework and a single model.
+Most AI agent definitions today are monolithic prompt files — brittle, untestable, and locked to one framework.
 
-This paper presents the **Skill Behavior Model**, a declarative YAML format for agent engineering. Each **Skill Behavior** is a reusable unit governed by 5 facets — Context, Strategy, Guardrails, Observability, and Security. A skill is a pure interface: it declares what it consumes and what it produces. Skills compose into **Agents** — named compositions that declare their own I/O contract and orchestration strategy. The linter validates coherence between agent and skill interfaces statically.
-
-The format is both framework-agnostic and LLM-agnostic: the same specification compiles to Claude Code [1], GitHub Copilot [2], or any other target without modification. We describe the model, its portability guarantees, and the design rationale behind each constraint.
+- **Skills as interfaces** — each skill declares `consumes`/`produces` and is governed by 5 facets (Context, Strategy, Guardrails, Observability, Security)
+- **Agents as compositions** — a named list of skills with its own I/O contract and orchestration strategy, validated statically by the linter
+- **Write once, deploy anywhere** — the same YAML compiles to Claude Code [1], GitHub Copilot [2], or any other target without modification
 
 ---
 
