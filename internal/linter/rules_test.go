@@ -261,6 +261,60 @@ func TestProducesMatchesDescription_NoConjunction_NoIssue(t *testing.T) {
 	assert.Nil(t, result)
 }
 
+func TestSkillNameMatchesOutput_AndPattern_Error(t *testing.T) {
+	skill := minimalSkill()
+	skill.Skill = "lint-and-format"
+
+	result := skillNameMatchesOutput(skill)
+
+	assert.NotNil(t, result)
+	assert.Equal(t, "skill-name-matches-output", result.Rule)
+	assert.Equal(t, SeverityError, result.Severity)
+	assert.Equal(t, "skill", result.Facet)
+	assert.Contains(t, result.Message, "-and-")
+}
+
+func TestSkillNameMatchesOutput_EtPattern_Error(t *testing.T) {
+	skill := minimalSkill()
+	skill.Skill = "analyser-et-formater"
+
+	result := skillNameMatchesOutput(skill)
+
+	assert.NotNil(t, result)
+	assert.Equal(t, "skill-name-matches-output", result.Rule)
+	assert.Contains(t, result.Message, "-et-")
+}
+
+func TestSkillNameMatchesOutput_ThenPattern_Error(t *testing.T) {
+	skill := minimalSkill()
+	skill.Skill = "scan-then-report"
+
+	result := skillNameMatchesOutput(skill)
+
+	assert.NotNil(t, result)
+	assert.Equal(t, "skill-name-matches-output", result.Rule)
+	assert.Contains(t, result.Message, "-then-")
+}
+
+func TestSkillNameMatchesOutput_AmpersandPattern_Error(t *testing.T) {
+	skill := minimalSkill()
+	skill.Skill = "lint-&-format"
+
+	result := skillNameMatchesOutput(skill)
+
+	assert.NotNil(t, result)
+	assert.Equal(t, "skill-name-matches-output", result.Rule)
+	assert.Contains(t, result.Message, "-&-")
+}
+
+func TestSkillNameMatchesOutput_CleanName_NoIssue(t *testing.T) {
+	skill := minimalSkill()
+
+	result := skillNameMatchesOutput(skill)
+
+	assert.Nil(t, result)
+}
+
 func TestLintSkill_CleanSkill_EmptyResults(t *testing.T) {
 	skill := minimalSkill()
 	skill.Guardrails = parseGuardrails(t, `- "timeout: 30s"`)
