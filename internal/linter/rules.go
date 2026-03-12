@@ -125,7 +125,7 @@ func skillNameMatchesOutput(skill model.SkillBehavior) *LintResult {
 				Rule:     "skill-name-matches-output",
 				Severity: SeverityError,
 				Message:  fmt.Sprintf("Skill name %q contains conjunction pattern %q. A skill name should describe a single responsibility.", skill.Skill, pat),
-				Facet:    "skill",
+				Facet:    "context",
 			}
 		}
 	}

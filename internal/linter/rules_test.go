@@ -270,7 +270,7 @@ func TestSkillNameMatchesOutput_AndPattern_Error(t *testing.T) {
 	assert.NotNil(t, result)
 	assert.Equal(t, "skill-name-matches-output", result.Rule)
 	assert.Equal(t, SeverityError, result.Severity)
-	assert.Equal(t, "skill", result.Facet)
+	assert.Equal(t, "context", result.Facet)
 	assert.Contains(t, result.Message, "-and-")
 }
 
