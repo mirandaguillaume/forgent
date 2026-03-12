@@ -55,7 +55,7 @@ layout: hextra-home
   <div class="forge-grid">
     <div class="forge-cell">
       <h3 data-icon="&#9889;">Skill Behavior Model</h3>
-      <p>6 facets per skill &mdash; Context, Strategy, Guardrails, Dependencies, Observability, Security. Structured, composable, auditable.</p>
+      <p>5 facets per skill &mdash; Context, Strategy, Guardrails, Observability, Security. Skills as pure interfaces, agents as compositions. Structured, composable, auditable.</p>
     </div>
     <div class="forge-cell">
       <h3 data-icon="&#127919;">Multi-Target Build</h3>

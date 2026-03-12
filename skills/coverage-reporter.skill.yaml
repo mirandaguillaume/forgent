@@ -13,7 +13,6 @@ strategy:
     - parse coverage output into structured report
 guardrails:
   - timeout: 10min
-depends_on: []
 observability:
   trace_level: standard
   metrics: [tokens, duration]

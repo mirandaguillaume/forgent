@@ -58,15 +58,6 @@ func GenerateCopilotSkillMd(skill model.SkillBehavior) string {
 	lines = append(lines, "Memory: "+string(skill.Context.Memory))
 	lines = append(lines, "")
 
-	// Dependencies
-	if len(skill.DependsOn) > 0 {
-		lines = append(lines, "## Dependencies")
-		for _, dep := range skill.DependsOn {
-			lines = append(lines, fmt.Sprintf("- **%s** provides `%s`", dep.Skill, dep.Provides))
-		}
-		lines = append(lines, "")
-	}
-
 	// Strategy
 	lines = append(lines, "## Strategy")
 	lines = append(lines, "Approach: "+skill.Strategy.Approach)

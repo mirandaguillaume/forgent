@@ -68,9 +68,6 @@ func RunDoctor(skillsDir string, agentsDir string) DoctorReport {
 		}
 	}
 
-	// Check dependencies across all skills
-	report.DependencyIssues = analyzer.CheckDependencies(report.Skills)
-
 	// Detect loop risks per skill
 	checker := &analyzer.DefaultGuardrailChecker{}
 	for _, skill := range report.Skills {
@@ -80,7 +77,7 @@ func RunDoctor(skillsDir string, agentsDir string) DoctorReport {
 		}
 	}
 
-	// Check skill ordering in agents
+	// Check dependencies and ordering per agent
 	if agentsDir != "" {
 		agentEntries, err := os.ReadDir(agentsDir)
 		if err == nil {
@@ -100,6 +97,8 @@ func RunDoctor(skillsDir string, agentsDir string) DoctorReport {
 				if err != nil {
 					continue
 				}
+				report.DependencyIssues = append(report.DependencyIssues,
+					analyzer.CheckDependencies(agent, report.Skills)...)
 				report.OrderingIssues = append(report.OrderingIssues,
 					analyzer.CheckSkillOrdering(agent, skillMap)...)
 			}

@@ -504,9 +504,6 @@ func skillFinishingBranch() model.SkillBehavior {
 			makeGuardrail("Never delete work without typed confirmation"),
 			makeGuardrail("Never merge without verifying tests on result"),
 		},
-		DependsOn: []model.Dependency{
-			{Skill: "verification-before-completion", Provides: "verified_completion"},
-		},
 		Observability: model.ObservabilityFacet{
 			TraceLevel: model.TraceLevelMinimal,
 			Metrics:    []string{"completion_path_chosen"},
@@ -556,9 +553,6 @@ func skillCodeReview() model.SkillBehavior {
 			makeGuardrail("Never skip review for completed tasks"),
 			makeGuardrail("Never dismiss reviewer feedback without investigation"),
 			makeGuardrail("If reviewer is wrong, verify with evidence before pushing back"),
-		},
-		DependsOn: []model.Dependency{
-			{Skill: "code-reviewer", Provides: "review_feedback"},
 		},
 		Observability: model.ObservabilityFacet{
 			TraceLevel: model.TraceLevelMinimal,

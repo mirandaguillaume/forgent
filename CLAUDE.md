@@ -4,7 +4,7 @@
 
 Standalone Go CLI that forges AI agents from composable skill specs across frameworks (Claude Code, GitHub Copilot, and more).
 
-Core concept: agents are **compositions of Skill Behaviors** — reusable behavioral units with 6 facets (Context, Strategy, Guardrails, Dependencies, Observability, Security).
+Core concept: agents are **compositions of Skill Behaviors** — reusable behavioral units with 5 facets (Context, Strategy, Guardrails, Observability, Security). Skills are pure interfaces (consumes/produces). Agents declare their own I/O contract and orchestration.
 
 ## Tech Stack
 

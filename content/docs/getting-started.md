@@ -61,8 +61,6 @@ guardrails:
   - "Max 5 queries per invocation"
   - "timeout: 30s"
 
-depends_on: []
-
 observability:
   trace_level: standard
   metrics: [latency, token_usage]

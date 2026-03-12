@@ -15,11 +15,6 @@ strategy:
 guardrails:
   - timeout: 3min
   - require_risk_score
-depends_on:
-  - skill: tdd-runner
-    provides: test_results
-  - skill: ts-linter
-    provides: lint_results
 observability:
   trace_level: standard
   metrics: [tokens, latency]
