@@ -54,6 +54,7 @@ jobs:
           BASE_URL: "${{ steps.pages.outputs.base_url }}"
         run: hugo --gc --minify --baseURL "${BASE_URL}/"
       - name: Upload artifact
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./public
