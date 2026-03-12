@@ -19,7 +19,7 @@ strategy:
   tools: []
   approach: sequential
 guardrails: []
-depends_on: []
+
 observability:
   trace_level: minimal
   metrics: []
@@ -67,7 +67,7 @@ strategy:
   tools: []
   approach: sequential
 guardrails: []
-depends_on: []
+
 observability:
   trace_level: minimal
   metrics: []

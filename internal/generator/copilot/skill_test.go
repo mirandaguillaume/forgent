@@ -35,9 +35,6 @@ func testSkill() model.SkillBehavior {
 			makeGuardrailString("Never modify source files directly"),
 			makeGuardrailString("Always explain reasoning"),
 		},
-		DependsOn: []model.Dependency{
-			{Skill: "file-reader", Provides: "source-code"},
-		},
 		Security: model.SecurityFacet{
 			Filesystem: model.AccessReadOnly,
 			Network:    model.NetworkNone,
@@ -92,10 +89,9 @@ func TestGenerateCopilotSkillMd_StepsNumbered(t *testing.T) {
 	assert.Contains(t, md, "3. Write report")
 }
 
-func TestGenerateCopilotSkillMd_Dependencies(t *testing.T) {
+func TestGenerateCopilotSkillMd_NoDependenciesSection(t *testing.T) {
 	md := copilot.GenerateCopilotSkillMd(testSkill())
-	assert.Contains(t, md, "## Dependencies")
-	assert.Contains(t, md, "**file-reader** provides `source-code`")
+	assert.NotContains(t, md, "## Dependencies")
 }
 
 func TestGenerateCopilotSkillMd_Security(t *testing.T) {
@@ -111,13 +107,6 @@ func TestGenerateCopilotSkillMd_NoGuardrails(t *testing.T) {
 	skill.Guardrails = nil
 	md := copilot.GenerateCopilotSkillMd(skill)
 	assert.NotContains(t, md, "## Guardrails")
-}
-
-func TestGenerateCopilotSkillMd_NoDependencies(t *testing.T) {
-	skill := testSkill()
-	skill.DependsOn = nil
-	md := copilot.GenerateCopilotSkillMd(skill)
-	assert.NotContains(t, md, "## Dependencies")
 }
 
 func TestGenerateCopilotSkillMd_DescriptionTruncation(t *testing.T) {

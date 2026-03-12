@@ -32,9 +32,6 @@ strategy:
 guardrails:
   - never approve without tests
   - max_comments: 10
-depends_on:
-  - skill: lint
-    provides: lint-results
 observability:
   trace_level: standard
   metrics:
@@ -69,11 +66,6 @@ negotiation:
 
 	// Guardrails
 	require.Len(t, sb.Guardrails, 2)
-
-	// Depends on
-	require.Len(t, sb.DependsOn, 1)
-	assert.Equal(t, "lint", sb.DependsOn[0].Skill)
-	assert.Equal(t, "lint-results", sb.DependsOn[0].Provides)
 
 	// Observability
 	assert.Equal(t, model.TraceLevelStandard, sb.Observability.TraceLevel)
@@ -169,7 +161,7 @@ strategy:
   tools: []
   approach: sequential
 guardrails: []
-depends_on: []
+
 observability:
   trace_level: minimal
   metrics: []
@@ -216,7 +208,7 @@ strategy:
   tools: []
   approach: sequential
 guardrails: []
-depends_on: []
+
 observability:
   trace_level: minimal
   metrics: []
@@ -254,7 +246,7 @@ strategy:
   tools: []
   approach: sequential
 guardrails: []
-depends_on: []
+
 observability:
   trace_level: minimal
   metrics: []

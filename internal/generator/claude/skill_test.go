@@ -35,9 +35,6 @@ func testSkill() model.SkillBehavior {
 			makeGuardrailString("Never modify source files directly"),
 			makeGuardrailString("Always explain reasoning"),
 		},
-		DependsOn: []model.Dependency{
-			{Skill: "file-reader", Provides: "source-code"},
-		},
 		Security: model.SecurityFacet{
 			Filesystem: model.AccessReadOnly,
 			Network:    model.NetworkNone,
@@ -92,10 +89,9 @@ func TestGenerateSkillMd_StepsNumbered(t *testing.T) {
 	assert.Contains(t, md, "3. Write report")
 }
 
-func TestGenerateSkillMd_Dependencies(t *testing.T) {
+func TestGenerateSkillMd_NoDependenciesSection(t *testing.T) {
 	md := claude.GenerateSkillMd(testSkill())
-	assert.Contains(t, md, "## Dependencies")
-	assert.Contains(t, md, "**file-reader** provides `source-code`")
+	assert.NotContains(t, md, "## Dependencies")
 }
 
 func TestGenerateSkillMd_Security(t *testing.T) {
@@ -111,13 +107,6 @@ func TestGenerateSkillMd_NoGuardrails(t *testing.T) {
 	skill.Guardrails = nil
 	md := claude.GenerateSkillMd(skill)
 	assert.NotContains(t, md, "## Guardrails")
-}
-
-func TestGenerateSkillMd_NoDependencies(t *testing.T) {
-	skill := testSkill()
-	skill.DependsOn = nil
-	md := claude.GenerateSkillMd(skill)
-	assert.NotContains(t, md, "## Dependencies")
 }
 
 func TestGenerateSkillMd_WhenToUse(t *testing.T) {
