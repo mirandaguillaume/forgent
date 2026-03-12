@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.2.0](https://github.com/mirandaguillaume/forgent/compare/v0.1.0...v0.2.0) (2026-03-12)
+
+
+### Features
+
+* add codebase scanner, enricher and bench command ([70ac475](https://github.com/mirandaguillaume/forgent/commit/70ac47522db6234c94bea08c33a445104d87c191))
+* **build:** auto-enrich skills that consume codebase_index ([25b1182](https://github.com/mirandaguillaume/forgent/commit/25b1182270ca44c9d2d7b85197965c6f59d4177e))
+* **linter:** add producesMatchesDescription SRP lint rule ([eb4c655](https://github.com/mirandaguillaume/forgent/commit/eb4c655bbcd0a420651a7c8423378b1e14007def))
+* **linter:** add singleProducesOutput SRP lint rule ([5ef5589](https://github.com/mirandaguillaume/forgent/commit/5ef55899a8c03e49461a0b74a7d7133228367b5c))
+* **linter:** add skillNameMatchesOutput SRP lint rule ([34c56d6](https://github.com/mirandaguillaume/forgent/commit/34c56d6fb6ab396c4262335a43f3c1192c34455d))
+* **model:** add when_to_use, anti_patterns and examples facets ([a82a5c5](https://github.com/mirandaguillaume/forgent/commit/a82a5c521055920b4d9becd7eac9911404aa7922))
+* SOLID skills + codebase scanner/enricher/bench ([7068630](https://github.com/mirandaguillaume/forgent/commit/70686303f535571d44d6ebbe22ed4d913c7e4d0f))
+
+
+### Bug Fixes
+
+* address code review issues ([135dbce](https://github.com/mirandaguillaume/forgent/commit/135dbce2b4fdf2fba6b5af2c3aed2910e78073fb))
+* **linter:** correct skillNameMatchesOutput facet to context ([9fb9abe](https://github.com/mirandaguillaume/forgent/commit/9fb9abef61ba7e68ea231360340f5bd3ba4177e5))
+
 ## [0.1.0](https://github.com/mirandaguillaume/forgent/compare/v0.0.0...v0.1.0) (2026-03-11)
 
 
