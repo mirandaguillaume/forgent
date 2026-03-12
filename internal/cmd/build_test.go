@@ -186,3 +186,97 @@ func TestRunBuild_NoEnrich(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotContains(t, string(skillData), "## Codebase Context")
 }
+
+// Skill YAML that declares codebase_index in consumes (codebase-navigation skill).
+const testSkillWithIndexYAML = `skill: nav-skill
+version: "1.0.0"
+context:
+  consumes: [codebase_index]
+  produces: [codebase_navigation]
+  memory: short-term
+strategy:
+  tools: [read_file, grep]
+  approach: sequential
+guardrails:
+  - "timeout: 60s"
+depends_on: []
+observability:
+  trace_level: standard
+  metrics: [duration]
+security:
+  filesystem: read-only
+  network: none
+  secrets: []
+negotiation:
+  file_conflicts: yield
+  priority: 0
+`
+
+// Skill YAML that does NOT declare codebase_index.
+const testSkillWithoutIndexYAML = `skill: lint-skill
+version: "1.0.0"
+context:
+  consumes: [source_code]
+  produces: [lint_results]
+  memory: short-term
+strategy:
+  tools: [read_file]
+  approach: sequential
+guardrails:
+  - "timeout: 30s"
+depends_on: []
+observability:
+  trace_level: minimal
+  metrics: []
+security:
+  filesystem: read-only
+  network: none
+  secrets: []
+negotiation:
+  file_conflicts: yield
+  priority: 0
+`
+
+func TestRunBuild_AutoEnrichViaConsumes(t *testing.T) {
+	root := t.TempDir()
+	skillsDir := filepath.Join(root, "skills")
+	agentsDir := filepath.Join(root, "agents")
+	outputDir := filepath.Join(root, "output")
+	require.NoError(t, os.MkdirAll(skillsDir, 0755))
+	require.NoError(t, os.MkdirAll(agentsDir, 0755))
+
+	// Two skills: one wants codebase_index, one doesn't.
+	os.WriteFile(filepath.Join(skillsDir, "nav-skill.skill.yaml"), []byte(testSkillWithIndexYAML), 0644)
+	os.WriteFile(filepath.Join(skillsDir, "lint-skill.skill.yaml"), []byte(testSkillWithoutIndexYAML), 0644)
+
+	// Create minimal Go project for scanner.
+	os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/test\n\ngo 1.22\n"), 0644)
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "cmd"), 0755))
+	os.WriteFile(filepath.Join(root, "cmd/main.go"), []byte("package main\n"), 0644)
+	require.NoError(t, os.MkdirAll(filepath.Join(root, "pkg/model"), 0755))
+	os.WriteFile(filepath.Join(root, "pkg/model/types.go"), []byte("package model\n"), 0644)
+
+	oldDir, _ := os.Getwd()
+	require.NoError(t, os.Chdir(root))
+	t.Cleanup(func() { os.Chdir(oldDir) })
+
+	// No --enrich flag (EnrichNone) — auto-detection via consumes.
+	result := cmd.RunBuild(skillsDir, agentsDir, outputDir, "claude", scanner.EnrichNone)
+	assert.True(t, result.Success)
+	assert.Equal(t, 2, result.SkillsGenerated)
+
+	// Context files should be generated (because nav-skill needs them).
+	assert.FileExists(t, filepath.Join(outputDir, "context", "index.md"))
+	assert.FileExists(t, filepath.Join(outputDir, "context", "stack.md"))
+
+	// nav-skill SHOULD have the codebase context pointer.
+	navData, err := os.ReadFile(filepath.Join(outputDir, "skills", "nav-skill", "SKILL.md"))
+	require.NoError(t, err)
+	assert.Contains(t, string(navData), "## Codebase Context")
+	assert.Contains(t, string(navData), "context/index.md")
+
+	// lint-skill should NOT have the codebase context pointer.
+	lintData, err := os.ReadFile(filepath.Join(outputDir, "skills", "lint-skill", "SKILL.md"))
+	require.NoError(t, err)
+	assert.NotContains(t, string(lintData), "## Codebase Context")
+}
