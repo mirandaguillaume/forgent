@@ -2,6 +2,7 @@ package linter
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mirandaguillaume/forgent/pkg/model"
 )
@@ -99,6 +100,22 @@ func singleProducesOutput(skill model.SkillBehavior) *LintResult {
 	return nil
 }
 
+func producesMatchesDescription(skill model.SkillBehavior) *LintResult {
+	conjunctions := []string{" and ", " et ", " then ", " puis ", " & "}
+	lower := strings.ToLower(skill.Strategy.Approach)
+	for _, conj := range conjunctions {
+		if strings.Contains(lower, conj) {
+			return &LintResult{
+				Rule:     "produces-matches-description",
+				Severity: SeverityError,
+				Message:  fmt.Sprintf("Skill %q strategy.approach contains conjunction %q suggesting multiple responsibilities. Split into separate skills.", skill.Skill, conj),
+				Facet:    "strategy",
+			}
+		}
+	}
+	return nil
+}
+
 var allRules = []lintRule{
 	noEmptyTools,
 	hasGuardrails,
@@ -106,6 +123,7 @@ var allRules = []lintRule{
 	securityNeedsGuardrails,
 	hasWhenToUse,
 	singleProducesOutput,
+	producesMatchesDescription,
 }
 
 // LintSkill runs all lint rules against a skill and returns findings.
