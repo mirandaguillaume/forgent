@@ -13,7 +13,11 @@ weight: 2
 
 ## Abstract
 
-AI agents are becoming critical infrastructure in software engineering workflows. Yet most agent definitions today are monolithic prompt files — brittle, untestable, and locked to a single framework and a single model. This paper presents the **Skill Behavior Model**, a declarative YAML format for agent engineering. Agents are composed from **Skill Behaviors** — reusable units governed by 6 facets (Context, Strategy, Guardrails, Dependencies, Observability, Security). Each skill has a single responsibility and produces exactly one output. Skills compose into **Agents** through orchestration strategies, forming a directed acyclic graph of data flow. The format is both framework-agnostic and LLM-agnostic: the same specification compiles to Claude Code [1], GitHub Copilot [2], or any other target without modification. We describe the model, the portability guarantees, and the design rationale behind each constraint.
+AI agents are becoming critical infrastructure in software engineering workflows. Yet most agent definitions today are monolithic prompt files — brittle, untestable, and locked to a single framework and a single model.
+
+This paper presents the **Skill Behavior Model**, a declarative YAML format for agent engineering. Each **Skill Behavior** is a reusable unit governed by 6 facets — Context, Strategy, Guardrails, Dependencies, Observability, and Security. A skill has a single responsibility and produces exactly one output. Skills compose into **Agents** through orchestration strategies, forming a directed acyclic graph of data flow.
+
+The format is both framework-agnostic and LLM-agnostic: the same specification compiles to Claude Code [1], GitHub Copilot [2], or any other target without modification. We describe the model, its portability guarantees, and the design rationale behind each constraint.
 
 ---
 
@@ -41,7 +45,8 @@ This approach has three fundamental problems.
 
 The coding agent ecosystem has grown rapidly. As of early 2026, developers choose between Claude Code [1], GitHub Copilot [2], OpenAI Codex, Gemini CLI, Cursor, Windsurf, Kiro, Aider, OpenCode, and others. Most of these tools now allow some form of agent customization — but the formats are fragmented and shallow.
 
-Three families have emerged:
+Three families have emerged.
+
 
 **Declarative markdown agents.** Claude Code, GitHub Copilot, Gemini CLI, and OpenCode define agents as markdown files with YAML frontmatter. A typical agent looks like:
 
@@ -63,7 +68,7 @@ The frontmatter declares tool access and model selection. The body is a free-for
 
 **Programmatic agents.** OpenAI Codex defines agents through its Python Agents SDK — no declarative file, agents are instantiated in code. Kiro (AWS) uses structured YAML configuration with "Powers" that bundle MCP tools, steering files, and hooks.
 
-All three families share the same structural gap. Across the ecosystem, only two concerns are consistently structured in agent definitions:
+All three families share the same structural gap. Only two concerns are consistently structured across agent definitions:
 
 | Concern | Structured? | Where it lives |
 |---------|:-----------:|----------------|
@@ -289,17 +294,17 @@ Generated skill files use a deliberate section ordering based on LLM attention r
 
 The Skill Behavior Model applies established software design principles to agent engineering.
 
-**Single Responsibility Principle.** Each skill produces exactly one output. This is not a convention — it is a structural constraint of the format. A skill with `produces: [lint_results, type_errors]` is invalid. This forces decomposition: what was one `pr-reviewer` producing `[review_comments, risk_score]` becomes two skills — `review-commenter` and `risk-scorer` — each testable and reusable independently.
+**Single Responsibility Principle.** Each skill produces exactly one output. This is not a convention — it is a structural constraint of the format. A skill with `produces: [lint_results, type_errors]` is invalid. This forces decomposition: one `pr-reviewer` producing two outputs becomes two skills — `review-commenter` and `risk-scorer` — each testable and reusable independently.
 
-**Law of Demeter.** A skill only accesses data from its explicitly declared dependencies. The `depends_on` field is the sole mechanism for inter-skill data flow. There is no global state, no shared context outside the declared contract. This makes the data flow graph fully explicit and statically analyzable.
+**Law of Demeter.** A skill only accesses data from its explicitly declared dependencies [5]. The `depends_on` field is the sole mechanism for inter-skill data flow. No global state, no shared context outside the declared contract. The data flow graph is fully explicit and statically analyzable.
 
-**Composition over Inheritance.** Agents are flat lists of skills. There are no "base agents", no agent inheritance, no override mechanisms. Behavior is assembled, not specialized. This eliminates the fragile base class problem entirely — changing a skill's behavior affects only agents that explicitly include it.
+**Composition over Inheritance.** Agents are flat lists of skills — no "base agents", no inheritance, no override mechanisms. Behavior is assembled, not specialized. This eliminates the fragile base class problem: changing a skill affects only agents that explicitly include it.
 
-**Tell, Don't Ask.** Skills declare what they produce. The framework reads the declarations and routes data. No skill queries another skill's state. This inversion of control means skills are decoupled from each other — they only know their own contract.
+**Tell, Don't Ask.** Skills declare what they produce. The framework reads the declarations and routes data [6]. No skill queries another skill's state — skills are decoupled from each other and only know their own contract.
 
-**LLM Attention Optimization.** The generated output orders sections to exploit primacy and recency biases documented in LLM attention research [7][8]. This is a compilation concern, not a specification concern — the YAML format itself is unordered, but the generated artifacts are deliberately structured.
+**LLM Attention Optimization.** Generated output orders sections to exploit primacy and recency biases [7][8]. Guardrails go first (primacy), security goes last (recency). This is a compilation concern — the YAML format is unordered, the generated artifacts are deliberately structured.
 
-**Framework Independence.** Tool names in the specification are abstract behavioral capabilities. The mapping from abstract to concrete happens at compilation time. This means skill authors never write framework-specific code, and framework migrations are zero-cost at the specification level.
+**Framework Independence.** Tool names are abstract behavioral capabilities. The mapping to concrete APIs happens at compilation time. Skill authors never write framework-specific code; framework migrations are zero-cost at the specification level.
 
 ---
 
