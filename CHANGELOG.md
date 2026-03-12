@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/mirandaguillaume/forgent/compare/v0.2.0...v0.3.0) (2026-03-12)
+
+
+### Features
+
+* codebase scanner, enricher, bench + whitepaper rewrite ([9d65407](https://github.com/mirandaguillaume/forgent/commit/9d65407a4eebad6cb7ecc32e82effa94dc7b7535))
+
 ## [0.2.0](https://github.com/mirandaguillaume/forgent/compare/v0.1.0...v0.2.0) (2026-03-12)
 
 
