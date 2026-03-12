@@ -116,6 +116,22 @@ func producesMatchesDescription(skill model.SkillBehavior) *LintResult {
 	return nil
 }
 
+func skillNameMatchesOutput(skill model.SkillBehavior) *LintResult {
+	patterns := []string{"-and-", "-et-", "-then-", "-puis-", "-&-"}
+	lower := strings.ToLower(skill.Skill)
+	for _, pat := range patterns {
+		if strings.Contains(lower, pat) {
+			return &LintResult{
+				Rule:     "skill-name-matches-output",
+				Severity: SeverityError,
+				Message:  fmt.Sprintf("Skill name %q contains conjunction pattern %q. A skill name should describe a single responsibility.", skill.Skill, pat),
+				Facet:    "skill",
+			}
+		}
+	}
+	return nil
+}
+
 var allRules = []lintRule{
 	noEmptyTools,
 	hasGuardrails,
@@ -124,6 +140,7 @@ var allRules = []lintRule{
 	hasWhenToUse,
 	singleProducesOutput,
 	producesMatchesDescription,
+	skillNameMatchesOutput,
 }
 
 // LintSkill runs all lint rules against a skill and returns findings.
