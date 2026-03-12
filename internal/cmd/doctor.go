@@ -72,8 +72,9 @@ func RunDoctor(skillsDir string, agentsDir string) DoctorReport {
 	report.DependencyIssues = analyzer.CheckDependencies(report.Skills)
 
 	// Detect loop risks per skill
+	checker := &analyzer.DefaultGuardrailChecker{}
 	for _, skill := range report.Skills {
-		risks := analyzer.DetectLoopRisks(skill)
+		risks := analyzer.DetectLoopRisks(skill, checker)
 		if len(risks) > 0 {
 			report.LoopRisks[skill.Skill] = risks
 		}
