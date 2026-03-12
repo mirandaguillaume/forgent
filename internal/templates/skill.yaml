@@ -13,8 +13,6 @@ strategy:
 
 guardrails: []
 
-depends_on: []
-
 observability:
   trace_level: minimal
   metrics: []

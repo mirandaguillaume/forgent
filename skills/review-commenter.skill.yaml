@@ -16,11 +16,6 @@ guardrails:
   - max_comments: 15
   - timeout: 5min
   - no_approve_without_tests
-depends_on:
-  - skill: tdd-runner
-    provides: test_results
-  - skill: ts-linter
-    provides: lint_results
 observability:
   trace_level: detailed
   metrics: [tokens, latency, comment_count]

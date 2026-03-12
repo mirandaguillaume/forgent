@@ -16,4 +16,6 @@ type AgentComposition struct {
 	Skills        []string              `yaml:"skills"`
 	Orchestration OrchestrationStrategy `yaml:"orchestration"`
 	Description   string                `yaml:"description,omitempty"`
+	Consumes      []string              `yaml:"consumes,omitempty"`
+	Produces      []string              `yaml:"produces,omitempty"`
 }
