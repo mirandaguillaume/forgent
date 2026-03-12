@@ -23,6 +23,7 @@ func (m *mockGenerator) GenerateInstructions(_ []model.SkillBehavior, _ []model.
 func (m *mockGenerator) SkillPath(name string) string { return "skills/" + name + "/SKILL.md" }
 func (m *mockGenerator) AgentPath(name string) string { return "agents/" + name + ".md" }
 func (m *mockGenerator) InstructionsPath() *string    { return nil }
+func (m *mockGenerator) ContextDir() string            { return "context" }
 
 func TestRegisterAndGet(t *testing.T) {
 	spec.Reset()

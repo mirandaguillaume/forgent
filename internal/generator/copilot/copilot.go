@@ -24,6 +24,7 @@ func (g *copilotGenerator) GenerateInstructions(skills []model.SkillBehavior, ag
 
 func (g *copilotGenerator) SkillPath(name string) string { return "skills/" + name + "/SKILL.md" }
 func (g *copilotGenerator) AgentPath(name string) string { return "agents/" + name + ".agent.md" }
+func (g *copilotGenerator) ContextDir() string           { return "context" }
 func (g *copilotGenerator) InstructionsPath() *string {
 	s := "copilot-instructions.md"
 	return &s

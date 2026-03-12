@@ -165,15 +165,43 @@ type NegotiationFacet struct {
 // GuardrailsFacet is a list of guardrail rules.
 type GuardrailsFacet = []GuardrailRule
 
+// WhenToUseFacet describes when a skill should and should not be used.
+type WhenToUseFacet struct {
+	Triggers   []string `yaml:"triggers,omitempty"`
+	DontUse    []string `yaml:"dont_use,omitempty"`
+	Especially []string `yaml:"especially,omitempty"`
+}
+
+// IsEmpty returns true if no when-to-use guidance is provided.
+func (w WhenToUseFacet) IsEmpty() bool {
+	return len(w.Triggers) == 0 && len(w.DontUse) == 0 && len(w.Especially) == 0
+}
+
+// AntiPattern documents a common mistake and the correct approach.
+type AntiPattern struct {
+	Excuse  string `yaml:"excuse"`
+	Reality string `yaml:"reality"`
+}
+
+// CodeExample provides a concrete code snippet demonstrating usage.
+type CodeExample struct {
+	Label string `yaml:"label"`
+	Code  string `yaml:"code"`
+	Lang  string `yaml:"lang,omitempty"`
+}
+
 // SkillBehavior is the complete skill specification with all facets.
 type SkillBehavior struct {
-	Skill         string           `yaml:"skill"`
-	Version       string           `yaml:"version"`
-	Context       ContextFacet     `yaml:"context"`
-	Strategy      StrategyFacet    `yaml:"strategy"`
-	Guardrails    GuardrailsFacet  `yaml:"guardrails"`
-	DependsOn     DependencyFacet  `yaml:"depends_on"`
+	Skill         string             `yaml:"skill"`
+	Version       string             `yaml:"version"`
+	Context       ContextFacet       `yaml:"context"`
+	Strategy      StrategyFacet      `yaml:"strategy"`
+	Guardrails    GuardrailsFacet    `yaml:"guardrails"`
+	DependsOn     DependencyFacet    `yaml:"depends_on"`
 	Observability ObservabilityFacet `yaml:"observability"`
-	Security      SecurityFacet    `yaml:"security"`
-	Negotiation   NegotiationFacet `yaml:"negotiation"`
+	Security      SecurityFacet      `yaml:"security"`
+	Negotiation   NegotiationFacet   `yaml:"negotiation"`
+	WhenToUse     WhenToUseFacet     `yaml:"when_to_use,omitempty"`
+	AntiPatterns  []AntiPattern      `yaml:"anti_patterns,omitempty"`
+	Examples      []CodeExample      `yaml:"examples,omitempty"`
 }

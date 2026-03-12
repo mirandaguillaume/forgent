@@ -139,10 +139,31 @@ func TestSecurityNeedsGuardrails_FullAccess_WithGuardrails_NoIssue(t *testing.T)
 	assert.Nil(t, result)
 }
 
+func TestHasWhenToUse_NoWhenToUse_Info(t *testing.T) {
+	skill := minimalSkill()
+
+	result := hasWhenToUse(skill)
+
+	assert.NotNil(t, result)
+	assert.Equal(t, "has-when-to-use", result.Rule)
+	assert.Equal(t, SeverityInfo, result.Severity)
+	assert.Equal(t, "when_to_use", result.Facet)
+}
+
+func TestHasWhenToUse_WithTriggers_NoIssue(t *testing.T) {
+	skill := minimalSkill()
+	skill.WhenToUse = model.WhenToUseFacet{Triggers: []string{"bug"}}
+
+	result := hasWhenToUse(skill)
+
+	assert.Nil(t, result)
+}
+
 func TestLintSkill_CleanSkill_EmptyResults(t *testing.T) {
 	skill := minimalSkill()
 	skill.Guardrails = parseGuardrails(t, `- "timeout: 30s"`)
 	skill.Observability.Metrics = []string{"latency"}
+	skill.WhenToUse = model.WhenToUseFacet{Triggers: []string{"test"}}
 
 	results := LintSkill(skill)
 

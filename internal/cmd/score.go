@@ -100,8 +100,9 @@ func PrintScoreReport(report ScoreReport) {
 		for _, s := range report.Skills {
 			c := scoreColor(s.Total)
 			fmt.Printf("  %s  %s  %s\n", c("%d", s.Total), bar(s.Total, 100), s.Skill)
-			fmt.Println(color.HiBlackString("       context:%d strategy:%d guardrails:%d observability:%d security:%d",
-				s.Breakdown.Context, s.Breakdown.Strategy, s.Breakdown.Guardrails, s.Breakdown.Observability, s.Breakdown.Security))
+			fmt.Println(color.HiBlackString("       context:%d strategy:%d guardrails:%d observability:%d security:%d when_to_use:%d anti_patterns:%d examples:%d",
+				s.Breakdown.Context, s.Breakdown.Strategy, s.Breakdown.Guardrails, s.Breakdown.Observability, s.Breakdown.Security,
+				s.Breakdown.WhenToUse, s.Breakdown.AntiPatterns, s.Breakdown.Examples))
 		}
 	}
 

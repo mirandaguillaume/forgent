@@ -157,3 +157,45 @@ func TestGenerateCopilotSkillMd_ShortDescriptionNotTruncated(t *testing.T) {
 		}
 	}
 }
+
+func TestGenerateCopilotSkillMd_WhenToUse(t *testing.T) {
+	skill := testSkill()
+	skill.WhenToUse = model.WhenToUseFacet{
+		Triggers: []string{"Test failures"},
+		DontUse:  []string{"Typos"},
+	}
+	md := copilot.GenerateCopilotSkillMd(skill)
+	assert.Contains(t, md, "## When to Use")
+	assert.Contains(t, md, "- Test failures")
+	assert.Contains(t, md, "- Typos")
+}
+
+func TestGenerateCopilotSkillMd_Examples(t *testing.T) {
+	skill := testSkill()
+	skill.Examples = []model.CodeExample{
+		{Label: "Good: verify", Code: "go test ./...", Lang: "bash"},
+	}
+	md := copilot.GenerateCopilotSkillMd(skill)
+	assert.Contains(t, md, "## Examples")
+	assert.Contains(t, md, "```bash")
+}
+
+func TestGenerateCopilotSkillMd_AntiPatterns(t *testing.T) {
+	skill := testSkill()
+	skill.AntiPatterns = []model.AntiPattern{
+		{Excuse: "Quick fix", Reality: "Do it right"},
+	}
+	md := copilot.GenerateCopilotSkillMd(skill)
+	assert.Contains(t, md, "## Red Flags")
+	assert.Contains(t, md, "| Quick fix | Do it right |")
+}
+
+func TestGenerateCopilotSkillMd_ExamplesAndAntiPatternsBeforeSecurity(t *testing.T) {
+	skill := testSkill()
+	skill.Examples = []model.CodeExample{{Label: "test", Code: "echo"}}
+	skill.AntiPatterns = []model.AntiPattern{{Excuse: "a", Reality: "b"}}
+	md := copilot.GenerateCopilotSkillMd(skill)
+	exIdx := strings.Index(md, "## Examples")
+	secIdx := strings.Index(md, "## Security")
+	assert.Greater(t, secIdx, exIdx, "Security should appear after Examples")
+}
