@@ -25,6 +25,7 @@ func (g *claudeGenerator) GenerateInstructions(_ []model.SkillBehavior, _ []mode
 func (g *claudeGenerator) SkillPath(name string) string { return "skills/" + name + "/SKILL.md" }
 func (g *claudeGenerator) AgentPath(name string) string { return "agents/" + name + ".md" }
 func (g *claudeGenerator) InstructionsPath() *string     { return nil }
+func (g *claudeGenerator) ContextDir() string            { return "context" }
 
 func init() {
 	spec.Register("claude", func() spec.TargetGenerator { return &claudeGenerator{} })

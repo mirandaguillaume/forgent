@@ -35,6 +35,9 @@ security:
 negotiation:
   file_conflicts: yield
   priority: 0
+when_to_use:
+  triggers:
+    - "testing"
 `
 
 const noGuardrailsSkillYAML = `skill: risky-skill

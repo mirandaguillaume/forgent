@@ -74,11 +74,24 @@ func securityNeedsGuardrails(skill model.SkillBehavior) *LintResult {
 	return nil
 }
 
+func hasWhenToUse(skill model.SkillBehavior) *LintResult {
+	if skill.WhenToUse.IsEmpty() {
+		return &LintResult{
+			Rule:     "has-when-to-use",
+			Severity: SeverityInfo,
+			Message:  fmt.Sprintf("Skill %q has no when_to_use guidance. Consider adding triggers and boundaries.", skill.Skill),
+			Facet:    "when_to_use",
+		}
+	}
+	return nil
+}
+
 var allRules = []lintRule{
 	noEmptyTools,
 	hasGuardrails,
 	observableOutputs,
 	securityNeedsGuardrails,
+	hasWhenToUse,
 }
 
 // LintSkill runs all lint rules against a skill and returns findings.

@@ -10,7 +10,9 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/mirandaguillaume/forgent/internal/analyzer"
+	"github.com/mirandaguillaume/forgent/internal/enricher"
 	"github.com/mirandaguillaume/forgent/internal/linter"
+	"github.com/mirandaguillaume/forgent/internal/scanner"
 	yamlloader "github.com/mirandaguillaume/forgent/internal/yaml"
 	"github.com/mirandaguillaume/forgent/pkg/model"
 	"github.com/mirandaguillaume/forgent/pkg/spec"
@@ -47,13 +49,32 @@ func GetOutputDir(target, override string) string {
 }
 
 // RunBuild executes the full build pipeline: parse, lint, generate skills/agents/instructions.
-func RunBuild(skillsDir, agentsDir, outputDir, target string) BuildResult {
+func RunBuild(skillsDir, agentsDir, outputDir, target string, enrichMode scanner.EnrichMode) BuildResult {
 	result := BuildResult{Target: target, OutputDir: outputDir}
 
 	gen, err := spec.Get(target)
 	if err != nil {
 		result.Error = err.Error()
 		return result
+	}
+
+	// 0. Scan codebase if enrichment is requested (SOAP "Objective" layer)
+	var codebaseCtx *scanner.CodebaseContext
+	if enrichMode != scanner.EnrichNone {
+		codebaseCtx, err = scanner.ScanCodebase(".")
+		if err != nil {
+			result.Warnings = append(result.Warnings,
+				fmt.Sprintf("Codebase scan failed (enrichment skipped): %v", err))
+		}
+	}
+
+	// Write context files in index mode (SOAP "Objective" → external files)
+	if enrichMode == scanner.EnrichIndex && codebaseCtx != nil {
+		contextDir := filepath.Join(outputDir, gen.ContextDir())
+		if err := enricher.WriteContextFiles(codebaseCtx, contextDir); err != nil {
+			result.Warnings = append(result.Warnings,
+				fmt.Sprintf("Failed to write context files: %v", err))
+		}
 	}
 
 	// 1. Parse all skills
@@ -89,9 +110,17 @@ func RunBuild(skillsDir, agentsDir, outputDir, target string) BuildResult {
 		return result
 	}
 
-	// 2. Generate skills
+	// 2. Generate skills (append SOAP "Plan" pointer or inline content)
 	for _, skill := range skillMap {
 		md := gen.GenerateSkill(skill)
+		if codebaseCtx != nil {
+			switch enrichMode {
+			case scanner.EnrichIndex:
+				md += enricher.RenderPointer(codebaseCtx, gen.ContextDir())
+			case scanner.EnrichFull:
+				md += enricher.RenderInline(codebaseCtx)
+			}
+		}
 		wordCount := countWords(md)
 		if wordCount > wordLimit {
 			result.Warnings = append(result.Warnings,
@@ -217,7 +246,7 @@ func PrintBuildResult(result BuildResult) {
 }
 
 func init() {
-	var target, skillsDir, agentsDir, outputDirFlag string
+	var target, skillsDir, agentsDir, outputDirFlag, enrichFlag string
 	var watchFlag bool
 
 	buildCmd := &cobra.Command{
@@ -237,14 +266,17 @@ func init() {
 				os.Exit(1)
 			}
 
+			enrichMode := scanner.EnrichMode(enrichFlag)
+
 			outputDir := GetOutputDir(target, outputDirFlag)
 
 			if watchFlag {
 				controller := CreateWatcher(WatchOptions{
-					SkillsDir: skillsDir,
-					AgentsDir: agentsDir,
-					OutputDir: outputDir,
-					Target:    target,
+					SkillsDir:  skillsDir,
+					AgentsDir:  agentsDir,
+					OutputDir:  outputDir,
+					Target:     target,
+					EnrichMode: enrichMode,
 				})
 				defer controller.Stop()
 				sigCh := make(chan os.Signal, 1)
@@ -253,7 +285,7 @@ func init() {
 				return
 			}
 
-			result := RunBuild(skillsDir, agentsDir, outputDir, target)
+			result := RunBuild(skillsDir, agentsDir, outputDir, target, enrichMode)
 			PrintBuildResult(result)
 			if !result.Success {
 				os.Exit(1)
@@ -266,6 +298,8 @@ func init() {
 	buildCmd.Flags().StringVarP(&agentsDir, "agents", "a", "agents", "agents directory")
 	buildCmd.Flags().StringVarP(&outputDirFlag, "output", "o", "", "output directory")
 	buildCmd.Flags().BoolVarP(&watchFlag, "watch", "w", false, "watch for changes")
+	buildCmd.Flags().StringVar(&enrichFlag, "enrich", "", "enrich skills with codebase context (index|full)")
+	buildCmd.Flag("enrich").NoOptDefVal = "index"
 
 	rootCmd.AddCommand(buildCmd)
 }

@@ -33,6 +33,11 @@ func GenerateSkillMd(skill model.SkillBehavior) string {
 		lines = append(lines, "")
 	}
 
+	// When to Use (after guardrails, before context)
+	if wtu := generator.FormatWhenToUse(skill.WhenToUse); wtu != "" {
+		lines = append(lines, wtu)
+	}
+
 	// Context
 	lines = append(lines, "## Context")
 	if len(skill.Context.Consumes) > 0 {
@@ -67,6 +72,16 @@ func GenerateSkillMd(skill model.SkillBehavior) string {
 		}
 	}
 	lines = append(lines, "")
+
+	// Examples (after strategy)
+	if exs := generator.FormatExamples(skill.Examples); exs != "" {
+		lines = append(lines, exs)
+	}
+
+	// Anti-patterns / Red Flags (before security)
+	if aps := generator.FormatAntiPatterns(skill.AntiPatterns); aps != "" {
+		lines = append(lines, aps)
+	}
 
 	// Security LAST (recency bias)
 	lines = append(lines, "## Security")
