@@ -10,6 +10,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/fsnotify/fsnotify"
+	"github.com/mirandaguillaume/forgent/internal/scanner"
 )
 
 // WatchOptions configures the file watcher.
@@ -19,6 +20,7 @@ type WatchOptions struct {
 	OutputDir  string
 	Target     string
 	DebounceMs int
+	EnrichMode scanner.EnrichMode
 }
 
 // WatchController manages the lifecycle of a file watcher.
@@ -68,7 +70,7 @@ func CreateWatcher(opts WatchOptions) *WatchController {
 	rebuild := func() {
 		ts := FormatTimestamp()
 		fmt.Printf("%s Rebuilding...\n", color.BlueString("[%s]", ts))
-		result := RunBuild(opts.SkillsDir, opts.AgentsDir, opts.OutputDir, opts.Target)
+		result := RunBuild(opts.SkillsDir, opts.AgentsDir, opts.OutputDir, opts.Target, opts.EnrichMode)
 		PrintBuildResult(result)
 		if result.Success {
 			fmt.Printf("%s Watching for changes...\n", color.GreenString("[%s]", FormatTimestamp()))

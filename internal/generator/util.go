@@ -44,6 +44,72 @@ func FormatGuardrail(g model.GuardrailRule) string {
 	return ""
 }
 
+// FormatWhenToUse formats the when-to-use facet as markdown.
+func FormatWhenToUse(w model.WhenToUseFacet) string {
+	if w.IsEmpty() {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString("## When to Use\n")
+	if len(w.Triggers) > 0 {
+		sb.WriteString("\nUse for:\n")
+		for _, t := range w.Triggers {
+			sb.WriteString("- " + t + "\n")
+		}
+	}
+	if len(w.Especially) > 0 {
+		sb.WriteString("\n**Especially when:**\n")
+		for _, e := range w.Especially {
+			sb.WriteString("- " + e + "\n")
+		}
+	}
+	if len(w.DontUse) > 0 {
+		sb.WriteString("\n**Don't use for:**\n")
+		for _, d := range w.DontUse {
+			sb.WriteString("- " + d + "\n")
+		}
+	}
+	return sb.String()
+}
+
+// FormatAntiPatterns formats anti-patterns as a markdown table.
+func FormatAntiPatterns(aps []model.AntiPattern) string {
+	if len(aps) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString("## Red Flags\n\n")
+	sb.WriteString("| Excuse | Reality |\n")
+	sb.WriteString("|--------|--------|\n")
+	for _, ap := range aps {
+		sb.WriteString(fmt.Sprintf("| %s | %s |\n", ap.Excuse, ap.Reality))
+	}
+	return sb.String()
+}
+
+// FormatExamples formats code examples as markdown code blocks.
+func FormatExamples(exs []model.CodeExample) string {
+	if len(exs) == 0 {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString("## Examples\n\n")
+	for i, ex := range exs {
+		if i > 0 {
+			sb.WriteString("\n")
+		}
+		sb.WriteString("**" + ex.Label + "**\n")
+		lang := ex.Lang
+		if lang == "" {
+			lang = ""
+		}
+		sb.WriteString("```" + lang + "\n")
+		sb.WriteString(ex.Code + "\n")
+		sb.WriteString("```\n")
+	}
+	return sb.String()
+}
+
 // BuildSkillDescription creates a description from skill facets.
 func BuildSkillDescription(skill model.SkillBehavior) string {
 	parts := []string{skill.Strategy.Approach + "-based skill"}

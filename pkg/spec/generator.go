@@ -19,6 +19,7 @@ type TargetGenerator interface {
 	SkillPath(name string) string
 	AgentPath(name string) string
 	InstructionsPath() *string
+	ContextDir() string
 }
 
 // GeneratorFactory creates a new TargetGenerator instance.
