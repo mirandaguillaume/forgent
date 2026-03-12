@@ -99,7 +99,7 @@ The Skill Behavior Model introduces a three-layer architecture:
 │  (agents/*.agent.yaml)  │  sequential | parallel | adaptive
 ├─────────────────────────┤
 │  Skill Behaviors        │  Reusable behavioral units
-│  (skills/*.skill.yaml)  │  6 facets per skill
+│  (skills/*.skill.yaml)  │  5 facets per skill
 ├─────────────────────────┤
 │  Build Targets          │  Framework-specific output
 │  (generated artifacts)  │  Compiled, never hand-written
@@ -120,9 +120,9 @@ Every skill is defined by **5 core facets**:
 | 4 | **Observability** | Traces and metrics | `trace_level: detailed`, `metrics: [tokens, latency]` |
 | 5 | **Security** | Filesystem, network, secrets | `filesystem: read-only`, `network: none` |
 
-A **Negotiation** facet handles multi-agent conflict resolution (`file_conflicts: yield`, `priority: 3`).
+Beyond the 5 core facets, a **Negotiation** facet handles multi-agent conflict resolution (`file_conflicts: yield`, `priority: 3`). It is separate because it governs inter-agent coordination, not the skill's own behavior.
 
-Three **optional documentation facets** enrich the skill without affecting its behavior:
+Three **optional documentation facets** enrich the skill without affecting its runtime behavior:
 
 | Facet | Purpose |
 |-------|---------|
@@ -169,7 +169,7 @@ negotiation:
   priority: 3
 ```
 
-**Key constraint:** `consumes` accepts a list (multiple inputs), but `produces` must contain **exactly one item**. A skill that `produces: [lint_results, type_errors]` is two skills pretending to be one. This constraint enforces the Single Responsibility Principle at the format level — each skill does one thing, and the format itself makes violations structurally visible.
+**Key constraint:** `consumes` accepts a list (multiple inputs), but `produces` must contain **exactly one item**. A skill that `produces: [lint_results, type_errors]` is two skills pretending to be one. This constraint enforces the Single Responsibility Principle at the format level — each skill does one thing, and the format itself makes violations structurally visible. The constraint is intentionally asymmetric: agents aggregate outputs from multiple skills, so `agent.produces` is a list.
 
 Skills are pure interfaces. They declare their I/O contract (`consumes`/`produces`) but have no knowledge of which other skills provide their inputs. Data flow is not declared in the skill — it emerges from the composition declared in the agent. This enforces the Law of Demeter [5]: a skill only accesses data it explicitly declares in its `consumes` contract. The linter validates that every skill's inputs are satisfied by either another skill's outputs or the agent's own `consumes`.
 
@@ -221,7 +221,7 @@ Four orchestration strategies are defined:
 | `sequential` | Skills run in declared order, outputs feed forward | CI pipelines, review workflows |
 | `parallel` | All skills run concurrently | Independent analyses |
 | `parallel-then-merge` | Run in parallel, merge results | Multi-source aggregation |
-| `adaptive` | Dynamic execution based on intermediate results | Complex decision trees |
+| `adaptive` | Dynamic execution based on intermediate results (e.g., skip `coverage-reporter` if `tdd-runner` reports zero test files). Defined for completeness; not yet implemented in the reference tooling. | Complex decision trees |
 
 Three validation rules apply to the DAG:
 
@@ -252,6 +252,8 @@ When compiling to a target, the abstract names are mapped:
 
 The skill author writes `tools: [read_file, grep]`. The compilation step translates. Switching from Claude Code to GitHub Copilot requires zero changes to any skill or agent specification — only a different build target.
 
+Tool name mapping is the first layer of portability — and the easiest. The harder layers — different tool capabilities, context window sizes, and model behaviors — remain framework-specific concerns. The compilation step can adapt to these differences (e.g., generating shorter prompts for smaller context windows), but the specification itself does not encode them. Portability at the specification level is solved; portability at the execution level is an ongoing challenge delegated to the compiler.
+
 ### 3.2 LLM Independence
 
 The format describes **behavior**, not **prompt instructions**. A skill's `strategy.steps` are declarative:
@@ -279,7 +281,7 @@ The same YAML specifications produce different outputs depending on the target:
 
 Both targets generate markdown skill files optimized for each framework's conventions. New targets can be added without modifying any existing specification — the format is open for extension.
 
-Generated skill files use a deliberate section ordering based on LLM attention research. Liu et al. [7] demonstrated that language models perform best when critical information is placed at the beginning or end of the input context — the "lost in the middle" effect. Peysakhovich & Lerer [8] confirmed that primacy and recency biases are widespread across LLM architectures. The generated output therefore places:
+Generated skill files use a deliberate section ordering motivated by LLM attention research. Liu et al. [7] demonstrated that language models perform best when critical information is placed at the beginning or end of the input context — the "lost in the middle" effect. Peysakhovich & Lerer [8] confirmed that primacy and recency biases are widespread across LLM architectures. These studies focus on information retrieval rather than instruction following, but the principle is plausible for agent prompts. Motivated by these findings, the generated output places:
 
 1. **Guardrails** first — primacy bias ensures constraints are remembered
 2. **Context, Strategy** in the middle — the execution plan
@@ -293,7 +295,7 @@ The Skill Behavior Model applies established software design principles to agent
 
 **Single Responsibility Principle.** Each skill produces exactly one output. This is not a convention — it is a structural constraint of the format. A skill with `produces: [lint_results, type_errors]` is invalid. This forces decomposition: one `pr-reviewer` producing two outputs becomes two skills — `review-commenter` and `risk-scorer` — each testable and reusable independently.
 
-**Law of Demeter.** A skill only accesses data declared in its `consumes` contract [5]. Data flow between skills is inferred from their `consumes`/`produces` interfaces and validated by the linter. No global state, no shared context outside the declared contract. The data flow graph is fully explicit and statically analyzable.
+**Explicit dependency injection.** A skill has no ambient access to shared state — its only inputs are what it explicitly declares in its `consumes` contract [5]. Data flow between skills is inferred from their `consumes`/`produces` interfaces and validated by the linter. No global state, no shared context outside the declared contract. The data flow graph is fully explicit and statically analyzable.
 
 **Composition over Inheritance.** Agents are flat lists of skills — no "base agents", no inheritance, no override mechanisms. Behavior is assembled, not specialized. This eliminates the fragile base class problem: changing a skill affects only agents that explicitly include it.
 
@@ -306,6 +308,8 @@ The Skill Behavior Model applies established software design principles to agent
 ---
 
 ## 5. Experience
+
+*The Skill Behavior Model is early-stage. The observations below come from the reference implementation and its test suite, not from large-scale production adoption. They illustrate the model's properties, not its maturity.*
 
 ### 5.1 Reusability
 
@@ -326,6 +330,10 @@ The Skill Behavior Model deliberately does not cover two concerns:
 **Agent identity.** The format describes what an agent *can do*, not *who it is*. Personality, tone, and values are the domain of complementary formats like SOUL.md [9]. The two are composable — an agent can have both a skill specification (capabilities) and a soul specification (identity).
 
 **Inter-agent communication.** The format defines behavior within a single agent. Communication between agents — discovery, negotiation, message passing — is the domain of protocols like MCP [10], Agent2Agent [11], and ACP. The Skill Behavior Model can coexist with these protocols: skills define what each agent does, protocols define how agents talk to each other.
+
+**Authoring cost.** The format trades authoring speed for composability. A monolithic prompt takes seconds to write; a full skill spec with 5 facets requires deliberate design. The CLI scaffolds a valid skeleton (`forgent skill create`), and the investment pays off when the same skill is reused across multiple agents or deployed to multiple frameworks. For one-off agents with no reuse intent, a monolithic prompt may remain simpler.
+
+**Runtime enforcement.** The format defines compile-time contracts, not runtime enforcement. Whether a framework actually restricts filesystem access to `read-only` or enforces a `timeout: 5min` guardrail is framework-specific. The specification makes the author's intent explicit and machine-readable; enforcement is delegated to the target platform.
 
 ---
 
@@ -370,6 +378,8 @@ These specifications answer different questions about agent systems:
 **Open Agent Specification** [14] is a declarative, framework-agnostic YAML format for defining agent workflows, introduced by Oracle in October 2025. It models workflows as directed graphs of typed nodes (LLMNode, APINode, ToolNode) with explicit data flow edges — analogous to ONNX for ML models. The Skill Behavior Model operates at a different granularity: it defines the *behavioral content* of each node, not the *workflow between nodes*. The two are potentially complementary — skills could serve as the behavioral building blocks within an Agent Spec workflow. The NIST AI Agent Standards Initiative [16] is working toward standardizing similar concerns at the policy level.
 
 **Programmatic frameworks** (LangGraph, CrewAI) [15] define agents in code (Python). The Skill Behavior Model defines agents in data (YAML). The declarative approach enables static analysis and non-programmer access to agent design. The trade-off is expressiveness — programmatic frameworks can encode arbitrary logic that a declarative format cannot.
+
+**ADL** [13] (Agent Description Language) is a declarative DSL for chatbot agents with typed slots and dialogue flows. It shares the goal of replacing free-form prompts with structured specifications, but targets conversational agents rather than coding agents. The Skill Behavior Model focuses on tool-using skills with I/O contracts rather than dialogue management.
 
 **Communication protocols** (MCP, A2A, ACP) [10][11] define how agents discover each other, negotiate, and exchange messages. The Skill Behavior Model defines what each agent does internally. They operate at different layers and are composable: skills define behavior, protocols define communication.
 
