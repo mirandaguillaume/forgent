@@ -8,21 +8,40 @@ import (
 	"github.com/mirandaguillaume/forgent/pkg/model"
 )
 
-// TargetGenerator is the public interface for generating framework-specific output.
-// Third parties can implement this interface to add new build targets.
-type TargetGenerator interface {
+// Generator is the core interface every build target must implement.
+type Generator interface {
 	Target() string
 	DefaultOutputDir() string
-	GenerateSkill(skill model.SkillBehavior) string
-	GenerateAgent(agent model.AgentComposition, skills []model.SkillBehavior, outputDir string) string
-	GenerateInstructions(skills []model.SkillBehavior, agents []model.AgentComposition) *string
-	SkillPath(name string) string
-	AgentPath(name string) string
-	InstructionsPath() *string
+	ContextDir() string
 }
 
-// GeneratorFactory creates a new TargetGenerator instance.
-type GeneratorFactory func() TargetGenerator
+// SkillGenerator generates skill files.
+type SkillGenerator interface {
+	GenerateSkill(skill model.SkillBehavior) string
+	SkillPath(name string) string
+}
+
+// AgentGenerator generates agent files.
+type AgentGenerator interface {
+	GenerateAgent(agent model.AgentComposition, skills []model.SkillBehavior, outputDir string) string
+	AgentPath(name string) string
+}
+
+// InstructionsGenerator generates framework-level instructions. Optional.
+type InstructionsGenerator interface {
+	GenerateInstructions(skills []model.SkillBehavior, agents []model.AgentComposition) string
+	InstructionsPath() string
+}
+
+// FullGenerator is the composition of Generator + SkillGenerator + AgentGenerator.
+type FullGenerator interface {
+	Generator
+	SkillGenerator
+	AgentGenerator
+}
+
+// GeneratorFactory creates a new Generator instance.
+type GeneratorFactory func() Generator
 
 var (
 	mu       sync.RWMutex
@@ -36,8 +55,8 @@ func Register(name string, factory GeneratorFactory) {
 	registry[name] = factory
 }
 
-// Get returns a new TargetGenerator for the given target name.
-func Get(name string) (TargetGenerator, error) {
+// Get returns a new Generator for the given target name.
+func Get(name string) (Generator, error) {
 	mu.RLock()
 	defer mu.RUnlock()
 	factory, ok := registry[name]

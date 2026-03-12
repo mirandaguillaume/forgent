@@ -119,3 +119,78 @@ func TestGenerateSkillMd_NoDependencies(t *testing.T) {
 	md := claude.GenerateSkillMd(skill)
 	assert.NotContains(t, md, "## Dependencies")
 }
+
+func TestGenerateSkillMd_WhenToUse(t *testing.T) {
+	skill := testSkill()
+	skill.WhenToUse = model.WhenToUseFacet{
+		Triggers:   []string{"Test failures", "Bug reports"},
+		DontUse:    []string{"Simple typos"},
+		Especially: []string{"Under pressure"},
+	}
+	md := claude.GenerateSkillMd(skill)
+	assert.Contains(t, md, "## When to Use")
+	assert.Contains(t, md, "- Test failures")
+	assert.Contains(t, md, "- Simple typos")
+	assert.Contains(t, md, "- Under pressure")
+}
+
+func TestGenerateSkillMd_WhenToUseEmpty(t *testing.T) {
+	skill := testSkill()
+	md := claude.GenerateSkillMd(skill)
+	assert.NotContains(t, md, "## When to Use")
+}
+
+func TestGenerateSkillMd_WhenToUseBeforeContext(t *testing.T) {
+	skill := testSkill()
+	skill.WhenToUse = model.WhenToUseFacet{Triggers: []string{"always"}}
+	md := claude.GenerateSkillMd(skill)
+	wtuIdx := strings.Index(md, "## When to Use")
+	ctxIdx := strings.Index(md, "## Context")
+	assert.Greater(t, ctxIdx, wtuIdx, "When to Use should appear before Context")
+}
+
+func TestGenerateSkillMd_Examples(t *testing.T) {
+	skill := testSkill()
+	skill.Examples = []model.CodeExample{
+		{Label: "Good: verify", Code: "go test ./...", Lang: "bash"},
+	}
+	md := claude.GenerateSkillMd(skill)
+	assert.Contains(t, md, "## Examples")
+	assert.Contains(t, md, "**Good: verify**")
+	assert.Contains(t, md, "```bash")
+	assert.Contains(t, md, "go test ./...")
+}
+
+func TestGenerateSkillMd_ExamplesEmpty(t *testing.T) {
+	skill := testSkill()
+	md := claude.GenerateSkillMd(skill)
+	assert.NotContains(t, md, "## Examples")
+}
+
+func TestGenerateSkillMd_AntiPatterns(t *testing.T) {
+	skill := testSkill()
+	skill.AntiPatterns = []model.AntiPattern{
+		{Excuse: "Quick fix", Reality: "Do it right"},
+	}
+	md := claude.GenerateSkillMd(skill)
+	assert.Contains(t, md, "## Red Flags")
+	assert.Contains(t, md, "| Quick fix | Do it right |")
+}
+
+func TestGenerateSkillMd_AntiPatternsEmpty(t *testing.T) {
+	skill := testSkill()
+	md := claude.GenerateSkillMd(skill)
+	assert.NotContains(t, md, "## Red Flags")
+}
+
+func TestGenerateSkillMd_ExamplesBeforeSecurity(t *testing.T) {
+	skill := testSkill()
+	skill.Examples = []model.CodeExample{{Label: "test", Code: "echo hi"}}
+	skill.AntiPatterns = []model.AntiPattern{{Excuse: "a", Reality: "b"}}
+	md := claude.GenerateSkillMd(skill)
+	exIdx := strings.Index(md, "## Examples")
+	apIdx := strings.Index(md, "## Red Flags")
+	secIdx := strings.Index(md, "## Security")
+	assert.Greater(t, apIdx, exIdx, "Red Flags should appear after Examples")
+	assert.Greater(t, secIdx, apIdx, "Security should appear after Red Flags")
+}

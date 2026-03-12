@@ -28,27 +28,28 @@ func TestClaudeGenerator_DefaultOutputDir(t *testing.T) {
 
 func TestClaudeGenerator_SkillPath(t *testing.T) {
 	gen, _ := spec.Get("claude")
-	assert.Equal(t, "skills/code-review/SKILL.md", gen.SkillPath("code-review"))
+	sg, ok := gen.(spec.SkillGenerator)
+	require.True(t, ok)
+	assert.Equal(t, "skills/code-review/SKILL.md", sg.SkillPath("code-review"))
 }
 
 func TestClaudeGenerator_AgentPath(t *testing.T) {
 	gen, _ := spec.Get("claude")
-	assert.Equal(t, "agents/code-reviewer.md", gen.AgentPath("code-reviewer"))
+	ag, ok := gen.(spec.AgentGenerator)
+	require.True(t, ok)
+	assert.Equal(t, "agents/code-reviewer.md", ag.AgentPath("code-reviewer"))
 }
 
-func TestClaudeGenerator_InstructionsPath(t *testing.T) {
+func TestClaudeGenerator_NoInstructionsGenerator(t *testing.T) {
 	gen, _ := spec.Get("claude")
-	assert.Nil(t, gen.InstructionsPath())
-}
-
-func TestClaudeGenerator_GenerateInstructions(t *testing.T) {
-	gen, _ := spec.Get("claude")
-	result := gen.GenerateInstructions(nil, nil)
-	assert.Nil(t, result)
+	_, ok := gen.(spec.InstructionsGenerator)
+	assert.False(t, ok, "Claude generator should not implement InstructionsGenerator")
 }
 
 func TestClaudeGenerator_GenerateSkill(t *testing.T) {
 	gen, _ := spec.Get("claude")
+	sg, ok := gen.(spec.SkillGenerator)
+	require.True(t, ok)
 	skill := model.SkillBehavior{
 		Skill: "test-skill",
 		Strategy: model.StrategyFacet{
@@ -62,18 +63,26 @@ func TestClaudeGenerator_GenerateSkill(t *testing.T) {
 			Network:    model.NetworkNone,
 		},
 	}
-	md := gen.GenerateSkill(skill)
+	md := sg.GenerateSkill(skill)
 	assert.Contains(t, md, "# Test Skill")
 	assert.Contains(t, md, "name: test-skill")
 }
 
 func TestClaudeGenerator_GenerateAgent(t *testing.T) {
 	gen, _ := spec.Get("claude")
+	ag, ok := gen.(spec.AgentGenerator)
+	require.True(t, ok)
 	agent := model.AgentComposition{
 		Agent:         "my-agent",
 		Orchestration: model.OrchestrationSequential,
 		Skills:        []string{"skill-a"},
 	}
-	md := gen.GenerateAgent(agent, nil, ".claude")
+	md := ag.GenerateAgent(agent, nil, ".claude")
 	assert.Contains(t, md, "name: my-agent")
+}
+
+func TestClaudeGenerator_FullGenerator(t *testing.T) {
+	gen, _ := spec.Get("claude")
+	_, ok := gen.(spec.FullGenerator)
+	assert.True(t, ok, "Claude generator should implement FullGenerator")
 }

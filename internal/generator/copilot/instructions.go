@@ -9,10 +9,10 @@ import (
 )
 
 // GenerateCopilotInstructions generates a copilot-instructions.md from skills and agents.
-// Returns nil if there are no skills or agents.
-func GenerateCopilotInstructions(skills []model.SkillBehavior, agents []model.AgentComposition) *string {
+// Returns empty string if there are no skills or agents.
+func GenerateCopilotInstructions(skills []model.SkillBehavior, agents []model.AgentComposition) string {
 	if len(skills) == 0 && len(agents) == 0 {
-		return nil
+		return ""
 	}
 
 	var lines []string
@@ -56,6 +56,5 @@ func GenerateCopilotInstructions(skills []model.SkillBehavior, agents []model.Ag
 		lines = append(lines, "")
 	}
 
-	result := strings.Join(lines, "\n")
-	return &result
+	return strings.Join(lines, "\n")
 }

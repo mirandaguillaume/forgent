@@ -15,7 +15,8 @@ const validSkillYAML = `skill: clean-skill
 version: "0.1.0"
 context:
   consumes: []
-  produces: []
+  produces:
+    - output
   memory: short-term
 strategy:
   tools:
@@ -35,13 +36,17 @@ security:
 negotiation:
   file_conflicts: yield
   priority: 0
+when_to_use:
+  triggers:
+    - "testing"
 `
 
 const noGuardrailsSkillYAML = `skill: risky-skill
 version: "0.1.0"
 context:
   consumes: []
-  produces: []
+  produces:
+    - output
   memory: short-term
 strategy:
   tools:
