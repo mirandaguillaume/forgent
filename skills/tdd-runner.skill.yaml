@@ -16,7 +16,6 @@ guardrails:
   - timeout: 10min
   - max_retries: 2
   - fail_fast_on_syntax_error
-depends_on: []
 observability:
   trace_level: detailed
   metrics: [tokens, duration, test_count]

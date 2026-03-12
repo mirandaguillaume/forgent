@@ -21,7 +21,6 @@ func validSkill() model.SkillBehavior {
 			Approach: "do things",
 		},
 		Guardrails: []model.GuardrailRule{},
-		DependsOn:  []model.Dependency{},
 		Observability: model.ObservabilityFacet{
 			TraceLevel: model.TraceLevelMinimal,
 			Metrics:    []string{"latency"},

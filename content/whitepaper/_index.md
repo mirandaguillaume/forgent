@@ -15,7 +15,7 @@ weight: 2
 
 AI agents are becoming critical infrastructure in software engineering workflows. Yet most agent definitions today are monolithic prompt files — brittle, untestable, and locked to a single framework and a single model.
 
-This paper presents the **Skill Behavior Model**, a declarative YAML format for agent engineering. Each **Skill Behavior** is a reusable unit governed by 6 facets — Context, Strategy, Guardrails, Dependencies, Observability, and Security. A skill has a single responsibility and produces exactly one output. Skills compose into **Agents** through orchestration strategies, forming a directed acyclic graph of data flow.
+This paper presents the **Skill Behavior Model**, a declarative YAML format for agent engineering. Each **Skill Behavior** is a reusable unit governed by 5 facets — Context, Strategy, Guardrails, Observability, and Security. A skill is a pure interface: it declares what it consumes and what it produces. Skills compose into **Agents** — named compositions that declare their own I/O contract and orchestration strategy. The linter validates coherence between agent and skill interfaces statically.
 
 The format is both framework-agnostic and LLM-agnostic: the same specification compiles to Claude Code [1], GitHub Copilot [2], or any other target without modification. We describe the model, its portability guarantees, and the design rationale behind each constraint.
 
@@ -77,7 +77,7 @@ All three families share the same structural gap. Only two concerns are consiste
 | Behavioral instructions | No | Free-form markdown body |
 | Guardrails (timeouts, limits) | No | Buried in prose, if present |
 | Security (filesystem, network) | No | Not declared |
-| Dependencies between skills | No | Not expressible |
+| Skill composition / data flow | No | Not expressible |
 | Observability (metrics, traces) | No | Not declared |
 | I/O contract (consumes/produces) | No | Not declared |
 
@@ -110,16 +110,15 @@ The Skill Behavior Model introduces a three-layer architecture:
 
 ### 2.1 Skills
 
-Every skill is defined by **6 core facets**:
+Every skill is defined by **5 core facets**:
 
 | # | Facet | Purpose | Example |
 |---|-------|---------|---------|
 | 1 | **Context** | I/O contract: what data flows in and out | `consumes: [git_diff, test_results]` → `produces: [review_comments]` |
 | 2 | **Strategy** | Tools, approach, execution steps | `tools: [read_file, grep]`, `approach: diff-first` |
 | 3 | **Guardrails** | Rules, limits, constraints | `timeout: 5min`, `max_comments: 15` |
-| 4 | **Dependencies** | Data flow between skills | `skill: tdd-runner provides test_results` |
-| 5 | **Observability** | Traces and metrics | `trace_level: detailed`, `metrics: [tokens, latency]` |
-| 6 | **Security** | Filesystem, network, secrets | `filesystem: read-only`, `network: none` |
+| 4 | **Observability** | Traces and metrics | `trace_level: detailed`, `metrics: [tokens, latency]` |
+| 5 | **Security** | Filesystem, network, secrets | `filesystem: read-only`, `network: none` |
 
 A **Negotiation** facet handles multi-agent conflict resolution (`file_conflicts: yield`, `priority: 3`).
 
@@ -156,12 +155,6 @@ guardrails:
   - timeout: 5min
   - no_approve_without_tests
 
-depends_on:
-  - skill: tdd-runner
-    provides: test_results
-  - skill: ts-linter
-    provides: lint_results
-
 observability:
   trace_level: detailed
   metrics: [tokens, latency, comment_count]
@@ -178,14 +171,15 @@ negotiation:
 
 **Key constraint:** `consumes` accepts a list (multiple inputs), but `produces` must contain **exactly one item**. A skill that `produces: [lint_results, type_errors]` is two skills pretending to be one. This constraint enforces the Single Responsibility Principle at the format level — each skill does one thing, and the format itself makes violations structurally visible.
 
-The `depends_on` field enforces the Law of Demeter [5]: a skill only accesses data from its explicitly declared providers. There is no way to reach into a transitive dependency's output — if `review-commenter` needs `test_results`, it must declare `tdd-runner` as a direct dependency. Implicit coupling between skills is impossible by construction.
+Skills are pure interfaces. They declare their I/O contract (`consumes`/`produces`) but have no knowledge of which other skills provide their inputs. Data flow is not declared in the skill — it emerges from the composition declared in the agent. This enforces the Law of Demeter [5]: a skill only accesses data it explicitly declares in its `consumes` contract. The linter validates that every skill's inputs are satisfied by either another skill's outputs or the agent's own `consumes`.
 
 ### 2.2 Agents
 
-An agent is a named list of skills with an orchestration strategy:
+An agent is a named composition of skills with its own I/O contract and orchestration strategy:
 
 ```yaml
 agent: ci-reviewer
+description: "Runs linting, type-checking, tests, coverage, then reviews and scores"
 skills:
   - ts-linter
   - type-checker
@@ -194,16 +188,19 @@ skills:
   - review-commenter
   - risk-scorer
 orchestration: sequential
-description: "Runs linting, type-checking, tests, coverage, then reviews and scores"
+consumes: [git_diff, file_tree, source_code]
+produces: [review_comments, risk_score]
 ```
+
+The agent declares what it consumes from the outside world and what it produces as final output. Skills within the agent wire together through their `consumes`/`produces` contracts — `tdd-runner` produces `test_results`, `review-commenter` consumes `test_results`. The linter validates this coherence statically: every skill's inputs must be satisfied by either another skill's outputs or the agent's `consumes`.
 
 Agents compose skills — they never inherit from other agents. There is no agent hierarchy, no "base agent" pattern. This is composition over inheritance applied at the agent level: behavior is assembled from atomic parts, not specialized from a parent.
 
-Skills declare what they produce. The agent declares the execution order. The framework reads both and orchestrates. No skill asks another skill for data — the framework resolves the dependency graph and routes outputs. This is Tell, Don't Ask [6] applied to agent design.
+Skills declare what they produce. The agent declares the execution order and its own I/O boundary. The framework reads both and orchestrates. No skill asks another skill for data — the framework resolves the data flow and routes outputs. This is Tell, Don't Ask [6] applied to agent design.
 
 ### 2.3 Orchestration
 
-Dependencies between skills form a directed acyclic graph (DAG):
+The `consumes`/`produces` contracts between skills form a directed acyclic graph (DAG):
 
 ```
 ci-reviewer agent data flow:
@@ -215,7 +212,7 @@ coverage-reporter   │
                     └──→ risk-scorer
 ```
 
-`ts-linter` produces `lint_results`. `review-commenter` consumes `lint_results`. The dependency is declared in the skill spec, and the graph is statically verifiable before any agent runs.
+`ts-linter` produces `lint_results`. `review-commenter` consumes `lint_results`. The data flow emerges from the skill interfaces — no explicit wiring is needed. The graph is statically verifiable before any agent runs.
 
 Four orchestration strategies are defined:
 
@@ -285,7 +282,7 @@ Both targets generate markdown skill files optimized for each framework's conven
 Generated skill files use a deliberate section ordering based on LLM attention research. Liu et al. [7] demonstrated that language models perform best when critical information is placed at the beginning or end of the input context — the "lost in the middle" effect. Peysakhovich & Lerer [8] confirmed that primacy and recency biases are widespread across LLM architectures. The generated output therefore places:
 
 1. **Guardrails** first — primacy bias ensures constraints are remembered
-2. **Context, Dependencies, Strategy** in the middle — the execution plan
+2. **Context, Strategy** in the middle — the execution plan
 3. **Security** last — recency bias keeps access controls top of mind
 
 ---
@@ -296,7 +293,7 @@ The Skill Behavior Model applies established software design principles to agent
 
 **Single Responsibility Principle.** Each skill produces exactly one output. This is not a convention — it is a structural constraint of the format. A skill with `produces: [lint_results, type_errors]` is invalid. This forces decomposition: one `pr-reviewer` producing two outputs becomes two skills — `review-commenter` and `risk-scorer` — each testable and reusable independently.
 
-**Law of Demeter.** A skill only accesses data from its explicitly declared dependencies [5]. The `depends_on` field is the sole mechanism for inter-skill data flow. No global state, no shared context outside the declared contract. The data flow graph is fully explicit and statically analyzable.
+**Law of Demeter.** A skill only accesses data declared in its `consumes` contract [5]. Data flow between skills is inferred from their `consumes`/`produces` interfaces and validated by the linter. No global state, no shared context outside the declared contract. The data flow graph is fully explicit and statically analyzable.
 
 **Composition over Inheritance.** Agents are flat lists of skills — no "base agents", no inheritance, no override mechanisms. Behavior is assembled, not specialized. This eliminates the fragile base class problem: changing a skill affects only agents that explicitly include it.
 
@@ -312,7 +309,7 @@ The Skill Behavior Model applies established software design principles to agent
 
 ### 5.1 Reusability
 
-In practice, skills compose across agents without modification. The `tdd-runner` skill — which runs tests and produces `test_results` — is consumed by `review-commenter`, `risk-scorer`, and `coverage-reporter`. Each consumer declares the dependency; the skill itself is unaware of its consumers. Adding a new consumer requires zero changes to `tdd-runner`.
+In practice, skills compose across agents without modification. The `tdd-runner` skill — which produces `test_results` — is consumed by `review-commenter`, `risk-scorer`, and `coverage-reporter` across different agents. Each consumer declares `test_results` in its `consumes`; the `tdd-runner` skill is unaware of its consumers. Adding a new consumer requires zero changes to `tdd-runner`.
 
 ### 5.2 Cross-Framework Deployment
 
@@ -350,7 +347,7 @@ The following table maps how each major coding agent framework handles customiza
 | Windsurf | `.windsurfrules` | — (rules only) | — | Activation mode |
 | Aider | `.aider.conf.yml` | — | — | Config only |
 
-A convergence is visible: the dominant pattern is markdown with YAML frontmatter declaring `name`, `description`, `tools`, and `model`. But across **all** frameworks, the same concerns remain unstructured: guardrails, security, observability, inter-skill dependencies, and I/O contracts.
+A convergence is visible: the dominant pattern is markdown with YAML frontmatter declaring `name`, `description`, `tools`, and `model`. But across **all** frameworks, the same concerns remain unstructured: guardrails, security, observability, and I/O contracts.
 
 ### 6.2 Complementary Specifications
 

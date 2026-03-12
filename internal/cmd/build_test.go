@@ -24,7 +24,7 @@ strategy:
   approach: sequential
 guardrails:
   - "timeout: 60s"
-depends_on: []
+
 observability:
   trace_level: standard
   metrics: [duration]
@@ -199,7 +199,7 @@ strategy:
   approach: sequential
 guardrails:
   - "timeout: 60s"
-depends_on: []
+
 observability:
   trace_level: standard
   metrics: [duration]
@@ -224,7 +224,7 @@ strategy:
   approach: sequential
 guardrails:
   - "timeout: 30s"
-depends_on: []
+
 observability:
   trace_level: minimal
   metrics: []
