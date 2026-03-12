@@ -85,7 +85,7 @@ Forgent maps generic tool names to framework-specific aliases:
 
 ## Adding a New Target
 
-Implement the `TargetGenerator` interface from `pkg/spec` and register it:
+Implement the generator interfaces from `pkg/spec` and register:
 
 ```go
 package mytarget
@@ -96,10 +96,11 @@ type MyGenerator struct{}
 
 func (g *MyGenerator) Target() string          { return "mytarget" }
 func (g *MyGenerator) DefaultOutputDir() string { return ".mytarget" }
-// ... implement remaining interface methods
+func (g *MyGenerator) ContextDir() string       { return "" }
+// ... implement SkillGenerator and AgentGenerator interfaces
 
 func init() {
-    spec.Register("mytarget", func() spec.TargetGenerator {
+    spec.Register("mytarget", func() spec.Generator {
         return &MyGenerator{}
     })
 }

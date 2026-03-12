@@ -2,14 +2,12 @@ skill: ts-linter
 version: "1.0.0"
 context:
   consumes: [file_tree, source_code]
-  produces: [lint_results, type_errors]
+  produces: [lint_results]
   memory: short-term
 strategy:
   tools: [bash, read_file, search]
   approach: static-analysis
   steps:
-    - run TypeScript compiler in noEmit mode
-    - collect type errors with file locations
     - check for common anti-patterns
     - produce structured lint report
 guardrails:

@@ -10,7 +10,9 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/mirandaguillaume/forgent/internal/analyzer"
+	"github.com/mirandaguillaume/forgent/internal/enricher"
 	"github.com/mirandaguillaume/forgent/internal/linter"
+	"github.com/mirandaguillaume/forgent/internal/scanner"
 	yamlloader "github.com/mirandaguillaume/forgent/internal/yaml"
 	"github.com/mirandaguillaume/forgent/pkg/model"
 	"github.com/mirandaguillaume/forgent/pkg/spec"
@@ -22,6 +24,20 @@ import (
 )
 
 const wordLimit = 500
+
+// CodebaseIndexKey is the consumes value that triggers codebase index generation.
+// The build pipeline produces the index; skills that need it declare it in consumes.
+const CodebaseIndexKey = "codebase_index"
+
+// skillConsumesIndex returns true if the skill declares codebase_index in consumes.
+func skillConsumesIndex(skill model.SkillBehavior) bool {
+	for _, c := range skill.Context.Consumes {
+		if c == CodebaseIndexKey {
+			return true
+		}
+	}
+	return false
+}
 
 // BuildResult holds the outcome of a build operation.
 type BuildResult struct {
@@ -47,7 +63,7 @@ func GetOutputDir(target, override string) string {
 }
 
 // RunBuild executes the full build pipeline: parse, lint, generate skills/agents/instructions.
-func RunBuild(skillsDir, agentsDir, outputDir, target string) BuildResult {
+func RunBuild(skillsDir, agentsDir, outputDir, target string, enrichMode scanner.EnrichMode) BuildResult {
 	result := BuildResult{Target: target, OutputDir: outputDir}
 
 	gen, err := spec.Get(target)
@@ -89,30 +105,75 @@ func RunBuild(skillsDir, agentsDir, outputDir, target string) BuildResult {
 		return result
 	}
 
-	// 2. Generate skills
+	// 2. Scan codebase if any skill consumes codebase_index or --enrich is set
+	var codebaseCtx *scanner.CodebaseContext
+	hasIndexConsumer := false
 	for _, skill := range skillMap {
-		md := gen.GenerateSkill(skill)
-		wordCount := countWords(md)
-		if wordCount > wordLimit {
-			result.Warnings = append(result.Warnings,
-				fmt.Sprintf("Skill %q generates %d words (limit: %d). Consider simplifying.", skill.Skill, wordCount, wordLimit))
+		if skillConsumesIndex(skill) {
+			hasIndexConsumer = true
+			break
 		}
+	}
 
-		relPath := gen.SkillPath(skill.Skill)
-		fullPath := filepath.Join(outputDir, filepath.FromSlash(relPath))
-		if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
-			result.Error = fmt.Sprintf("Failed to create directory for skill %q: %v", skill.Skill, err)
-			return result
+	if hasIndexConsumer || enrichMode != scanner.EnrichNone {
+		codebaseCtx, err = scanner.ScanCodebase(".")
+		if err != nil {
+			result.Warnings = append(result.Warnings,
+				fmt.Sprintf("Codebase scan failed (enrichment skipped): %v", err))
 		}
-		if err := os.WriteFile(fullPath, []byte(md), 0644); err != nil {
-			result.Error = fmt.Sprintf("Failed to write skill %q: %v", skill.Skill, err)
-			return result
+	}
+
+	// Write context files when index mode is needed
+	writeContextFiles := enrichMode == scanner.EnrichIndex || (hasIndexConsumer && enrichMode != scanner.EnrichFull)
+	if writeContextFiles && codebaseCtx != nil {
+		contextDir := filepath.Join(outputDir, gen.ContextDir())
+		if err := enricher.WriteContextFiles(codebaseCtx, contextDir); err != nil {
+			result.Warnings = append(result.Warnings,
+				fmt.Sprintf("Failed to write context files: %v", err))
 		}
-		result.SkillsGenerated++
+	}
+
+	// 3. Generate skills (enrich consumer skills or globally via --enrich)
+	sg, hasSG := gen.(spec.SkillGenerator)
+	if hasSG {
+		for _, skill := range skillMap {
+			md := sg.GenerateSkill(skill)
+			if codebaseCtx != nil {
+				switch {
+				case enrichMode == scanner.EnrichFull:
+					// --enrich=full overrides: inline into ALL skills
+					md += enricher.RenderInline(codebaseCtx)
+				case enrichMode == scanner.EnrichIndex:
+					// --enrich=index overrides: pointer in ALL skills
+					md += enricher.RenderPointer(codebaseCtx, gen.ContextDir())
+				case skillConsumesIndex(skill):
+					// Auto: only skills that consume codebase_index get the pointer
+					md += enricher.RenderPointer(codebaseCtx, gen.ContextDir())
+				}
+			}
+			wordCount := countWords(md)
+			if wordCount > wordLimit {
+				result.Warnings = append(result.Warnings,
+					fmt.Sprintf("Skill %q generates %d words (limit: %d). Consider simplifying.", skill.Skill, wordCount, wordLimit))
+			}
+
+			relPath := sg.SkillPath(skill.Skill)
+			fullPath := filepath.Join(outputDir, filepath.FromSlash(relPath))
+			if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+				result.Error = fmt.Sprintf("Failed to create directory for skill %q: %v", skill.Skill, err)
+				return result
+			}
+			if err := os.WriteFile(fullPath, []byte(md), 0644); err != nil {
+				result.Error = fmt.Sprintf("Failed to write skill %q: %v", skill.Skill, err)
+				return result
+			}
+			result.SkillsGenerated++
+		}
 	}
 
 	// 3. Generate agents
 	var allAgents []model.AgentComposition
+	ag, hasAG := gen.(spec.AgentGenerator)
 
 	if entries, err := os.ReadDir(agentsDir); err == nil {
 		for _, entry := range entries {
@@ -130,6 +191,10 @@ func RunBuild(skillsDir, agentsDir, outputDir, target string) BuildResult {
 			}
 
 			allAgents = append(allAgents, agent)
+
+			if !hasAG {
+				continue
+			}
 
 			var resolvedSkills []model.SkillBehavior
 			for _, name := range agent.Skills {
@@ -154,8 +219,8 @@ func RunBuild(skillsDir, agentsDir, outputDir, target string) BuildResult {
 				result.Warnings = append(result.Warnings, fmt.Sprintf("Agent %q: %s", agent.Agent, issue.Message))
 			}
 
-			md := gen.GenerateAgent(agent, resolvedSkills, outputDir)
-			relPath := gen.AgentPath(agent.Agent)
+			md := ag.GenerateAgent(agent, resolvedSkills, outputDir)
+			relPath := ag.AgentPath(agent.Agent)
 			fullPath := filepath.Join(outputDir, filepath.FromSlash(relPath))
 			if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
 				result.Error = fmt.Sprintf("Failed to create directory for agent %q: %v", agent.Agent, err)
@@ -169,22 +234,24 @@ func RunBuild(skillsDir, agentsDir, outputDir, target string) BuildResult {
 		}
 	}
 
-	// 4. Generate instructions
-	skills := make([]model.SkillBehavior, 0, len(skillMap))
-	for _, s := range skillMap {
-		skills = append(skills, s)
-	}
-	instructions := gen.GenerateInstructions(skills, allAgents)
-	instrPath := gen.InstructionsPath()
-	if instructions != nil && instrPath != nil {
-		fullPath := filepath.Join(outputDir, filepath.FromSlash(*instrPath))
-		if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
-			result.Error = fmt.Sprintf("Failed to create directory for instructions: %v", err)
-			return result
+	// 4. Generate instructions (optional — only if generator implements InstructionsGenerator)
+	if ig, ok := gen.(spec.InstructionsGenerator); ok {
+		skills := make([]model.SkillBehavior, 0, len(skillMap))
+		for _, s := range skillMap {
+			skills = append(skills, s)
 		}
-		if err := os.WriteFile(fullPath, []byte(*instructions), 0644); err != nil {
-			result.Error = fmt.Sprintf("Failed to write instructions: %v", err)
-			return result
+		instructions := ig.GenerateInstructions(skills, allAgents)
+		instrPath := ig.InstructionsPath()
+		if instructions != "" {
+			fullPath := filepath.Join(outputDir, filepath.FromSlash(instrPath))
+			if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+				result.Error = fmt.Sprintf("Failed to create directory for instructions: %v", err)
+				return result
+			}
+			if err := os.WriteFile(fullPath, []byte(instructions), 0644); err != nil {
+				result.Error = fmt.Sprintf("Failed to write instructions: %v", err)
+				return result
+			}
 		}
 	}
 
@@ -217,7 +284,7 @@ func PrintBuildResult(result BuildResult) {
 }
 
 func init() {
-	var target, skillsDir, agentsDir, outputDirFlag string
+	var target, skillsDir, agentsDir, outputDirFlag, enrichFlag string
 	var watchFlag bool
 
 	buildCmd := &cobra.Command{
@@ -237,14 +304,17 @@ func init() {
 				os.Exit(1)
 			}
 
+			enrichMode := scanner.EnrichMode(enrichFlag)
+
 			outputDir := GetOutputDir(target, outputDirFlag)
 
 			if watchFlag {
 				controller := CreateWatcher(WatchOptions{
-					SkillsDir: skillsDir,
-					AgentsDir: agentsDir,
-					OutputDir: outputDir,
-					Target:    target,
+					SkillsDir:  skillsDir,
+					AgentsDir:  agentsDir,
+					OutputDir:  outputDir,
+					Target:     target,
+					EnrichMode: enrichMode,
 				})
 				defer controller.Stop()
 				sigCh := make(chan os.Signal, 1)
@@ -253,7 +323,7 @@ func init() {
 				return
 			}
 
-			result := RunBuild(skillsDir, agentsDir, outputDir, target)
+			result := RunBuild(skillsDir, agentsDir, outputDir, target, enrichMode)
 			PrintBuildResult(result)
 			if !result.Success {
 				os.Exit(1)
@@ -266,6 +336,8 @@ func init() {
 	buildCmd.Flags().StringVarP(&agentsDir, "agents", "a", "agents", "agents directory")
 	buildCmd.Flags().StringVarP(&outputDirFlag, "output", "o", "", "output directory")
 	buildCmd.Flags().BoolVarP(&watchFlag, "watch", "w", false, "watch for changes")
+	buildCmd.Flags().StringVar(&enrichFlag, "enrich", "", "enrich skills with codebase context (index|full)")
+	buildCmd.Flag("enrich").NoOptDefVal = "index"
 
 	rootCmd.AddCommand(buildCmd)
 }

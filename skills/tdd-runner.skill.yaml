@@ -2,14 +2,14 @@ skill: tdd-runner
 version: "1.0.0"
 context:
   consumes: [file_tree, source_code]
-  produces: [test_results, coverage_report]
+  produces: [test_results]
   memory: short-term
 strategy:
   tools: [bash, read_file, grep]
   approach: test-first
   steps:
     - detect test framework from package.json
-    - run test suite with coverage
+    - run test suite
     - parse test output for failures
     - summarize results with pass/fail counts
 guardrails:
