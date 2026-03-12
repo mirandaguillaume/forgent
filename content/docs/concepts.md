@@ -66,24 +66,34 @@ YAML Spec → forgent build → Framework Output
 
 This separation means you write your skill specs once and deploy to any supported framework. See [Build Targets](../build-targets) for details.
 
-## TargetGenerator Interface
+## Generator Interfaces
 
-New build targets are added by implementing the `TargetGenerator` interface in `pkg/spec`:
+New build targets are added by implementing focused interfaces from `pkg/spec`:
 
 ```go
-type TargetGenerator interface {
+type Generator interface {
     Target() string
     DefaultOutputDir() string
+    ContextDir() string
+}
+
+type SkillGenerator interface {
     GenerateSkill(skill model.SkillBehavior) string
-    GenerateAgent(agent model.AgentComposition, skills []model.SkillBehavior, outputDir string) string
-    GenerateInstructions(skills []model.SkillBehavior, agents []model.AgentComposition) *string
     SkillPath(name string) string
+}
+
+type AgentGenerator interface {
+    GenerateAgent(agent model.AgentComposition, skills []model.SkillBehavior, outputDir string) string
     AgentPath(name string) string
-    InstructionsPath() *string
+}
+
+type InstructionsGenerator interface {  // Optional
+    GenerateInstructions(skills []model.SkillBehavior, agents []model.AgentComposition) string
+    InstructionsPath() string
 }
 ```
 
-This is a public interface — third parties can import `pkg/spec` and `pkg/model` to build their own generators without depending on Forgent's internal implementation.
+Interfaces follow the Interface Segregation Principle — generators implement only what they support. Third parties can import `pkg/spec` and `pkg/model` to build their own generators without depending on Forgent's internal implementation.
 
 ## Design Quality
 
