@@ -18,18 +18,15 @@ func (g *copilotGenerator) GenerateAgent(agent model.AgentComposition, skills []
 	return GenerateCopilotAgentMd(agent, skills, outputDir)
 }
 
-func (g *copilotGenerator) GenerateInstructions(skills []model.SkillBehavior, agents []model.AgentComposition) *string {
+func (g *copilotGenerator) GenerateInstructions(skills []model.SkillBehavior, agents []model.AgentComposition) string {
 	return GenerateCopilotInstructions(skills, agents)
 }
 
 func (g *copilotGenerator) SkillPath(name string) string { return "skills/" + name + "/SKILL.md" }
 func (g *copilotGenerator) AgentPath(name string) string { return "agents/" + name + ".agent.md" }
 func (g *copilotGenerator) ContextDir() string           { return "context" }
-func (g *copilotGenerator) InstructionsPath() *string {
-	s := "copilot-instructions.md"
-	return &s
-}
+func (g *copilotGenerator) InstructionsPath() string     { return "copilot-instructions.md" }
 
 func init() {
-	spec.Register("copilot", func() spec.TargetGenerator { return &copilotGenerator{} })
+	spec.Register("copilot", func() spec.Generator { return &copilotGenerator{} })
 }
