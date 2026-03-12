@@ -25,6 +25,20 @@ import (
 
 const wordLimit = 500
 
+// CodebaseIndexKey is the consumes value that triggers codebase index generation.
+// The build pipeline produces the index; skills that need it declare it in consumes.
+const CodebaseIndexKey = "codebase_index"
+
+// skillConsumesIndex returns true if the skill declares codebase_index in consumes.
+func skillConsumesIndex(skill model.SkillBehavior) bool {
+	for _, c := range skill.Context.Consumes {
+		if c == CodebaseIndexKey {
+			return true
+		}
+	}
+	return false
+}
+
 // BuildResult holds the outcome of a build operation.
 type BuildResult struct {
 	Success         bool
@@ -56,25 +70,6 @@ func RunBuild(skillsDir, agentsDir, outputDir, target string, enrichMode scanner
 	if err != nil {
 		result.Error = err.Error()
 		return result
-	}
-
-	// 0. Scan codebase if enrichment is requested (SOAP "Objective" layer)
-	var codebaseCtx *scanner.CodebaseContext
-	if enrichMode != scanner.EnrichNone {
-		codebaseCtx, err = scanner.ScanCodebase(".")
-		if err != nil {
-			result.Warnings = append(result.Warnings,
-				fmt.Sprintf("Codebase scan failed (enrichment skipped): %v", err))
-		}
-	}
-
-	// Write context files in index mode (SOAP "Objective" → external files)
-	if enrichMode == scanner.EnrichIndex && codebaseCtx != nil {
-		contextDir := filepath.Join(outputDir, gen.ContextDir())
-		if err := enricher.WriteContextFiles(codebaseCtx, contextDir); err != nil {
-			result.Warnings = append(result.Warnings,
-				fmt.Sprintf("Failed to write context files: %v", err))
-		}
 	}
 
 	// 1. Parse all skills
@@ -110,15 +105,48 @@ func RunBuild(skillsDir, agentsDir, outputDir, target string, enrichMode scanner
 		return result
 	}
 
-	// 2. Generate skills (append SOAP "Plan" pointer or inline content)
+	// 2. Scan codebase if any skill consumes codebase_index or --enrich is set
+	var codebaseCtx *scanner.CodebaseContext
+	hasIndexConsumer := false
+	for _, skill := range skillMap {
+		if skillConsumesIndex(skill) {
+			hasIndexConsumer = true
+			break
+		}
+	}
+
+	if hasIndexConsumer || enrichMode != scanner.EnrichNone {
+		codebaseCtx, err = scanner.ScanCodebase(".")
+		if err != nil {
+			result.Warnings = append(result.Warnings,
+				fmt.Sprintf("Codebase scan failed (enrichment skipped): %v", err))
+		}
+	}
+
+	// Write context files when index mode is needed
+	writeContextFiles := enrichMode == scanner.EnrichIndex || (hasIndexConsumer && enrichMode != scanner.EnrichFull)
+	if writeContextFiles && codebaseCtx != nil {
+		contextDir := filepath.Join(outputDir, gen.ContextDir())
+		if err := enricher.WriteContextFiles(codebaseCtx, contextDir); err != nil {
+			result.Warnings = append(result.Warnings,
+				fmt.Sprintf("Failed to write context files: %v", err))
+		}
+	}
+
+	// 3. Generate skills (enrich consumer skills or globally via --enrich)
 	for _, skill := range skillMap {
 		md := gen.GenerateSkill(skill)
 		if codebaseCtx != nil {
-			switch enrichMode {
-			case scanner.EnrichIndex:
-				md += enricher.RenderPointer(codebaseCtx, gen.ContextDir())
-			case scanner.EnrichFull:
+			switch {
+			case enrichMode == scanner.EnrichFull:
+				// --enrich=full overrides: inline into ALL skills
 				md += enricher.RenderInline(codebaseCtx)
+			case enrichMode == scanner.EnrichIndex:
+				// --enrich=index overrides: pointer in ALL skills
+				md += enricher.RenderPointer(codebaseCtx, gen.ContextDir())
+			case skillConsumesIndex(skill):
+				// Auto: only skills that consume codebase_index get the pointer
+				md += enricher.RenderPointer(codebaseCtx, gen.ContextDir())
 			}
 		}
 		wordCount := countWords(md)
