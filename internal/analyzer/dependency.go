@@ -24,16 +24,20 @@ type DependencyIssue struct {
 	Details []string
 }
 
-// CheckDependencies analyzes a set of skills for dependency issues:
-// missing dependencies, circular dependencies, and unmet context.
-func CheckDependencies(skills []model.SkillBehavior) []DependencyIssue {
-	var issues []DependencyIssue
-	skillMap := make(map[string]model.SkillBehavior)
+// toSkillMap builds a lookup map from skill name to SkillBehavior.
+func toSkillMap(skills []model.SkillBehavior) map[string]model.SkillBehavior {
+	m := make(map[string]model.SkillBehavior)
 	for _, s := range skills {
-		skillMap[s.Skill] = s
+		m[s.Skill] = s
 	}
+	return m
+}
 
-	// 1. Check missing dependencies
+// CheckMissingDependencies checks for references to non-existent skills.
+func CheckMissingDependencies(skills []model.SkillBehavior) []DependencyIssue {
+	var issues []DependencyIssue
+	skillMap := toSkillMap(skills)
+
 	for _, skill := range skills {
 		for _, dep := range skill.DependsOn {
 			if _, ok := skillMap[dep.Skill]; !ok {
@@ -46,7 +50,14 @@ func CheckDependencies(skills []model.SkillBehavior) []DependencyIssue {
 		}
 	}
 
-	// 2. Check circular dependencies (DFS cycle detection)
+	return issues
+}
+
+// CheckCircularDependencies detects cycles via DFS.
+func CheckCircularDependencies(skills []model.SkillBehavior) []DependencyIssue {
+	var issues []DependencyIssue
+	skillMap := toSkillMap(skills)
+
 	visited := map[string]bool{}
 	inStack := map[string]bool{}
 
@@ -90,7 +101,14 @@ func CheckDependencies(skills []model.SkillBehavior) []DependencyIssue {
 		}
 	}
 
-	// 3. Check unmet context
+	return issues
+}
+
+// CheckUnmetContext checks that declared provides match what dependencies actually produce.
+func CheckUnmetContext(skills []model.SkillBehavior) []DependencyIssue {
+	var issues []DependencyIssue
+	skillMap := toSkillMap(skills)
+
 	for _, skill := range skills {
 		for _, dep := range skill.DependsOn {
 			if depSkill, ok := skillMap[dep.Skill]; ok {
@@ -105,6 +123,16 @@ func CheckDependencies(skills []model.SkillBehavior) []DependencyIssue {
 		}
 	}
 
+	return issues
+}
+
+// CheckDependencies analyzes a set of skills for dependency issues:
+// missing dependencies, circular dependencies, and unmet context.
+func CheckDependencies(skills []model.SkillBehavior) []DependencyIssue {
+	var issues []DependencyIssue
+	issues = append(issues, CheckMissingDependencies(skills)...)
+	issues = append(issues, CheckCircularDependencies(skills)...)
+	issues = append(issues, CheckUnmetContext(skills)...)
 	return issues
 }
 
