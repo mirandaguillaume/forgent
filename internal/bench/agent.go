@@ -158,7 +158,7 @@ func AutoGenerateTasks(ctx *scanner.CodebaseContext) []Task {
 			}
 			// Skip config files.
 			ext := filepath.Ext(f)
-			if !sourceExts[ext] {
+			if !scanner.SourceExts[ext] {
 				continue
 			}
 

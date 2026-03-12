@@ -99,11 +99,7 @@ func FormatExamples(exs []model.CodeExample) string {
 			sb.WriteString("\n")
 		}
 		sb.WriteString("**" + ex.Label + "**\n")
-		lang := ex.Lang
-		if lang == "" {
-			lang = ""
-		}
-		sb.WriteString("```" + lang + "\n")
+		sb.WriteString("```" + ex.Lang + "\n")
 		sb.WriteString(ex.Code + "\n")
 		sb.WriteString("```\n")
 	}

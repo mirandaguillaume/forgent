@@ -9,8 +9,8 @@ import (
 	"strings"
 )
 
-// skipDirs are directories excluded from scanning.
-var skipDirs = map[string]bool{
+// SkipDirs are directories excluded from scanning.
+var SkipDirs = map[string]bool{
 	".git":         true,
 	"vendor":       true,
 	"node_modules": true,
@@ -52,8 +52,8 @@ var langMap = map[string]string{
 	".exs":   "Elixir",
 }
 
-// sourceExts are file extensions that represent actual source code.
-var sourceExts = map[string]bool{
+// SourceExts are file extensions that represent actual source code.
+var SourceExts = map[string]bool{
 	".go": true, ".ts": true, ".tsx": true, ".js": true, ".jsx": true,
 	".py": true, ".rs": true, ".java": true, ".rb": true, ".cs": true,
 	".cpp": true, ".c": true, ".swift": true, ".kt": true,
@@ -149,7 +149,7 @@ func ScanCodebase(root string) (*CodebaseContext, error) {
 
 		// Skip excluded directories.
 		if d.IsDir() {
-			if skipDirs[d.Name()] || infraDirs[d.Name()] {
+			if SkipDirs[d.Name()] || infraDirs[d.Name()] {
 				return filepath.SkipDir
 			}
 			return nil
@@ -168,7 +168,7 @@ func ScanCodebase(root string) (*CodebaseContext, error) {
 		dir := filepath.Dir(rel)
 		if noiseFiles[name] || isHashedAsset(name) || monorepoBoilerplate[name] {
 			// Skip changelogs, lock files, hashed build assets, mono-repo boilerplate.
-		} else if sourceExts[ext] {
+		} else if SourceExts[ext] {
 			dirFiles[dir] = append(dirFiles[dir], name)
 			dirHasSource[dir] = true
 			dirSourceCount[dir]++
