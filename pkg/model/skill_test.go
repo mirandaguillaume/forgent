@@ -156,3 +156,129 @@ func TestNegotiationStrategyConstants(t *testing.T) {
 	assert.Equal(t, model.NegotiationStrategy("override"), model.NegotiationOverride)
 	assert.Equal(t, model.NegotiationStrategy("merge"), model.NegotiationMerge)
 }
+
+func TestWhenToUseFacetParsing(t *testing.T) {
+	input := `
+skill: debug
+version: "1.0"
+context:
+  consumes: []
+  produces: []
+  memory: short-term
+strategy:
+  tools: []
+  approach: sequential
+guardrails: []
+depends_on: []
+observability:
+  trace_level: minimal
+  metrics: []
+security:
+  filesystem: none
+  network: none
+  secrets: []
+negotiation:
+  file_conflicts: yield
+  priority: 0
+when_to_use:
+  triggers:
+    - "Test failures"
+    - "Bug reports"
+  dont_use:
+    - "Simple typo fixes"
+  especially:
+    - "After 3+ failed attempts"
+`
+	var sb model.SkillBehavior
+	err := yaml.Unmarshal([]byte(input), &sb)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"Test failures", "Bug reports"}, sb.WhenToUse.Triggers)
+	assert.Equal(t, []string{"Simple typo fixes"}, sb.WhenToUse.DontUse)
+	assert.Equal(t, []string{"After 3+ failed attempts"}, sb.WhenToUse.Especially)
+	assert.False(t, sb.WhenToUse.IsEmpty())
+}
+
+func TestWhenToUseFacetEmpty(t *testing.T) {
+	w := model.WhenToUseFacet{}
+	assert.True(t, w.IsEmpty())
+}
+
+func TestAntiPatternsParsing(t *testing.T) {
+	input := `
+skill: debug
+version: "1.0"
+context:
+  consumes: []
+  produces: []
+  memory: short-term
+strategy:
+  tools: []
+  approach: sequential
+guardrails: []
+depends_on: []
+observability:
+  trace_level: minimal
+  metrics: []
+security:
+  filesystem: none
+  network: none
+  secrets: []
+negotiation:
+  file_conflicts: yield
+  priority: 0
+anti_patterns:
+  - excuse: "Quick fix for now"
+    reality: "First fix sets the pattern"
+  - excuse: "It works on my machine"
+    reality: "Test in CI"
+`
+	var sb model.SkillBehavior
+	err := yaml.Unmarshal([]byte(input), &sb)
+	require.NoError(t, err)
+
+	require.Len(t, sb.AntiPatterns, 2)
+	assert.Equal(t, "Quick fix for now", sb.AntiPatterns[0].Excuse)
+	assert.Equal(t, "First fix sets the pattern", sb.AntiPatterns[0].Reality)
+}
+
+func TestCodeExamplesParsing(t *testing.T) {
+	input := `
+skill: debug
+version: "1.0"
+context:
+  consumes: []
+  produces: []
+  memory: short-term
+strategy:
+  tools: []
+  approach: sequential
+guardrails: []
+depends_on: []
+observability:
+  trace_level: minimal
+  metrics: []
+security:
+  filesystem: none
+  network: none
+  secrets: []
+negotiation:
+  file_conflicts: yield
+  priority: 0
+examples:
+  - label: "Good: explicit verification"
+    code: "go test ./..."
+    lang: bash
+  - label: "Bad: skip tests"
+    code: "git push --no-verify"
+`
+	var sb model.SkillBehavior
+	err := yaml.Unmarshal([]byte(input), &sb)
+	require.NoError(t, err)
+
+	require.Len(t, sb.Examples, 2)
+	assert.Equal(t, "Good: explicit verification", sb.Examples[0].Label)
+	assert.Equal(t, "go test ./...", sb.Examples[0].Code)
+	assert.Equal(t, "bash", sb.Examples[0].Lang)
+	assert.Equal(t, "", sb.Examples[1].Lang)
+}

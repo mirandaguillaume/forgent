@@ -9,30 +9,41 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// mockGenerator implements Generator + SkillGenerator + AgentGenerator (no InstructionsGenerator).
 type mockGenerator struct{}
 
 func (m *mockGenerator) Target() string            { return "mock" }
 func (m *mockGenerator) DefaultOutputDir() string  { return ".mock" }
+func (m *mockGenerator) ContextDir() string        { return "context" }
 func (m *mockGenerator) GenerateSkill(_ model.SkillBehavior) string { return "skill-md" }
 func (m *mockGenerator) GenerateAgent(_ model.AgentComposition, _ []model.SkillBehavior, _ string) string {
 	return "agent-md"
 }
-func (m *mockGenerator) GenerateInstructions(_ []model.SkillBehavior, _ []model.AgentComposition) *string {
-	return nil
-}
 func (m *mockGenerator) SkillPath(name string) string { return "skills/" + name + "/SKILL.md" }
 func (m *mockGenerator) AgentPath(name string) string { return "agents/" + name + ".md" }
-func (m *mockGenerator) InstructionsPath() *string    { return nil }
+
+// mockFullGenerator implements all 4 interfaces including InstructionsGenerator.
+type mockFullGenerator struct {
+	mockGenerator
+}
+
+func (m *mockFullGenerator) GenerateInstructions(_ []model.SkillBehavior, _ []model.AgentComposition) string {
+	return "instructions-md"
+}
+func (m *mockFullGenerator) InstructionsPath() string { return "instructions.md" }
 
 func TestRegisterAndGet(t *testing.T) {
 	spec.Reset()
-	spec.Register("mock", func() spec.TargetGenerator { return &mockGenerator{} })
+	spec.Register("mock", func() spec.Generator { return &mockGenerator{} })
 
 	gen, err := spec.Get("mock")
 	require.NoError(t, err)
 	assert.Equal(t, "mock", gen.Target())
 	assert.Equal(t, ".mock", gen.DefaultOutputDir())
-	assert.Equal(t, "skill-md", gen.GenerateSkill(model.SkillBehavior{}))
+
+	sg, ok := gen.(spec.SkillGenerator)
+	require.True(t, ok)
+	assert.Equal(t, "skill-md", sg.GenerateSkill(model.SkillBehavior{}))
 }
 
 func TestGet_Unknown(t *testing.T) {
@@ -44,8 +55,8 @@ func TestGet_Unknown(t *testing.T) {
 
 func TestAvailable(t *testing.T) {
 	spec.Reset()
-	spec.Register("beta", func() spec.TargetGenerator { return &mockGenerator{} })
-	spec.Register("alpha", func() spec.TargetGenerator { return &mockGenerator{} })
+	spec.Register("beta", func() spec.Generator { return &mockGenerator{} })
+	spec.Register("alpha", func() spec.Generator { return &mockGenerator{} })
 
 	targets := spec.Available()
 	assert.Equal(t, []string{"alpha", "beta"}, targets) // sorted
@@ -59,7 +70,7 @@ func TestAvailable_Empty(t *testing.T) {
 
 func TestReset(t *testing.T) {
 	spec.Reset()
-	spec.Register("test", func() spec.TargetGenerator { return &mockGenerator{} })
+	spec.Register("test", func() spec.Generator { return &mockGenerator{} })
 	assert.Len(t, spec.Available(), 1)
 	spec.Reset()
 	assert.Empty(t, spec.Available())
@@ -67,11 +78,37 @@ func TestReset(t *testing.T) {
 
 func TestGeneratorMethods(t *testing.T) {
 	spec.Reset()
-	spec.Register("mock", func() spec.TargetGenerator { return &mockGenerator{} })
+	spec.Register("mock", func() spec.Generator { return &mockGenerator{} })
 	gen, _ := spec.Get("mock")
 
-	assert.Equal(t, "skills/test/SKILL.md", gen.SkillPath("test"))
-	assert.Equal(t, "agents/test.md", gen.AgentPath("test"))
-	assert.Nil(t, gen.InstructionsPath())
-	assert.Nil(t, gen.GenerateInstructions(nil, nil))
+	sg, ok := gen.(spec.SkillGenerator)
+	require.True(t, ok)
+	assert.Equal(t, "skills/test/SKILL.md", sg.SkillPath("test"))
+
+	ag, ok := gen.(spec.AgentGenerator)
+	require.True(t, ok)
+	assert.Equal(t, "agents/test.md", ag.AgentPath("test"))
+
+	_, ok = gen.(spec.InstructionsGenerator)
+	assert.False(t, ok, "mockGenerator should not implement InstructionsGenerator")
+}
+
+func TestInstructionsGenerator(t *testing.T) {
+	spec.Reset()
+	spec.Register("full", func() spec.Generator { return &mockFullGenerator{} })
+	gen, _ := spec.Get("full")
+
+	ig, ok := gen.(spec.InstructionsGenerator)
+	require.True(t, ok, "mockFullGenerator should implement InstructionsGenerator")
+	assert.Equal(t, "instructions-md", ig.GenerateInstructions(nil, nil))
+	assert.Equal(t, "instructions.md", ig.InstructionsPath())
+}
+
+func TestFullGeneratorInterface(t *testing.T) {
+	spec.Reset()
+	spec.Register("mock", func() spec.Generator { return &mockGenerator{} })
+	gen, _ := spec.Get("mock")
+
+	_, ok := gen.(spec.FullGenerator)
+	assert.True(t, ok, "mockGenerator should implement FullGenerator")
 }

@@ -14,6 +14,9 @@ type SkillBreakdown struct {
 	Guardrails    int
 	Observability int
 	Security      int
+	WhenToUse     int
+	AntiPatterns  int
+	Examples      int
 }
 
 // SkillScore is the overall score and per-facet breakdown for a skill.
@@ -38,13 +41,16 @@ type AgentScore struct {
 	Breakdown AgentBreakdown
 }
 
-// Skill scoring weights
+// Skill scoring weights (base facets = 90, bonus facets = 10)
 const (
-	weightContext       = 20
-	weightStrategy      = 25
-	weightGuardrails    = 20
-	weightObservability = 15
-	weightSecurity      = 20
+	weightContext       = 18
+	weightStrategy      = 22
+	weightGuardrails    = 18
+	weightObservability = 14
+	weightSecurity      = 18
+	weightWhenToUse     = 3
+	weightAntiPatterns  = 2
+	weightExamples      = 5
 )
 
 // Agent scoring weights
@@ -213,6 +219,46 @@ func scoreSecurity(skill model.SkillBehavior) int {
 	return clampRound(score, weightSecurity)
 }
 
+func scoreWhenToUse(skill model.SkillBehavior) int {
+	if skill.WhenToUse.IsEmpty() {
+		return 0
+	}
+	score := 0.0
+	max := float64(weightWhenToUse)
+	if len(skill.WhenToUse.Triggers) > 0 {
+		score += max * 0.4
+	}
+	if len(skill.WhenToUse.DontUse) > 0 {
+		score += max * 0.3
+	}
+	if len(skill.WhenToUse.Especially) > 0 {
+		score += max * 0.3
+	}
+	return clampRound(score, weightWhenToUse)
+}
+
+func scoreAntiPatterns(skill model.SkillBehavior) int {
+	if len(skill.AntiPatterns) == 0 {
+		return 0
+	}
+	score := float64(weightAntiPatterns) * 0.5
+	if len(skill.AntiPatterns) >= 2 {
+		score = float64(weightAntiPatterns)
+	}
+	return clampRound(score, weightAntiPatterns)
+}
+
+func scoreExamples(skill model.SkillBehavior) int {
+	if len(skill.Examples) == 0 {
+		return 0
+	}
+	score := float64(weightExamples) * 0.5
+	if len(skill.Examples) >= 2 {
+		score = float64(weightExamples)
+	}
+	return clampRound(score, weightExamples)
+}
+
 // ScoreSkill calculates the AX quality score for a skill.
 func ScoreSkill(skill model.SkillBehavior) SkillScore {
 	breakdown := SkillBreakdown{
@@ -221,10 +267,14 @@ func ScoreSkill(skill model.SkillBehavior) SkillScore {
 		Guardrails:    scoreGuardrails(skill),
 		Observability: scoreObservability(skill),
 		Security:      scoreSecurity(skill),
+		WhenToUse:     scoreWhenToUse(skill),
+		AntiPatterns:  scoreAntiPatterns(skill),
+		Examples:      scoreExamples(skill),
 	}
 
 	total := breakdown.Context + breakdown.Strategy + breakdown.Guardrails +
-		breakdown.Observability + breakdown.Security
+		breakdown.Observability + breakdown.Security +
+		breakdown.WhenToUse + breakdown.AntiPatterns + breakdown.Examples
 
 	return SkillScore{
 		Skill:     skill.Skill,
