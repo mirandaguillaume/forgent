@@ -6,17 +6,16 @@ import (
 	"github.com/mirandaguillaume/forgent/internal/generator/copilot"
 	"github.com/mirandaguillaume/forgent/pkg/model"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func TestGenerateCopilotInstructions_NilForEmpty(t *testing.T) {
+func TestGenerateCopilotInstructions_EmptyForNil(t *testing.T) {
 	result := copilot.GenerateCopilotInstructions(nil, nil)
-	assert.Nil(t, result)
+	assert.Empty(t, result)
 }
 
-func TestGenerateCopilotInstructions_NilForEmptySlices(t *testing.T) {
+func TestGenerateCopilotInstructions_EmptyForEmptySlices(t *testing.T) {
 	result := copilot.GenerateCopilotInstructions([]model.SkillBehavior{}, []model.AgentComposition{})
-	assert.Nil(t, result)
+	assert.Empty(t, result)
 }
 
 func TestGenerateCopilotInstructions_WithSkills(t *testing.T) {
@@ -38,11 +37,11 @@ func TestGenerateCopilotInstructions_WithSkills(t *testing.T) {
 		},
 	}
 	result := copilot.GenerateCopilotInstructions(skills, nil)
-	require.NotNil(t, result)
-	assert.Contains(t, *result, "# Project Instructions")
-	assert.Contains(t, *result, "## Available Skills")
-	assert.Contains(t, *result, "**Code Review**")
-	assert.Contains(t, *result, "analytical-based skill")
+	assert.NotEmpty(t, result)
+	assert.Contains(t, result, "# Project Instructions")
+	assert.Contains(t, result, "## Available Skills")
+	assert.Contains(t, result, "**Code Review**")
+	assert.Contains(t, result, "analytical-based skill")
 }
 
 func TestGenerateCopilotInstructions_WithAgents(t *testing.T) {
@@ -55,10 +54,10 @@ func TestGenerateCopilotInstructions_WithAgents(t *testing.T) {
 		},
 	}
 	result := copilot.GenerateCopilotInstructions(nil, agents)
-	require.NotNil(t, result)
-	assert.Contains(t, *result, "## Available Agents")
-	assert.Contains(t, *result, "**Code Reviewer**")
-	assert.Contains(t, *result, "Reviews code for quality")
+	assert.NotEmpty(t, result)
+	assert.Contains(t, result, "## Available Agents")
+	assert.Contains(t, result, "**Code Reviewer**")
+	assert.Contains(t, result, "Reviews code for quality")
 }
 
 func TestGenerateCopilotInstructions_AgentWithoutDescription(t *testing.T) {
@@ -70,8 +69,8 @@ func TestGenerateCopilotInstructions_AgentWithoutDescription(t *testing.T) {
 		},
 	}
 	result := copilot.GenerateCopilotInstructions(nil, agents)
-	require.NotNil(t, result)
-	assert.Contains(t, *result, "**My Agent**: parallel agent with 3 skills")
+	assert.NotEmpty(t, result)
+	assert.Contains(t, result, "**My Agent**: parallel agent with 3 skills")
 }
 
 func TestGenerateCopilotInstructions_WithGuardrails(t *testing.T) {
@@ -95,10 +94,10 @@ func TestGenerateCopilotInstructions_WithGuardrails(t *testing.T) {
 		},
 	}
 	result := copilot.GenerateCopilotInstructions(skills, nil)
-	require.NotNil(t, result)
-	assert.Contains(t, *result, "## Global Guardrails")
-	assert.Contains(t, *result, "- Never delete files")
-	assert.Contains(t, *result, "- Always backup first")
+	assert.NotEmpty(t, result)
+	assert.Contains(t, result, "## Global Guardrails")
+	assert.Contains(t, result, "- Never delete files")
+	assert.Contains(t, result, "- Always backup first")
 }
 
 func TestGenerateCopilotInstructions_NoGuardrailsSection(t *testing.T) {
@@ -118,8 +117,8 @@ func TestGenerateCopilotInstructions_NoGuardrailsSection(t *testing.T) {
 		},
 	}
 	result := copilot.GenerateCopilotInstructions(skills, nil)
-	require.NotNil(t, result)
-	assert.NotContains(t, *result, "## Global Guardrails")
+	assert.NotEmpty(t, result)
+	assert.NotContains(t, result, "## Global Guardrails")
 }
 
 func TestGenerateCopilotInstructions_BothSkillsAndAgents(t *testing.T) {
@@ -148,7 +147,7 @@ func TestGenerateCopilotInstructions_BothSkillsAndAgents(t *testing.T) {
 		},
 	}
 	result := copilot.GenerateCopilotInstructions(skills, agents)
-	require.NotNil(t, result)
-	assert.Contains(t, *result, "## Available Skills")
-	assert.Contains(t, *result, "## Available Agents")
+	assert.NotEmpty(t, result)
+	assert.Contains(t, result, "## Available Skills")
+	assert.Contains(t, result, "## Available Agents")
 }

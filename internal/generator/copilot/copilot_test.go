@@ -28,23 +28,29 @@ func TestCopilotGenerator_DefaultOutputDir(t *testing.T) {
 
 func TestCopilotGenerator_SkillPath(t *testing.T) {
 	gen, _ := spec.Get("copilot")
-	assert.Equal(t, "skills/code-review/SKILL.md", gen.SkillPath("code-review"))
+	sg, ok := gen.(spec.SkillGenerator)
+	require.True(t, ok)
+	assert.Equal(t, "skills/code-review/SKILL.md", sg.SkillPath("code-review"))
 }
 
 func TestCopilotGenerator_AgentPath(t *testing.T) {
 	gen, _ := spec.Get("copilot")
-	assert.Equal(t, "agents/code-reviewer.agent.md", gen.AgentPath("code-reviewer"))
+	ag, ok := gen.(spec.AgentGenerator)
+	require.True(t, ok)
+	assert.Equal(t, "agents/code-reviewer.agent.md", ag.AgentPath("code-reviewer"))
 }
 
 func TestCopilotGenerator_InstructionsPath(t *testing.T) {
 	gen, _ := spec.Get("copilot")
-	path := gen.InstructionsPath()
-	require.NotNil(t, path)
-	assert.Equal(t, "copilot-instructions.md", *path)
+	ig, ok := gen.(spec.InstructionsGenerator)
+	require.True(t, ok, "Copilot generator should implement InstructionsGenerator")
+	assert.Equal(t, "copilot-instructions.md", ig.InstructionsPath())
 }
 
-func TestCopilotGenerator_GenerateInstructions_NotNil(t *testing.T) {
+func TestCopilotGenerator_GenerateInstructions_NotEmpty(t *testing.T) {
 	gen, _ := spec.Get("copilot")
+	ig, ok := gen.(spec.InstructionsGenerator)
+	require.True(t, ok)
 	skills := []model.SkillBehavior{
 		{
 			Skill: "test-skill",
@@ -60,19 +66,23 @@ func TestCopilotGenerator_GenerateInstructions_NotNil(t *testing.T) {
 			},
 		},
 	}
-	result := gen.GenerateInstructions(skills, nil)
-	require.NotNil(t, result)
-	assert.Contains(t, *result, "# Project Instructions")
+	result := ig.GenerateInstructions(skills, nil)
+	assert.NotEmpty(t, result)
+	assert.Contains(t, result, "# Project Instructions")
 }
 
-func TestCopilotGenerator_GenerateInstructions_NilForEmpty(t *testing.T) {
+func TestCopilotGenerator_GenerateInstructions_EmptyForNoInput(t *testing.T) {
 	gen, _ := spec.Get("copilot")
-	result := gen.GenerateInstructions(nil, nil)
-	assert.Nil(t, result)
+	ig, ok := gen.(spec.InstructionsGenerator)
+	require.True(t, ok)
+	result := ig.GenerateInstructions(nil, nil)
+	assert.Empty(t, result)
 }
 
 func TestCopilotGenerator_GenerateSkill(t *testing.T) {
 	gen, _ := spec.Get("copilot")
+	sg, ok := gen.(spec.SkillGenerator)
+	require.True(t, ok)
 	skill := model.SkillBehavior{
 		Skill: "test-skill",
 		Strategy: model.StrategyFacet{
@@ -86,18 +96,26 @@ func TestCopilotGenerator_GenerateSkill(t *testing.T) {
 			Network:    model.NetworkNone,
 		},
 	}
-	md := gen.GenerateSkill(skill)
+	md := sg.GenerateSkill(skill)
 	assert.Contains(t, md, "# Test Skill")
 	assert.Contains(t, md, "name: test-skill")
 }
 
 func TestCopilotGenerator_GenerateAgent(t *testing.T) {
 	gen, _ := spec.Get("copilot")
+	ag, ok := gen.(spec.AgentGenerator)
+	require.True(t, ok)
 	agent := model.AgentComposition{
 		Agent:         "my-agent",
 		Orchestration: model.OrchestrationSequential,
 		Skills:        []string{"skill-a"},
 	}
-	md := gen.GenerateAgent(agent, nil, ".github")
+	md := ag.GenerateAgent(agent, nil, ".github")
 	assert.Contains(t, md, "name: my-agent")
+}
+
+func TestCopilotGenerator_FullGenerator(t *testing.T) {
+	gen, _ := spec.Get("copilot")
+	_, ok := gen.(spec.FullGenerator)
+	assert.True(t, ok, "Copilot generator should implement FullGenerator")
 }
