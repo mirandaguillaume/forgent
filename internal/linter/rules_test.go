@@ -195,6 +195,72 @@ func TestSingleProducesOutput_OneProduces_NoIssue(t *testing.T) {
 	assert.Nil(t, result)
 }
 
+func TestProducesMatchesDescription_ConjunctionAnd_Error(t *testing.T) {
+	skill := minimalSkill()
+	skill.Strategy.Approach = "parse the file and generate output"
+
+	result := producesMatchesDescription(skill)
+
+	assert.NotNil(t, result)
+	assert.Equal(t, "produces-matches-description", result.Rule)
+	assert.Equal(t, SeverityError, result.Severity)
+	assert.Equal(t, "strategy", result.Facet)
+	assert.Contains(t, result.Message, " and ")
+}
+
+func TestProducesMatchesDescription_ConjunctionEt_Error(t *testing.T) {
+	skill := minimalSkill()
+	skill.Strategy.Approach = "analyser le fichier et produire le rapport"
+
+	result := producesMatchesDescription(skill)
+
+	assert.NotNil(t, result)
+	assert.Equal(t, "produces-matches-description", result.Rule)
+	assert.Equal(t, SeverityError, result.Severity)
+	assert.Contains(t, result.Message, " et ")
+}
+
+func TestProducesMatchesDescription_ConjunctionThen_Error(t *testing.T) {
+	skill := minimalSkill()
+	skill.Strategy.Approach = "scan the code then report findings"
+
+	result := producesMatchesDescription(skill)
+
+	assert.NotNil(t, result)
+	assert.Equal(t, "produces-matches-description", result.Rule)
+	assert.Contains(t, result.Message, " then ")
+}
+
+func TestProducesMatchesDescription_ConjunctionAmpersand_Error(t *testing.T) {
+	skill := minimalSkill()
+	skill.Strategy.Approach = "lint & format the code"
+
+	result := producesMatchesDescription(skill)
+
+	assert.NotNil(t, result)
+	assert.Equal(t, "produces-matches-description", result.Rule)
+	assert.Contains(t, result.Message, " & ")
+}
+
+func TestProducesMatchesDescription_CaseInsensitive_Error(t *testing.T) {
+	skill := minimalSkill()
+	skill.Strategy.Approach = "Parse the file AND generate output"
+
+	result := producesMatchesDescription(skill)
+
+	assert.NotNil(t, result)
+	assert.Equal(t, "produces-matches-description", result.Rule)
+}
+
+func TestProducesMatchesDescription_NoConjunction_NoIssue(t *testing.T) {
+	skill := minimalSkill()
+	skill.Strategy.Approach = "sequential processing of inputs"
+
+	result := producesMatchesDescription(skill)
+
+	assert.Nil(t, result)
+}
+
 func TestLintSkill_CleanSkill_EmptyResults(t *testing.T) {
 	skill := minimalSkill()
 	skill.Guardrails = parseGuardrails(t, `- "timeout: 30s"`)
