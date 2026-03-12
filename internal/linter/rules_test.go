@@ -10,6 +10,16 @@ import (
 	"github.com/mirandaguillaume/forgent/pkg/model"
 )
 
+// findResult returns the first LintResult matching the given rule name, or nil.
+func findResult(results []LintResult, ruleName string) *LintResult {
+	for i := range results {
+		if results[i].Rule == ruleName {
+			return &results[i]
+		}
+	}
+	return nil
+}
+
 // minimalSkill returns a valid skill with tools and no guardrails.
 func minimalSkill() model.SkillBehavior {
 	return model.SkillBehavior{
@@ -50,10 +60,10 @@ func TestNoEmptyTools_NoTools_Warning(t *testing.T) {
 	skill := minimalSkill()
 	skill.Strategy.Tools = nil
 
-	result := noEmptyTools(skill)
+	results := LintSkill(skill)
+	result := findResult(results, "no-empty-tools")
 
 	assert.NotNil(t, result)
-	assert.Equal(t, "no-empty-tools", result.Rule)
 	assert.Equal(t, SeverityWarning, result.Severity)
 	assert.Equal(t, "strategy", result.Facet)
 	assert.Contains(t, result.Message, "test-skill")
@@ -62,7 +72,8 @@ func TestNoEmptyTools_NoTools_Warning(t *testing.T) {
 func TestNoEmptyTools_WithTools_NoIssue(t *testing.T) {
 	skill := minimalSkill()
 
-	result := noEmptyTools(skill)
+	results := LintSkill(skill)
+	result := findResult(results, "no-empty-tools")
 
 	assert.Nil(t, result)
 }
@@ -70,10 +81,10 @@ func TestNoEmptyTools_WithTools_NoIssue(t *testing.T) {
 func TestHasGuardrails_NoGuardrails_Warning(t *testing.T) {
 	skill := minimalSkill()
 
-	result := hasGuardrails(skill)
+	results := LintSkill(skill)
+	result := findResult(results, "has-guardrails")
 
 	assert.NotNil(t, result)
-	assert.Equal(t, "has-guardrails", result.Rule)
 	assert.Equal(t, SeverityWarning, result.Severity)
 	assert.Equal(t, "guardrails", result.Facet)
 	assert.Contains(t, result.Message, "test-skill")
@@ -84,10 +95,10 @@ func TestObservableOutputs_ProducesNoMetrics_Warning(t *testing.T) {
 	skill.Context.Produces = []string{"report.md"}
 	skill.Observability.Metrics = nil
 
-	result := observableOutputs(skill)
+	results := LintSkill(skill)
+	result := findResult(results, "observable-outputs")
 
 	assert.NotNil(t, result)
-	assert.Equal(t, "observable-outputs", result.Rule)
 	assert.Equal(t, SeverityWarning, result.Severity)
 	assert.Equal(t, "observability", result.Facet)
 	assert.Contains(t, result.Message, "test-skill")
@@ -98,7 +109,8 @@ func TestObservableOutputs_NoProduces_NoIssue(t *testing.T) {
 	skill.Context.Produces = nil
 	skill.Observability.Metrics = nil
 
-	result := observableOutputs(skill)
+	results := LintSkill(skill)
+	result := findResult(results, "observable-outputs")
 
 	assert.Nil(t, result)
 }
@@ -108,10 +120,10 @@ func TestSecurityNeedsGuardrails_FullAccess_NoGuardrails_Error(t *testing.T) {
 	skill.Security.Filesystem = model.AccessFull
 	skill.Guardrails = nil
 
-	result := securityNeedsGuardrails(skill)
+	results := LintSkill(skill)
+	result := findResult(results, "security-needs-guardrails")
 
 	assert.NotNil(t, result)
-	assert.Equal(t, "security-needs-guardrails", result.Rule)
 	assert.Equal(t, SeverityError, result.Severity)
 	assert.Equal(t, "security", result.Facet)
 	assert.Contains(t, result.Message, "full")
@@ -122,10 +134,10 @@ func TestSecurityNeedsGuardrails_ReadWrite_NoGuardrails_Error(t *testing.T) {
 	skill.Security.Filesystem = model.AccessReadWrite
 	skill.Guardrails = nil
 
-	result := securityNeedsGuardrails(skill)
+	results := LintSkill(skill)
+	result := findResult(results, "security-needs-guardrails")
 
 	assert.NotNil(t, result)
-	assert.Equal(t, "security-needs-guardrails", result.Rule)
 	assert.Equal(t, SeverityError, result.Severity)
 	assert.Contains(t, result.Message, "read-write")
 }
@@ -135,7 +147,8 @@ func TestSecurityNeedsGuardrails_FullAccess_WithGuardrails_NoIssue(t *testing.T)
 	skill.Security.Filesystem = model.AccessFull
 	skill.Guardrails = parseGuardrails(t, `- "timeout: 30s"`)
 
-	result := securityNeedsGuardrails(skill)
+	results := LintSkill(skill)
+	result := findResult(results, "security-needs-guardrails")
 
 	assert.Nil(t, result)
 }
@@ -143,10 +156,10 @@ func TestSecurityNeedsGuardrails_FullAccess_WithGuardrails_NoIssue(t *testing.T)
 func TestHasWhenToUse_NoWhenToUse_Info(t *testing.T) {
 	skill := minimalSkill()
 
-	result := hasWhenToUse(skill)
+	results := LintSkill(skill)
+	result := findResult(results, "has-when-to-use")
 
 	assert.NotNil(t, result)
-	assert.Equal(t, "has-when-to-use", result.Rule)
 	assert.Equal(t, SeverityInfo, result.Severity)
 	assert.Equal(t, "when_to_use", result.Facet)
 }
@@ -155,7 +168,8 @@ func TestHasWhenToUse_WithTriggers_NoIssue(t *testing.T) {
 	skill := minimalSkill()
 	skill.WhenToUse = model.WhenToUseFacet{Triggers: []string{"bug"}}
 
-	result := hasWhenToUse(skill)
+	results := LintSkill(skill)
+	result := findResult(results, "has-when-to-use")
 
 	assert.Nil(t, result)
 }
@@ -164,10 +178,10 @@ func TestSingleProducesOutput_ZeroProduces_Error(t *testing.T) {
 	skill := minimalSkill()
 	skill.Context.Produces = nil
 
-	result := singleProducesOutput(skill)
+	results := LintSkill(skill)
+	result := findResult(results, "single-produces-output")
 
 	assert.NotNil(t, result)
-	assert.Equal(t, "single-produces-output", result.Rule)
 	assert.Equal(t, SeverityError, result.Severity)
 	assert.Equal(t, "context", result.Facet)
 	assert.Contains(t, result.Message, "test-skill")
@@ -178,10 +192,10 @@ func TestSingleProducesOutput_MultipleProduces_Error(t *testing.T) {
 	skill := minimalSkill()
 	skill.Context.Produces = []string{"output1", "output2"}
 
-	result := singleProducesOutput(skill)
+	results := LintSkill(skill)
+	result := findResult(results, "single-produces-output")
 
 	assert.NotNil(t, result)
-	assert.Equal(t, "single-produces-output", result.Rule)
 	assert.Equal(t, SeverityError, result.Severity)
 	assert.Contains(t, result.Message, "test-skill")
 	assert.Contains(t, result.Message, "2")
@@ -190,7 +204,8 @@ func TestSingleProducesOutput_MultipleProduces_Error(t *testing.T) {
 func TestSingleProducesOutput_OneProduces_NoIssue(t *testing.T) {
 	skill := minimalSkill()
 
-	result := singleProducesOutput(skill)
+	results := LintSkill(skill)
+	result := findResult(results, "single-produces-output")
 
 	assert.Nil(t, result)
 }
@@ -199,10 +214,10 @@ func TestProducesMatchesDescription_ConjunctionAnd_Error(t *testing.T) {
 	skill := minimalSkill()
 	skill.Strategy.Approach = "parse the file and generate output"
 
-	result := producesMatchesDescription(skill)
+	results := LintSkill(skill)
+	result := findResult(results, "produces-matches-description")
 
 	assert.NotNil(t, result)
-	assert.Equal(t, "produces-matches-description", result.Rule)
 	assert.Equal(t, SeverityError, result.Severity)
 	assert.Equal(t, "strategy", result.Facet)
 	assert.Contains(t, result.Message, " and ")
@@ -212,10 +227,10 @@ func TestProducesMatchesDescription_ConjunctionEt_Error(t *testing.T) {
 	skill := minimalSkill()
 	skill.Strategy.Approach = "analyser le fichier et produire le rapport"
 
-	result := producesMatchesDescription(skill)
+	results := LintSkill(skill)
+	result := findResult(results, "produces-matches-description")
 
 	assert.NotNil(t, result)
-	assert.Equal(t, "produces-matches-description", result.Rule)
 	assert.Equal(t, SeverityError, result.Severity)
 	assert.Contains(t, result.Message, " et ")
 }
@@ -224,7 +239,8 @@ func TestProducesMatchesDescription_ConjunctionThen_Error(t *testing.T) {
 	skill := minimalSkill()
 	skill.Strategy.Approach = "scan the code then report findings"
 
-	result := producesMatchesDescription(skill)
+	results := LintSkill(skill)
+	result := findResult(results, "produces-matches-description")
 
 	assert.NotNil(t, result)
 	assert.Equal(t, "produces-matches-description", result.Rule)
@@ -235,7 +251,8 @@ func TestProducesMatchesDescription_ConjunctionAmpersand_Error(t *testing.T) {
 	skill := minimalSkill()
 	skill.Strategy.Approach = "lint & format the code"
 
-	result := producesMatchesDescription(skill)
+	results := LintSkill(skill)
+	result := findResult(results, "produces-matches-description")
 
 	assert.NotNil(t, result)
 	assert.Equal(t, "produces-matches-description", result.Rule)
@@ -246,7 +263,8 @@ func TestProducesMatchesDescription_CaseInsensitive_Error(t *testing.T) {
 	skill := minimalSkill()
 	skill.Strategy.Approach = "Parse the file AND generate output"
 
-	result := producesMatchesDescription(skill)
+	results := LintSkill(skill)
+	result := findResult(results, "produces-matches-description")
 
 	assert.NotNil(t, result)
 	assert.Equal(t, "produces-matches-description", result.Rule)
@@ -256,7 +274,8 @@ func TestProducesMatchesDescription_NoConjunction_NoIssue(t *testing.T) {
 	skill := minimalSkill()
 	skill.Strategy.Approach = "sequential processing of inputs"
 
-	result := producesMatchesDescription(skill)
+	results := LintSkill(skill)
+	result := findResult(results, "produces-matches-description")
 
 	assert.Nil(t, result)
 }
@@ -265,10 +284,10 @@ func TestSkillNameMatchesOutput_AndPattern_Error(t *testing.T) {
 	skill := minimalSkill()
 	skill.Skill = "lint-and-format"
 
-	result := skillNameMatchesOutput(skill)
+	results := LintSkill(skill)
+	result := findResult(results, "skill-name-matches-output")
 
 	assert.NotNil(t, result)
-	assert.Equal(t, "skill-name-matches-output", result.Rule)
 	assert.Equal(t, SeverityError, result.Severity)
 	assert.Equal(t, "context", result.Facet)
 	assert.Contains(t, result.Message, "-and-")
@@ -278,7 +297,8 @@ func TestSkillNameMatchesOutput_EtPattern_Error(t *testing.T) {
 	skill := minimalSkill()
 	skill.Skill = "analyser-et-formater"
 
-	result := skillNameMatchesOutput(skill)
+	results := LintSkill(skill)
+	result := findResult(results, "skill-name-matches-output")
 
 	assert.NotNil(t, result)
 	assert.Equal(t, "skill-name-matches-output", result.Rule)
@@ -289,7 +309,8 @@ func TestSkillNameMatchesOutput_ThenPattern_Error(t *testing.T) {
 	skill := minimalSkill()
 	skill.Skill = "scan-then-report"
 
-	result := skillNameMatchesOutput(skill)
+	results := LintSkill(skill)
+	result := findResult(results, "skill-name-matches-output")
 
 	assert.NotNil(t, result)
 	assert.Equal(t, "skill-name-matches-output", result.Rule)
@@ -300,7 +321,8 @@ func TestSkillNameMatchesOutput_AmpersandPattern_Error(t *testing.T) {
 	skill := minimalSkill()
 	skill.Skill = "lint-&-format"
 
-	result := skillNameMatchesOutput(skill)
+	results := LintSkill(skill)
+	result := findResult(results, "skill-name-matches-output")
 
 	assert.NotNil(t, result)
 	assert.Equal(t, "skill-name-matches-output", result.Rule)
@@ -310,7 +332,8 @@ func TestSkillNameMatchesOutput_AmpersandPattern_Error(t *testing.T) {
 func TestSkillNameMatchesOutput_CleanName_NoIssue(t *testing.T) {
 	skill := minimalSkill()
 
-	result := skillNameMatchesOutput(skill)
+	results := LintSkill(skill)
+	result := findResult(results, "skill-name-matches-output")
 
 	assert.Nil(t, result)
 }
