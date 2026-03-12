@@ -1,25 +1,22 @@
-skill: tdd-runner
+skill: coverage-reporter
 version: "1.0.0"
 context:
   consumes: [file_tree, source_code]
-  produces: [test_results]
+  produces: [coverage_report]
   memory: short-term
 strategy:
-  tools: [bash, read_file, grep]
+  tools: [bash, read_file]
   approach: test-first
   steps:
     - detect test framework from package.json
-    - run test suite
-    - parse test output for failures
-    - summarize results with pass/fail counts
+    - run test suite with coverage flag
+    - parse coverage output into structured report
 guardrails:
   - timeout: 10min
-  - max_retries: 2
-  - fail_fast_on_syntax_error
 depends_on: []
 observability:
-  trace_level: detailed
-  metrics: [tokens, duration, test_count]
+  trace_level: standard
+  metrics: [tokens, duration]
 security:
   filesystem: full
   network: none

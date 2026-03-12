@@ -1,15 +1,15 @@
-skill: ts-linter
+skill: type-checker
 version: "1.0.0"
 context:
   consumes: [file_tree, source_code]
-  produces: [lint_results]
+  produces: [type_errors]
   memory: short-term
 strategy:
-  tools: [bash, read_file, search]
+  tools: [bash, read_file]
   approach: static-analysis
   steps:
-    - check for common anti-patterns
-    - produce structured lint report
+    - run TypeScript compiler in noEmit mode
+    - collect type errors with file locations
 guardrails:
   - timeout: 5min
   - max_file_size: 500KB
