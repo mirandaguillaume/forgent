@@ -33,31 +33,52 @@ func toSkillMap(skills []model.SkillBehavior) map[string]model.SkillBehavior {
 	return m
 }
 
-// CheckMissingDependencies checks for references to non-existent skills.
-func CheckMissingDependencies(skills []model.SkillBehavior) []DependencyIssue {
+// CheckMissingDependencies checks that all skills referenced in the agent exist.
+func CheckMissingDependencies(agent model.AgentComposition, skills []model.SkillBehavior) []DependencyIssue {
 	var issues []DependencyIssue
 	skillMap := toSkillMap(skills)
 
-	for _, skill := range skills {
-		for _, dep := range skill.DependsOn {
-			if _, ok := skillMap[dep.Skill]; !ok {
-				issues = append(issues, DependencyIssue{
-					Type:    IssueMissing,
-					Skill:   skill.Skill,
-					Message: fmt.Sprintf("Depends on %q which does not exist", dep.Skill),
-				})
-			}
+	for _, name := range agent.Skills {
+		if _, ok := skillMap[name]; !ok {
+			issues = append(issues, DependencyIssue{
+				Type:    IssueMissing,
+				Skill:   name,
+				Message: fmt.Sprintf("Agent %q references skill %q which does not exist", agent.Agent, name),
+			})
 		}
 	}
 
 	return issues
 }
 
-// CheckCircularDependencies detects cycles via DFS.
-func CheckCircularDependencies(skills []model.SkillBehavior) []DependencyIssue {
+// CheckCircularDependencies detects cycles in the consumes/produces graph within an agent.
+func CheckCircularDependencies(agent model.AgentComposition, skills []model.SkillBehavior) []DependencyIssue {
 	var issues []DependencyIssue
 	skillMap := toSkillMap(skills)
 
+	// Build producer map: data item -> skill name
+	producerOf := make(map[string]string)
+	for _, name := range agent.Skills {
+		if s, ok := skillMap[name]; ok {
+			for _, p := range s.Context.Produces {
+				producerOf[p] = name
+			}
+		}
+	}
+
+	// Build adjacency: skill A -> skill B if A consumes something B produces
+	adj := make(map[string][]string)
+	for _, name := range agent.Skills {
+		if s, ok := skillMap[name]; ok {
+			for _, c := range s.Context.Consumes {
+				if provider, exists := producerOf[c]; exists && provider != name {
+					adj[name] = append(adj[name], provider)
+				}
+			}
+		}
+	}
+
+	// DFS cycle detection
 	visited := map[string]bool{}
 	inStack := map[string]bool{}
 
@@ -81,44 +102,59 @@ func CheckCircularDependencies(skills []model.SkillBehavior) []DependencyIssue {
 		visited[name] = true
 		inStack[name] = true
 
-		if skill, ok := skillMap[name]; ok {
-			for _, dep := range skill.DependsOn {
-				if _, exists := skillMap[dep.Skill]; exists {
-					newPath := make([]string, len(path)+1)
-					copy(newPath, path)
-					newPath[len(path)] = name
-					dfs(dep.Skill, newPath)
-				}
-			}
+		for _, dep := range adj[name] {
+			newPath := make([]string, len(path)+1)
+			copy(newPath, path)
+			newPath[len(path)] = name
+			dfs(dep, newPath)
 		}
 
 		inStack[name] = false
 	}
 
-	for _, skill := range skills {
-		if !visited[skill.Skill] {
-			dfs(skill.Skill, nil)
+	for _, name := range agent.Skills {
+		if !visited[name] {
+			dfs(name, nil)
 		}
 	}
 
 	return issues
 }
 
-// CheckUnmetContext checks that declared provides match what dependencies actually produce.
-func CheckUnmetContext(skills []model.SkillBehavior) []DependencyIssue {
+// CheckUnmetContext validates that every skill's consumes are satisfied by
+// another skill's produces within the agent, or by the agent's own consumes.
+func CheckUnmetContext(agent model.AgentComposition, skills []model.SkillBehavior) []DependencyIssue {
 	var issues []DependencyIssue
 	skillMap := toSkillMap(skills)
 
-	for _, skill := range skills {
-		for _, dep := range skill.DependsOn {
-			if depSkill, ok := skillMap[dep.Skill]; ok {
-				if !containsString(depSkill.Context.Produces, dep.Provides) {
-					issues = append(issues, DependencyIssue{
-						Type:    IssueUnmetContext,
-						Skill:   skill.Skill,
-						Message: fmt.Sprintf("Expects %q from %q, but that skill produces: [%s]", dep.Provides, dep.Skill, strings.Join(depSkill.Context.Produces, ", ")),
-					})
-				}
+	// Collect all produces from skills in this agent
+	allProduced := make(map[string]bool)
+	for _, name := range agent.Skills {
+		if s, ok := skillMap[name]; ok {
+			for _, p := range s.Context.Produces {
+				allProduced[p] = true
+			}
+		}
+	}
+
+	// Agent-level consumes are also available as inputs
+	for _, c := range agent.Consumes {
+		allProduced[c] = true
+	}
+
+	// Check each skill's consumes
+	for _, name := range agent.Skills {
+		s, ok := skillMap[name]
+		if !ok {
+			continue
+		}
+		for _, c := range s.Context.Consumes {
+			if !allProduced[c] {
+				issues = append(issues, DependencyIssue{
+					Type:    IssueUnmetContext,
+					Skill:   name,
+					Message: fmt.Sprintf("Skill %q consumes %q but no skill in agent %q produces it and it is not in agent consumes", name, c, agent.Agent),
+				})
 			}
 		}
 	}
@@ -126,13 +162,41 @@ func CheckUnmetContext(skills []model.SkillBehavior) []DependencyIssue {
 	return issues
 }
 
-// CheckDependencies analyzes a set of skills for dependency issues:
-// missing dependencies, circular dependencies, and unmet context.
-func CheckDependencies(skills []model.SkillBehavior) []DependencyIssue {
+// CheckAgentProduces validates that the agent's declared produces match
+// what its skills actually produce.
+func CheckAgentProduces(agent model.AgentComposition, skills []model.SkillBehavior) []DependencyIssue {
 	var issues []DependencyIssue
-	issues = append(issues, CheckMissingDependencies(skills)...)
-	issues = append(issues, CheckCircularDependencies(skills)...)
-	issues = append(issues, CheckUnmetContext(skills)...)
+	skillMap := toSkillMap(skills)
+
+	allProduced := make(map[string]bool)
+	for _, name := range agent.Skills {
+		if s, ok := skillMap[name]; ok {
+			for _, p := range s.Context.Produces {
+				allProduced[p] = true
+			}
+		}
+	}
+
+	for _, p := range agent.Produces {
+		if !allProduced[p] {
+			issues = append(issues, DependencyIssue{
+				Type:    IssueUnmetContext,
+				Skill:   agent.Agent,
+				Message: fmt.Sprintf("Agent %q declares produces %q but no skill produces it", agent.Agent, p),
+			})
+		}
+	}
+
+	return issues
+}
+
+// CheckDependencies analyzes an agent and its skills for dependency issues.
+func CheckDependencies(agent model.AgentComposition, skills []model.SkillBehavior) []DependencyIssue {
+	var issues []DependencyIssue
+	issues = append(issues, CheckMissingDependencies(agent, skills)...)
+	issues = append(issues, CheckCircularDependencies(agent, skills)...)
+	issues = append(issues, CheckUnmetContext(agent, skills)...)
+	issues = append(issues, CheckAgentProduces(agent, skills)...)
 	return issues
 }
 

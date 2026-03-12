@@ -29,7 +29,7 @@ strategy:
 guardrails:
   - "timeout: 30s"
   - "max_tokens: 4096"
-depends_on: []
+
 observability:
   trace_level: detailed
   metrics:

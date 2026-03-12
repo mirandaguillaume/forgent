@@ -7,31 +7,31 @@ Forgent is built on one core idea: **agents are compositions of Skill Behaviors*
 
 ## Skill Behavior Model
 
-A **Skill Behavior** is a reusable behavioral unit that describes *what* an agent skill does and *how* it should behave. Each skill is defined in YAML with **6 facets**:
+A **Skill Behavior** is a reusable behavioral unit that describes *what* an agent skill does and *how* it should behave. Each skill is a pure interface defined in YAML with **5 facets**:
 
 | Facet | What it defines |
 |-------|----------------|
-| **Context** | Memory type, data consumed and produced |
+| **Context** | Memory type, data consumed and produced (the I/O contract) |
 | **Strategy** | Tools, approach, execution steps |
 | **Guardrails** | Rules, limits, constraints (timeouts, max tokens) |
-| **Dependencies** | Skill composition and data flow between skills |
 | **Observability** | Trace level, metrics to collect |
 | **Security** | Filesystem access, network access, secrets, sandboxing |
 
-### Why 6 facets?
+### Why 5 facets?
 
 Each facet addresses a distinct concern in agent design:
 
 - **Context** defines the I/O contract — what data flows in and out
 - **Strategy** describes the execution plan — tools and steps
 - **Guardrails** prevent runaway behavior — timeouts, limits, constraints
-- **Dependencies** enable composition — skills that build on other skills
 - **Observability** makes behavior visible — traces and metrics
 - **Security** enforces least privilege — minimal access by default
 
+Skills are pure interfaces: they declare `consumes` and `produces` but have no knowledge of which other skills provide their inputs. Data flow emerges from the composition declared in the agent.
+
 ## Agent Composition
 
-An **Agent** is a named composition of skills with an orchestration strategy:
+An **Agent** is a named composition of skills with its own I/O contract and orchestration strategy:
 
 ```yaml
 agent: research-pipeline
@@ -41,7 +41,11 @@ skills:
   - analyze-code
   - write-report
 orchestration: sequential
+consumes: [query, source_code]
+produces: [research_report]
 ```
+
+The agent declares what it `consumes` from the outside world and what it `produces` as final output. The linter validates coherence: every skill's inputs must be satisfied by either another skill's outputs or the agent's `consumes`, and the agent's `produces` must match what its skills actually produce.
 
 ### Orchestration Strategies
 

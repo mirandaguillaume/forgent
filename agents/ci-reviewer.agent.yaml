@@ -2,3 +2,5 @@ agent: ci-reviewer
 skills: [ts-linter, type-checker, tdd-runner, coverage-reporter, review-commenter, risk-scorer]
 orchestration: sequential
 description: "Runs type-checking, linting, tests, coverage, then reviews the PR diff and scores risk"
+consumes: [git_diff, file_tree, source_code]
+produces: [review_comments, risk_score]

@@ -13,7 +13,6 @@ strategy:
 guardrails:
   - timeout: 5min
   - max_file_size: 500KB
-depends_on: []
 observability:
   trace_level: standard
   metrics: [tokens, error_count]
