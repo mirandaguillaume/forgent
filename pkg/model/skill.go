@@ -133,15 +133,6 @@ func (g GuardrailRule) ContainsString(substr string) bool {
 	return strings.Contains(*g.stringVal, substr)
 }
 
-// Dependency represents a skill dependency.
-type Dependency struct {
-	Skill    string `yaml:"skill"`
-	Provides string `yaml:"provides"`
-}
-
-// DependencyFacet is a list of dependencies.
-type DependencyFacet = []Dependency
-
 // ObservabilityFacet defines tracing and metrics configuration.
 type ObservabilityFacet struct {
 	TraceLevel TraceLevel `yaml:"trace_level"`
@@ -197,7 +188,6 @@ type SkillBehavior struct {
 	Context       ContextFacet       `yaml:"context"`
 	Strategy      StrategyFacet      `yaml:"strategy"`
 	Guardrails    GuardrailsFacet    `yaml:"guardrails"`
-	DependsOn     DependencyFacet    `yaml:"depends_on"`
 	Observability ObservabilityFacet `yaml:"observability"`
 	Security      SecurityFacet      `yaml:"security"`
 	Negotiation   NegotiationFacet   `yaml:"negotiation"`

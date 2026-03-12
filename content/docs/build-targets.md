@@ -37,7 +37,7 @@ forgent build --target claude
 
 Each `SKILL.md` includes YAML frontmatter (`name`, `description`) and markdown sections ordered for LLM consumption:
 1. **Guardrails** first (primacy bias — read first, remembered best)
-2. Context, Dependencies, Strategy in the middle
+2. Context, Strategy in the middle
 3. **Security** last (recency bias — read last, top of mind)
 
 ### Agent format
