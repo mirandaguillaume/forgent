@@ -13,11 +13,11 @@ weight: 2
 
 ## Abstract
 
-AI agents are becoming critical infrastructure in software engineering workflows. Yet most agent definitions today are monolithic prompt files — brittle, untestable, and locked to a single framework and a single model.
+Most AI agent definitions today are monolithic prompt files — brittle, untestable, and locked to one framework.
 
-This paper presents the **Skill Behavior Model**, a declarative YAML format for agent engineering. Each **Skill Behavior** is a reusable unit governed by 5 facets — Context, Strategy, Guardrails, Observability, and Security. A skill is a pure interface: it declares what it consumes and what it produces. Skills compose into **Agents** — named compositions that declare their own I/O contract and orchestration strategy. The linter validates coherence between agent and skill interfaces statically.
-
-The format is both framework-agnostic and LLM-agnostic: the same specification compiles to Claude Code [1], GitHub Copilot [2], or any other target without modification. We describe the model, its portability guarantees, and the design rationale behind each constraint.
+- **Skills as interfaces** — each skill declares `consumes`/`produces` and is governed by 5 facets (Context, Strategy, Guardrails, Observability, Security)
+- **Agents as compositions** — a named list of skills with its own I/O contract and orchestration strategy, validated statically by the linter
+- **Write once, deploy anywhere** — the same YAML compiles to Claude Code [1], GitHub Copilot [2], or any other target without modification
 
 ---
 
@@ -43,12 +43,12 @@ This approach has three fundamental problems.
 
 ### 1.2 The Structured Gap
 
-The coding agent ecosystem has grown rapidly. As of early 2026, developers choose between Claude Code [1], GitHub Copilot [2], OpenAI Codex, Gemini CLI, Cursor, Windsurf, Kiro, Aider, OpenCode, and others. Most of these tools now allow some form of agent customization — but the formats are fragmented and shallow.
+The coding agent ecosystem has grown rapidly. As of early 2026, developers choose between Claude Code [1], GitHub Copilot [2], OpenAI Codex, Gemini CLI, Cursor, Windsurf, Cline, Roo Code, Augment Code, Kiro, Aider, OpenCode, Amazon Q Developer, Zed AI, Continue, and others. Most of these tools now allow some form of agent customization — but the formats are fragmented and shallow.
 
-Three families have emerged.
+Four families have emerged.
 
 
-**Declarative markdown agents.** Claude Code, GitHub Copilot, Gemini CLI, and OpenCode define agents as markdown files with YAML frontmatter. A typical agent looks like:
+**Declarative markdown agents.** Claude Code, GitHub Copilot, Gemini CLI, OpenCode, Amazon Q Developer, Zed AI, and Continue define agents as markdown files with YAML frontmatter. A typical agent looks like:
 
 ```yaml
 ---
@@ -64,11 +64,13 @@ specific, actionable feedback on quality, security, and best practices.
 
 The frontmatter declares tool access and model selection. The body is a free-form behavioral prompt. Each framework uses its own file location and field names, but the pattern is converging.
 
-**Rules-based systems.** Cursor (`.cursor/rules/*.mdc`) and Windsurf (`.windsurf/rules/`) define conditional rules that guide a single built-in agent. Rules have activation conditions (file globs, always-apply flags) but no concept of separate behavioral agents or composition.
+**Rules-based systems.** Cursor (`.cursor/rules/*.mdc`), Windsurf (`.windsurf/rules/`), Cline (`.clinerules/`), Roo Code (`.roo/rules/`), and Augment Code (`.augment/rules/`) define conditional rules that guide a single built-in agent. Rules have activation conditions (file globs, always-apply flags) but no concept of separate behavioral agents or composition.
 
-**Programmatic agents.** OpenAI Codex defines agents through its Python Agents SDK — no declarative file, agents are instantiated in code. Kiro (AWS) uses structured YAML configuration with "Powers" that bundle MCP tools, steering files, and hooks.
+**Config-based systems.** Kiro (AWS) uses structured YAML configuration with "Powers" that bundle MCP tools, steering files, and hooks. Aider uses `.aider.conf.yml` for model and behavior configuration without a standalone agent concept.
 
-All three families share the same structural gap. Only two concerns are consistently structured across agent definitions:
+**Programmatic agents.** OpenAI Codex defines agents through its Python Agents SDK — no declarative file, agents are instantiated in code.
+
+All four families share the same structural gap. Only two concerns are consistently structured across agent definitions:
 
 | Concern | Structured? | Where it lives |
 |---------|:-----------:|----------------|
@@ -99,7 +101,7 @@ The Skill Behavior Model introduces a three-layer architecture:
 │  (agents/*.agent.yaml)  │  sequential | parallel | adaptive
 ├─────────────────────────┤
 │  Skill Behaviors        │  Reusable behavioral units
-│  (skills/*.skill.yaml)  │  6 facets per skill
+│  (skills/*.skill.yaml)  │  5 facets per skill
 ├─────────────────────────┤
 │  Build Targets          │  Framework-specific output
 │  (generated artifacts)  │  Compiled, never hand-written
@@ -120,9 +122,9 @@ Every skill is defined by **5 core facets**:
 | 4 | **Observability** | Traces and metrics | `trace_level: detailed`, `metrics: [tokens, latency]` |
 | 5 | **Security** | Filesystem, network, secrets | `filesystem: read-only`, `network: none` |
 
-A **Negotiation** facet handles multi-agent conflict resolution (`file_conflicts: yield`, `priority: 3`).
+Beyond the 5 core facets, a **Negotiation** facet handles multi-agent conflict resolution (`file_conflicts: yield`, `priority: 3`). It is separate because it governs inter-agent coordination, not the skill's own behavior.
 
-Three **optional documentation facets** enrich the skill without affecting its behavior:
+Three **optional documentation facets** enrich the skill without affecting its runtime behavior:
 
 | Facet | Purpose |
 |-------|---------|
@@ -169,9 +171,210 @@ negotiation:
   priority: 3
 ```
 
-**Key constraint:** `consumes` accepts a list (multiple inputs), but `produces` must contain **exactly one item**. A skill that `produces: [lint_results, type_errors]` is two skills pretending to be one. This constraint enforces the Single Responsibility Principle at the format level — each skill does one thing, and the format itself makes violations structurally visible.
+**Key constraint:** `consumes` accepts a list (multiple inputs), but `produces` must contain **exactly one item**. A skill that `produces: [lint_results, type_errors]` is two skills pretending to be one. This constraint enforces the Single Responsibility Principle at the format level — each skill does one thing, and the format itself makes violations structurally visible. The constraint is intentionally asymmetric: agents aggregate outputs from multiple skills, so `agent.produces` is a list.
 
 Skills are pure interfaces. They declare their I/O contract (`consumes`/`produces`) but have no knowledge of which other skills provide their inputs. Data flow is not declared in the skill — it emerges from the composition declared in the agent. This enforces the Law of Demeter [5]: a skill only accesses data it explicitly declares in its `consumes` contract. The linter validates that every skill's inputs are satisfied by either another skill's outputs or the agent's own `consumes`.
+
+#### I/O Type Catalog
+
+The `consumes` and `produces` fields use **semantic type names** — free-form strings, not a closed enum. The linter validates that connections between skills are coherent (every input is satisfied), but it does not restrict which names can be used. Teams can define domain-specific types (`security_audit`, `api_docs`, `migration_plan`) alongside the built-in ones.
+
+Types fall into three categories based on their role in the data flow:
+
+- **Input** — provided by the outside world (the agent's `consumes`). These are the raw materials the agent receives.
+- **Intermediate** — produced by one skill and consumed by another within the same agent. These are internal data products.
+- **Output** — the agent's final deliverables (the agent's `produces`). These are what the caller receives.
+
+The reference implementation ships with the following types:
+
+---
+
+<dl>
+
+<dt><code>git_diff</code></dt>
+<dd>
+
+**Category:** Input
+**Description:** The unified diff of pending changes, typically obtained from `git diff`, `git diff --staged`, or a pull request payload. Represents the scope of modifications under review.
+**Typical producer:** Agent input (CI hook, PR event, user invocation).
+**Typical consumers:** `review-commenter`, `risk-scorer`.
+**Example:**
+```diff
+diff --git a/src/auth/login.ts b/src/auth/login.ts
+index 3a4b5c6..7d8e9f0 100644
+--- a/src/auth/login.ts
++++ b/src/auth/login.ts
+@@ -12,3 +12,5 @@ export async function login(credentials: Credentials) {
++  if (!credentials.email) {
++    throw new ValidationError("Email is required");
++  }
+```
+
+</dd>
+
+<dt><code>source_code</code></dt>
+<dd>
+
+**Category:** Input
+**Description:** Raw source files relevant to the task, read from the working tree or a checkout. May be the full repository or a filtered subset (e.g., only files matching `src/**/*.ts`). Provides the code context that analysis skills operate on.
+**Typical producer:** Agent input (filesystem read).
+**Typical consumers:** `ts-linter`, `type-checker`, `tdd-runner`, `coverage-reporter`.
+**Example:**
+```typescript
+// src/auth/login.ts
+export async function login(credentials: Credentials): Promise<Session> {
+  const user = await findUser(credentials.email);
+  if (!user || !await verify(credentials.password, user.hash)) {
+    throw new AuthError("Invalid credentials");
+  }
+  return createSession(user);
+}
+```
+
+</dd>
+
+<dt><code>file_tree</code></dt>
+<dd>
+
+**Category:** Input
+**Description:** A listing of file paths in the repository, providing structural context. Enables skills to understand project layout, detect naming conventions, and identify relevant files without reading their contents.
+**Typical producer:** Agent input (directory scan).
+**Typical consumers:** `ts-linter`, `type-checker`, `tdd-runner`, `coverage-reporter`.
+**Example:**
+```
+src/
+  auth/
+    login.ts
+    middleware.ts
+    session.ts
+  api/
+    handler.go
+    routes.go
+  tests/
+    auth.test.ts
+    api.test.go
+```
+
+</dd>
+
+<dt><code>lint_results</code></dt>
+<dd>
+
+**Category:** Intermediate
+**Description:** Linter output containing errors, warnings, and their file locations. Produced by a linting skill after analyzing source code against configured rules. Structured as a list of diagnostics with severity, file path, line number, and message.
+**Typical producer:** `ts-linter` (or any language-specific linting skill).
+**Typical consumers:** `review-commenter`, `risk-scorer`.
+**Example:**
+```
+src/auth/login.ts:3:1    error    no-unused-vars       'logger' is defined but never used
+src/api/handler.go:45:12 warning  sql-injection-risk    SQL query uses string concatenation
+src/auth/session.ts:8:5  warning  no-explicit-any       Unexpected 'any' type
+```
+
+</dd>
+
+<dt><code>type_errors</code></dt>
+<dd>
+
+**Category:** Intermediate
+**Description:** Type-checker output containing type mismatches, missing imports, and interface violations. Produced by a type-checking skill after static analysis. Each diagnostic includes the file path, position, error code, and a human-readable message.
+**Typical producer:** `type-checker`.
+**Typical consumers:** `review-commenter`.
+**Example:**
+```
+src/auth/login.ts:15:23 - error TS2345: Argument of type 'string' is not assignable
+                          to parameter of type 'HashedPassword'.
+src/api/routes.go:8:2   - error: cannot use "admin" (untyped string constant)
+                          as type Role in assignment
+```
+
+</dd>
+
+<dt><code>test_results</code></dt>
+<dd>
+
+**Category:** Intermediate
+**Description:** Test runner output including pass/fail counts, failure details, and execution duration. Produced by a testing skill after running the project's test suite (or a filtered subset). Provides evidence of functional correctness.
+**Typical producer:** `tdd-runner`.
+**Typical consumers:** `review-commenter`, `risk-scorer`, `coverage-reporter`.
+**Example:**
+```
+Tests: 42 passed, 2 failed, 1 skipped (45 total)
+Duration: 12.3s
+
+FAIL TestAuth/expired_token (auth_test.go:78)
+  Expected: ErrSessionExpired
+  Got:      nil
+
+FAIL TestAPI/rate_limit (api_test.go:156)
+  Expected status: 429
+  Got status: 200
+```
+
+</dd>
+
+<dt><code>coverage_report</code></dt>
+<dd>
+
+**Category:** Intermediate
+**Description:** Code coverage data including line and branch percentages, per-file breakdown, and uncovered regions. Produced by a coverage skill after analyzing test execution traces. Highlights areas of the codebase that lack test coverage.
+**Typical producer:** `coverage-reporter`.
+**Typical consumers:** `review-commenter`.
+**Example:**
+```
+Overall coverage: 78.3% (lines), 65.1% (branches)
+
+File                      Lines    Branches
+src/auth/login.ts         92.0%    85.7%
+src/auth/middleware.ts     45.2%    30.0%   ← below threshold
+src/api/handler.go        88.5%    72.3%
+src/auth/refresh.ts       12.0%    0.0%    ← critical gap
+```
+
+</dd>
+
+<dt><code>review_comments</code></dt>
+<dd>
+
+**Category:** Output
+**Description:** Actionable review comments anchored to specific files and lines, ready to post on a pull request. Each comment identifies the issue, explains why it matters, and suggests a concrete fix. Produced by a review skill that synthesizes lint results, type errors, test results, and diff analysis.
+**Typical producer:** `review-commenter`.
+**Typical consumers:** Agent output (posted to PR, displayed to user).
+**Example:**
+```markdown
+**src/api/handler.go:45** — SQL injection risk
+The query is built with string concatenation. Use parameterized queries instead:
+`db.Query("SELECT * FROM users WHERE id = ?", userID)`
+
+**src/auth/middleware.ts:12** — Missing error handling
+The `verifyToken()` call can throw but is not wrapped in try/catch.
+Consider adding error handling or using a middleware error boundary.
+```
+
+</dd>
+
+<dt><code>risk_score</code></dt>
+<dd>
+
+**Category:** Output
+**Description:** A numeric score from 0 (no risk) to 10 (critical risk) summarizing the overall risk of the change, accompanied by a brief justification. Produced by a scoring skill that weighs diff size, test coverage delta, lint severity, and affected subsystems.
+**Typical producer:** `risk-scorer`.
+**Typical consumers:** Agent output (used for merge gating, reviewer prioritization).
+**Example:**
+```
+Score: 7/10
+Justification: Large diff (420 lines) touching authentication logic
+with no new tests. Lint reports 1 SQL injection warning. Coverage
+for modified files dropped from 82% to 71%.
+```
+
+</dd>
+
+</dl>
+
+---
+
+These types are conventions, not constraints. A team building a security-focused agent might define `vulnerability_scan`, `dependency_audit`, or `compliance_report`. A documentation agent might use `api_schema` and `generated_docs`. The linter validates the wiring — that every `consumes` is satisfied by a `produces` — regardless of type names.
 
 ### 2.2 Agents
 
@@ -221,7 +424,7 @@ Four orchestration strategies are defined:
 | `sequential` | Skills run in declared order, outputs feed forward | CI pipelines, review workflows |
 | `parallel` | All skills run concurrently | Independent analyses |
 | `parallel-then-merge` | Run in parallel, merge results | Multi-source aggregation |
-| `adaptive` | Dynamic execution based on intermediate results | Complex decision trees |
+| `adaptive` | Dynamic execution based on intermediate results (e.g., skip `coverage-reporter` if `tdd-runner` reports zero test files). Defined for completeness; not yet implemented in the reference tooling. | Complex decision trees |
 
 Three validation rules apply to the DAG:
 
@@ -241,16 +444,28 @@ These rules are statically checkable — no agent needs to run for violations to
 
 Skills use abstract tool names in their `strategy.tools` field: `read_file`, `grep`, `search`, `execute`. These are behavioral capabilities, not framework-specific APIs.
 
-When compiling to a target, the abstract names are mapped:
+When compiling to a target, the abstract names are mapped to framework-specific tool APIs. The full catalog of recognized abstract tools:
 
-| Abstract | Claude Code | GitHub Copilot |
-|----------|-------------|----------------|
-| `read_file` | `Read` | `read` |
-| `grep` | `Grep` | `search` |
-| `execute` | `Bash` | `execute` |
-| `search` | `Glob` | `search` |
+| Abstract tool | Aliases | Claude Code | GitHub Copilot |
+|---------------|---------|-------------|----------------|
+| `read_file` | `read` | `Read` | `read` |
+| `write_file` | `write` | `Write` | `edit` |
+| `edit_file` | `edit` | `Edit` | `edit` |
+| `grep` | — | `Grep` | `search` |
+| `search` | `find`, `glob` | `Glob` | `search` |
+| `bash` | `shell`, `exec`, `terminal` | `Bash` | `execute` |
+| `web_fetch` | `http`, `fetch` | `WebFetch` | `web` |
+| `web_search` | — | `WebSearch` | `web` |
+| `todo` | — | `TodoWrite` | `todo` |
+| `task` | — | `Task` | `agent` |
+
+Aliases are normalized at compilation time — `read_file` and `read` both resolve to the same framework tool. When a target does not support a given tool (e.g., Cursor has no `task` equivalent), the tool is silently omitted from the generated output. The skill remains portable; the generated artifact adapts.
+
+The compilation step also **infers tools from the security facet**. A skill with `filesystem: read-only` automatically gains `read_file`, `grep`, and `search` in the generated output, even if the author did not list them explicitly. A skill with `network: full` gains `web_fetch` and `web_search`. This inference ensures that the generated agent has the minimum tools required by its declared security posture.
 
 The skill author writes `tools: [read_file, grep]`. The compilation step translates. Switching from Claude Code to GitHub Copilot requires zero changes to any skill or agent specification — only a different build target.
+
+Tool name mapping is the first layer of portability — and the easiest. The harder layers — different tool capabilities, context window sizes, and model behaviors — remain framework-specific concerns. The compilation step can adapt to these differences (e.g., generating shorter prompts for smaller context windows), but the specification itself does not encode them. Portability at the specification level is solved; portability at the execution level is an ongoing challenge delegated to the compiler.
 
 ### 3.2 LLM Independence
 
@@ -270,16 +485,37 @@ This separation means that model upgrades — or model switches — do not requi
 
 ### 3.3 Write Once, Deploy Anywhere
 
-The same YAML specifications produce different outputs depending on the target:
+The same YAML specifications produce different outputs depending on the target. The coding agent ecosystem as of early 2026 falls into four families, each with different implications for the compilation step:
 
-| Target | Output directory | Skill format | Agent format |
-|--------|-----------------|--------------|--------------|
-| Claude Code | `.claude/` | `skills/<name>/SKILL.md` | `agents/<name>.md` |
-| GitHub Copilot | `.github/` | `skills/<name>/SKILL.md` | `agents/<name>.agent.md` |
+**Declarative markdown agents.** Claude Code, GitHub Copilot, Gemini CLI, OpenCode, Amazon Q Developer, Zed AI, and Continue define agents as markdown files with YAML frontmatter. These targets have the highest fidelity — every facet of the skill specification maps directly to a generated section.
 
-Both targets generate markdown skill files optimized for each framework's conventions. New targets can be added without modifying any existing specification — the format is open for extension.
+**Rules-based systems.** Cursor, Windsurf, Cline, Roo Code, and Augment Code define conditional rules that guide a single built-in agent. Skills compile to individual rule files; the composition model (agents) is not directly expressible — the generated output flattens agent orchestration into rule ordering and activation conditions.
 
-Generated skill files use a deliberate section ordering based on LLM attention research. Liu et al. [7] demonstrated that language models perform best when critical information is placed at the beginning or end of the input context — the "lost in the middle" effect. Peysakhovich & Lerer [8] confirmed that primacy and recency biases are widespread across LLM architectures. The generated output therefore places:
+**Config-based systems.** Kiro (AWS) and Aider use structured YAML or JSON configuration. Skills map to configuration entries; the generated output adapts to each framework's config schema.
+
+**Programmatic systems.** OpenAI Codex defines agents through its Python Agents SDK. The compilation step generates code scaffolds rather than markdown files — a fundamentally different output format with lower fidelity.
+
+| Target | Output directory | Skill format | Agent format | Extra artifacts | Family | Status |
+|--------|-----------------|--------------|--------------|-----------------|--------|--------|
+| Claude Code [1] | `.claude/` | `skills/<name>/SKILL.md` | `agents/<name>.md` | — | Declarative | **Available** |
+| GitHub Copilot [2] | `.github/` | `skills/<name>/SKILL.md` | `agents/<name>.agent.md` | `copilot-instructions.md` | Declarative | **Available** |
+| Gemini CLI | `.gemini/` | `skills/<name>/SKILL.md` | `agents/<name>.md` | `GEMINI.md` | Declarative | Planned |
+| OpenCode | `.opencode/` | `skills/<name>/SKILL.md` | `agents/<name>.md` | `opencode.json` | Declarative | Planned |
+| Amazon Q Developer | `.amazonq/` | `rules/<name>.md` | `cli-agents/<name>.json` | — | Declarative | Possible |
+| Zed AI | `.rules` | Rules library `.md` | — | — | Declarative | Possible |
+| Continue | `.continue/` | Prompt files `.md` | `config.yaml` agents | — | Declarative | Possible |
+| Cursor | `.cursor/rules/` | `<name>.mdc` | — | — | Rules-based | Possible |
+| Windsurf | `.windsurf/rules/` | `<name>.md` | — | — | Rules-based | Possible |
+| Cline | `.clinerules/` | `<name>.md` | — | — | Rules-based | Possible |
+| Roo Code | `.roo/rules/` | `<name>.md` | Mode config | — | Rules-based | Possible |
+| Augment Code | `.augment/rules/` | `<name>.md` | — | — | Rules-based | Possible |
+| Codex (OpenAI) | `codex/` | — | Agents SDK (Python) | `AGENTS.md` | Programmatic | Possible |
+| Kiro (AWS) | `.kiro/` | YAML specs | YAML config | Steering files | Config-based | Possible |
+| Aider | `.aider/` | — | — | `.aider.conf.yml` | Config-based | Possible |
+
+New targets can be added without modifying any existing specification — the format is open for extension. The compilation step adapts: declarative targets get high-fidelity output preserving all facets; rules-based targets get conditional rules with activation patterns; config-based and programmatic targets get best-effort mappings with reduced fidelity.
+
+Generated skill files use a deliberate section ordering motivated by LLM attention research. Liu et al. [7] demonstrated that language models perform best when critical information is placed at the beginning or end of the input context — the "lost in the middle" effect. Peysakhovich & Lerer [8] confirmed that primacy and recency biases are widespread across LLM architectures. These studies focus on information retrieval rather than instruction following, but the principle is plausible for agent prompts. Motivated by these findings, the generated output places:
 
 1. **Guardrails** first — primacy bias ensures constraints are remembered
 2. **Context, Strategy** in the middle — the execution plan
@@ -293,7 +529,7 @@ The Skill Behavior Model applies established software design principles to agent
 
 **Single Responsibility Principle.** Each skill produces exactly one output. This is not a convention — it is a structural constraint of the format. A skill with `produces: [lint_results, type_errors]` is invalid. This forces decomposition: one `pr-reviewer` producing two outputs becomes two skills — `review-commenter` and `risk-scorer` — each testable and reusable independently.
 
-**Law of Demeter.** A skill only accesses data declared in its `consumes` contract [5]. Data flow between skills is inferred from their `consumes`/`produces` interfaces and validated by the linter. No global state, no shared context outside the declared contract. The data flow graph is fully explicit and statically analyzable.
+**Explicit dependency injection.** A skill has no ambient access to shared state — its only inputs are what it explicitly declares in its `consumes` contract [5]. Data flow between skills is inferred from their `consumes`/`produces` interfaces and validated by the linter. No global state, no shared context outside the declared contract. The data flow graph is fully explicit and statically analyzable.
 
 **Composition over Inheritance.** Agents are flat lists of skills — no "base agents", no inheritance, no override mechanisms. Behavior is assembled, not specialized. This eliminates the fragile base class problem: changing a skill affects only agents that explicitly include it.
 
@@ -306,6 +542,8 @@ The Skill Behavior Model applies established software design principles to agent
 ---
 
 ## 5. Experience
+
+*The Skill Behavior Model is early-stage. The observations below come from the reference implementation and its test suite, not from large-scale production adoption. They illustrate the model's properties, not its maturity.*
 
 ### 5.1 Reusability
 
@@ -327,6 +565,10 @@ The Skill Behavior Model deliberately does not cover two concerns:
 
 **Inter-agent communication.** The format defines behavior within a single agent. Communication between agents — discovery, negotiation, message passing — is the domain of protocols like MCP [10], Agent2Agent [11], and ACP. The Skill Behavior Model can coexist with these protocols: skills define what each agent does, protocols define how agents talk to each other.
 
+**Authoring cost.** The format trades authoring speed for composability. A monolithic prompt takes seconds to write; a full skill spec with 5 facets requires deliberate design. The CLI scaffolds a valid skeleton (`forgent skill create`), and the investment pays off when the same skill is reused across multiple agents or deployed to multiple frameworks. For one-off agents with no reuse intent, a monolithic prompt may remain simpler.
+
+**Runtime enforcement.** The format defines compile-time contracts, not runtime enforcement. Whether a framework actually restricts filesystem access to `read-only` or enforces a `timeout: 5min` guardrail is framework-specific. The specification makes the author's intent explicit and machine-readable; enforcement is delegated to the target platform.
+
 ---
 
 ## 6. Related Work
@@ -341,10 +583,16 @@ The following table maps how each major coding agent framework handles customiza
 | GitHub Copilot [2] | Repo instructions | `.github/agents/*.agent.md` | `.github/skills/*/SKILL.md` | name, description, tools, model |
 | Gemini CLI | `GEMINI.md` | `.gemini/agents/*.md` | — | name, description, tools, model, temperature, max_turns, timeout |
 | OpenCode | `opencode.json` | `.opencode/agents/*.md` | — | description, mode, model, tools, permission |
+| Amazon Q Developer | `.amazonq/rules/*.md` | `.amazonq/cli-agents/*.json` | — | name, description, tools, permissions |
+| Zed AI | `.rules` | Rules library | — | model, temperature, rules |
+| Continue | `config.yaml` | `config.yaml` agents | Prompt files `.md` | models, rules, tools (MCP) |
 | Codex (OpenAI) | `AGENTS.md` | Agents SDK (Python) | `SKILL.md` | Programmatic only |
 | Kiro (AWS) | Steering files | YAML config | "Powers" | name, description, prompt, tools, mcpServers |
 | Cursor | `.cursor/rules/*.mdc` | — (rules only) | — | description, globs, alwaysApply |
 | Windsurf | `.windsurfrules` | — (rules only) | — | Activation mode |
+| Cline | `.clinerules/*.md` | — (rules only) | — | Globs (frontmatter), activation conditions |
+| Roo Code | `.roo/rules/*.md` | Mode config | — | Modes, rules, AGENTS.md support |
+| Augment Code | `.augment/rules/*.md` | — (rules only) | — | Agent-requested activation |
 | Aider | `.aider.conf.yml` | — | — | Config only |
 
 A convergence is visible: the dominant pattern is markdown with YAML frontmatter declaring `name`, `description`, `tools`, and `model`. But across **all** frameworks, the same concerns remain unstructured: guardrails, security, observability, and I/O contracts.
@@ -370,6 +618,8 @@ These specifications answer different questions about agent systems:
 **Open Agent Specification** [14] is a declarative, framework-agnostic YAML format for defining agent workflows, introduced by Oracle in October 2025. It models workflows as directed graphs of typed nodes (LLMNode, APINode, ToolNode) with explicit data flow edges — analogous to ONNX for ML models. The Skill Behavior Model operates at a different granularity: it defines the *behavioral content* of each node, not the *workflow between nodes*. The two are potentially complementary — skills could serve as the behavioral building blocks within an Agent Spec workflow. The NIST AI Agent Standards Initiative [16] is working toward standardizing similar concerns at the policy level.
 
 **Programmatic frameworks** (LangGraph, CrewAI) [15] define agents in code (Python). The Skill Behavior Model defines agents in data (YAML). The declarative approach enables static analysis and non-programmer access to agent design. The trade-off is expressiveness — programmatic frameworks can encode arbitrary logic that a declarative format cannot.
+
+**ADL** [13] (Agent Description Language) is a declarative DSL for chatbot agents with typed slots and dialogue flows. It shares the goal of replacing free-form prompts with structured specifications, but targets conversational agents rather than coding agents. The Skill Behavior Model focuses on tool-using skills with I/O contracts rather than dialogue management.
 
 **Communication protocols** (MCP, A2A, ACP) [10][11] define how agents discover each other, negotiate, and exchange messages. The Skill Behavior Model defines what each agent does internally. They operate at different layers and are composable: skills define behavior, protocols define communication.
 
