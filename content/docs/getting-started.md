@@ -94,6 +94,16 @@ forgent build --target copilot
 
 {{% /steps %}}
 
+## Import Existing Agents (Optional)
+
+If you already have agent definitions (Claude Code, GitHub Copilot, or any markdown), import them:
+
+```bash
+forgent import .claude/agents/review.md
+```
+
+This uses an LLM to decompose the agent into Forgent skill specs, validated by `lint` and `score`.
+
 ## What's Next?
 
 - [Concepts](../concepts) — understand the Skill Behavior Model
