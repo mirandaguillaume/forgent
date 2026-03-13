@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/fatih/color"
@@ -155,7 +156,7 @@ func removeExistingFiles(result importer.ImportResult, outputDir string) {
 		if name == "" {
 			name = "unknown"
 		}
-		path := fmt.Sprintf("%s/skills/%s.skill.yaml", outputDir, name)
+		path := filepath.Join(outputDir, "skills", name+".skill.yaml")
 		os.Remove(path)
 	}
 	if result.Agent != nil {
@@ -163,7 +164,7 @@ func removeExistingFiles(result importer.ImportResult, outputDir string) {
 		if name == "" {
 			name = "unknown"
 		}
-		path := fmt.Sprintf("%s/agents/%s.agent.yaml", outputDir, name)
+		path := filepath.Join(outputDir, "agents", name+".agent.yaml")
 		os.Remove(path)
 	}
 }
