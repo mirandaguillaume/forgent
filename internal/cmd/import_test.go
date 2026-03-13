@@ -33,6 +33,12 @@ func TestResolveAPIKey(t *testing.T) {
 			expected: "openai-key",
 		},
 		{
+			name:     "falls back to OPENROUTER_API_KEY",
+			env:      map[string]string{"OPENROUTER_API_KEY": "openrouter-key"},
+			provider: "openrouter",
+			expected: "openrouter-key",
+		},
+		{
 			name:     "no key found",
 			env:      map[string]string{},
 			provider: "anthropic",

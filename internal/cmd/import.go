@@ -51,9 +51,10 @@ func runImport(source, providerFlag, outputDir string, minScore int, yes, dryRun
 
 	// 2. Resolve API key
 	envMap := map[string]string{
-		"FORGENT_API_KEY":  os.Getenv("FORGENT_API_KEY"),
-		"ANTHROPIC_API_KEY": os.Getenv("ANTHROPIC_API_KEY"),
-		"OPENAI_API_KEY":   os.Getenv("OPENAI_API_KEY"),
+		"FORGENT_API_KEY":    os.Getenv("FORGENT_API_KEY"),
+		"ANTHROPIC_API_KEY":  os.Getenv("ANTHROPIC_API_KEY"),
+		"OPENAI_API_KEY":     os.Getenv("OPENAI_API_KEY"),
+		"OPENROUTER_API_KEY": os.Getenv("OPENROUTER_API_KEY"),
 	}
 	apiKey, err := resolveAPIKey(providerName, envMap)
 	if err != nil {
@@ -138,6 +139,8 @@ func resolveAPIKey(provider string, env map[string]string) (string, error) {
 		envVar = "ANTHROPIC_API_KEY"
 	case "openai":
 		envVar = "OPENAI_API_KEY"
+	case "openrouter":
+		envVar = "OPENROUTER_API_KEY"
 	default:
 		envVar = strings.ToUpper(provider) + "_API_KEY"
 	}
