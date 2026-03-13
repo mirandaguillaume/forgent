@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	defaultBaseURL    = "https://api.anthropic.com"
+	defaultBaseURL    = "https://api.anthropic.com/v1/messages"
 	anthropicVersion  = "2023-06-01"
 	anthropicModel    = "claude-sonnet-4-20250514"
 	anthropicMaxTok   = 8192
@@ -34,6 +34,9 @@ type anthropicMessage struct {
 
 type anthropicResponse struct {
 	Content []anthropicContent `json:"content"`
+	Error *struct {
+		Message string `json:"message"`
+	} `json:"error,omitempty"`
 }
 
 type anthropicContent struct {
@@ -56,7 +59,10 @@ func (p *AnthropicProvider) Complete(prompt string) (string, error) {
 		return "", fmt.Errorf("marshal request: %w", err)
 	}
 
-	url := p.baseURL + "/v1/messages"
+	url := p.baseURL
+	if url == "" {
+		url = defaultBaseURL
+	}
 	req, err := http.NewRequest("POST", url, bytes.NewReader(body))
 	if err != nil {
 		return "", fmt.Errorf("create request: %w", err)
@@ -86,6 +92,10 @@ func (p *AnthropicProvider) Complete(prompt string) (string, error) {
 		return "", fmt.Errorf("unmarshal response: %w", err)
 	}
 
+	if result.Error != nil {
+		return "", fmt.Errorf("API error: %s", result.Error.Message)
+	}
+
 	if len(result.Content) == 0 {
 		return "", fmt.Errorf("empty response from API")
 	}
@@ -93,11 +103,15 @@ func (p *AnthropicProvider) Complete(prompt string) (string, error) {
 	return result.Content[0].Text, nil
 }
 
-func init() {
+func registerAnthropicProvider() {
 	RegisterProvider("anthropic", func(apiKey string) Provider {
 		return &AnthropicProvider{
 			apiKey:  apiKey,
 			baseURL: defaultBaseURL,
 		}
 	})
+}
+
+func init() {
+	registerAnthropicProvider()
 }
