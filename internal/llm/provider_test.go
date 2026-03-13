@@ -92,3 +92,39 @@ func TestAnthropicProviderRegistered(t *testing.T) {
 	_, err := GetProvider("anthropic", "test-key")
 	assert.NoError(t, err)
 }
+
+func TestOpenRouterComplete(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "POST", r.Method)
+		assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+		assert.Equal(t, "Bearer test-key", r.Header.Get("Authorization"))
+
+		body, _ := io.ReadAll(r.Body)
+		var req map[string]interface{}
+		json.Unmarshal(body, &req)
+		assert.Equal(t, "anthropic/claude-sonnet-4", req["model"])
+
+		resp := map[string]interface{}{
+			"choices": []map[string]interface{}{
+				{"message": map[string]string{"role": "assistant", "content": `{"skills": [{"yaml": "skill: test"}]}`}},
+			},
+		}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	p := &OpenRouterProvider{
+		apiKey:  "test-key",
+		baseURL: server.URL,
+		model:   openRouterModel,
+	}
+
+	result, err := p.Complete("analyze this agent")
+	require.NoError(t, err)
+	assert.Contains(t, result, "skills")
+}
+
+func TestOpenRouterProviderRegistered(t *testing.T) {
+	_, err := GetProvider("openrouter", "test-key")
+	assert.NoError(t, err)
+}
