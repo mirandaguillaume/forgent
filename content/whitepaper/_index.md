@@ -404,6 +404,26 @@ The Skill Behavior Model has the following known limitations and scope boundarie
 
 **Data flow security.** The current security facet declares filesystem and network access but does not address data flow injection — a malicious or misconfigured skill could produce output that, when consumed by a downstream skill, causes unintended behavior. The format assumes skills are authored by trusted teams. Extending the security model to validate inter-skill data flow is a potential future direction.
 
+### 5.5 Case Study: Importing a 1 260-Line Agent
+
+To test the model's ability to decompose real-world agent definitions, we applied the `forgent import` pipeline to the Claude-SPARC Automated Development System — a 1 260-line, 40 KB monolithic Markdown prompt that orchestrates multi-agent software development through 5 phases (Specification, Pseudocode, Architecture, Refinement, Completion).
+
+**Setup.** The import pipeline reads the monolithic prompt, sends it to an LLM (Claude Sonnet 4 via OpenRouter), and asks it to decompose the agent into Forgent skill specs. The LLM response is parsed, validated by the existing linter, scorer, and dependency checker, and — if any skill scores below a configurable threshold — the pipeline retries with the validation feedback appended to the prompt.
+
+**First pass (no quality gate).** The LLM produced 7 skills and 1 agent. Every skill violated the Single Responsibility Principle: `research-discovery` produced 3 outputs, `sparc-architecture` produced 4, and so on. The dependency checker flagged 9 unmet `consumes` entries — inputs that no sibling skill produced and that the agent did not declare in its own contract. Scores ranged from 76 to 84.
+
+**Second pass (min-score 80).** The retry prompt included the linter and dependency feedback. The LLM corrected both defects: it split the 7 coarse skills into 15 atomic skills, each producing exactly 1 output (`web-research → research_findings`, `tdd-implementation → production_code`, etc.). All dependency edges were satisfied — every `consumes` was either produced by an upstream skill or declared in the agent's top-level contract. The agent scored 94/100.
+
+The 15 skills and 1 agent were then written to disk and compiled to Claude Code format (`forgent build --target claude`), producing 10 `SKILL.md` files and 1 agent Markdown file with a sequential execution plan referencing each skill. To validate the generated agent end-to-end, we executed it on a test task: building a Go CLI URL shortener with SQLite storage. The agent followed its own skill pipeline — domain research, technology analysis, requirements extraction, constraints analysis, system architecture, then TDD implementation — and produced a working binary with 23 passing tests.
+
+**Observations.** Three properties of the Skill Behavior Model proved useful in this exercise:
+
+1. **Static validation as LLM feedback.** The linter's SRP violation and unmet-dependency diagnostics, when fed back to the LLM, were sufficient to guide it toward a correct decomposition. No human intervention was needed between retries.
+
+2. **Composability preserved at scale.** The 15-skill decomposition maintained clean `consumes`/`produces` edges — the same property that enables reuse in hand-authored skills also holds for LLM-generated ones.
+
+3. **Format as quality gate.** The skill spec format's structural constraints (single `produces`, declared dependencies, scored facets) acted as a machine-readable quality gate that caught defects a free-form prompt review would likely miss.
+
 ---
 
 ## 6. Related Work
