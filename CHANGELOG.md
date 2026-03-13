@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/mirandaguillaume/forgent/compare/v0.3.0...v0.4.0) (2026-03-13)
+
+
+### Features
+
+* forgent import — LLM-powered agent decomposition pipeline ([#13](https://github.com/mirandaguillaume/forgent/issues/13)) ([5a216e0](https://github.com/mirandaguillaume/forgent/commit/5a216e0ab7fb9b694970db172e9a902ea74238ef))
+
 ## [0.3.0](https://github.com/mirandaguillaume/forgent/compare/v0.2.0...v0.3.0) (2026-03-12)
 
 
