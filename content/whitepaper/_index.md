@@ -710,7 +710,7 @@ for modified files dropped from 82% to 71%.
 <dd>
 
 **Category:** Intermediate
-**Description:** A human decision injected at a defined point in the pipeline. The skill that produces an `approval_gate` pauses execution and requests human review before downstream skills proceed. The decision can be an approval, a rejection, or a request for changes — including questions that the human needs answered before proceeding. When the decision includes questions, the pipeline may loop back to a prior skill to address them before re-requesting approval.
+**Description:** A human decision injected at a defined point in the pipeline. The skill that produces an `approval_gate` pauses execution and requests human review before downstream skills proceed. The decision can be an approval, a rejection, or a request for changes — including questions that the human needs answered before proceeding. Questions can be open-ended or carry predefined answer options, reducing reviewer effort and producing machine-readable responses. When the decision includes questions, the pipeline may loop back to a prior skill to address them before re-requesting approval.
 **Typical producer:** A gate skill that presents prior results to a human reviewer.
 **Typical consumers:** Any downstream skill that should only run after human approval (e.g., a deployment skill, a merge-trigger skill). A skill that addresses questions raised in a rejected gate.
 **Example:**
@@ -719,10 +719,19 @@ decision: request_changes
 reviewer: "alice@example.com"
 timestamp: "2026-03-12T14:30:00Z"
 questions:
-  - "What's the rollback strategy if the auth migration fails?"
-  - "Have we tested this against the staging LDAP server?"
+  - text: "What's the rollback strategy if the auth migration fails?"
+    options:
+      - "Revert migration via down script"
+      - "Feature flag — disable new auth path"
+      - "Manual DB restore from backup"
+  - text: "Have we tested this against the staging LDAP server?"
+    options:
+      - "Yes, all tests pass"
+      - "No, needs staging deployment first"
 notes: "The approach looks reasonable but I need answers before approving."
 ```
+
+Questions can be open-ended (no `options` field) or structured with predefined choices. Structured questions reduce reviewer effort and produce machine-readable answers that downstream skills can act on programmatically.
 
 </dd>
 
