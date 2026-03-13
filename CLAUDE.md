@@ -26,6 +26,8 @@ forgent score [path]                   # Score design quality
 forgent build --target claude          # Generate skills/agents for Claude Code
 forgent build --target copilot         # Generate skills/agents for GitHub Copilot
 forgent build --watch                  # Watch and rebuild on changes
+forgent import <source>               # Import agent .md files as Forgent skill specs
+forgent import <source> --yes         # Skip confirmation, write directly
 ```
 
 ## Dev Commands
