@@ -40,6 +40,8 @@ forgent score [path]              # Score design quality
 forgent build                     # Build for Claude Code (default)
 forgent build --target copilot    # Build for GitHub Copilot
 forgent build --watch             # Watch and rebuild on changes
+forgent import <source>           # Import agent .md files as Forgent skill specs
+forgent import <source> --yes     # Skip confirmation, write directly
 ```
 
 ## Quick Start

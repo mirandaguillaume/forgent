@@ -132,3 +132,79 @@ forgent build --watch
 ```
 
 The build pipeline: parse YAML → validate → lint (fail on errors) → generate output → check word limits (warn if > 500 words per skill).
+
+## `forgent import`
+
+Convert existing agent markdown files into Forgent skill YAML specs using LLM-assisted decomposition.
+
+### Usage
+
+```bash
+forgent import <source>
+```
+
+### Sources
+
+| Source | Example |
+|--------|---------|
+| Local file | `forgent import .claude/agents/review.md` |
+| Local directory | `forgent import .claude/` |
+| Copilot agent | `forgent import .github/agents/review.agent.md` |
+| Any markdown | `forgent import my-agent.md` |
+| Vercel registry | `forgent import vercel:code-reviewer` (planned) |
+
+### Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--provider`, `-p` | `anthropic` | LLM provider (from `FORGENT_LLM_PROVIDER` env) |
+| `--output`, `-o` | `.` | Output directory |
+| `--min-score` | `60` | Minimum quality score (triggers LLM retry if below) |
+| `--yes` | `false` | Skip confirmation, write directly |
+| `--dry-run` | `false` | Preview without writing (default behavior) |
+| `--force` | `false` | Write even if files exist or validation fails |
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `FORGENT_API_KEY` | API key (priority 1) |
+| `ANTHROPIC_API_KEY` | Anthropic API key (priority 2 for `--provider anthropic`) |
+| `OPENAI_API_KEY` | OpenAI API key (priority 2 for `--provider openai`) |
+| `FORGENT_LLM_PROVIDER` | Default provider name |
+
+### Pipeline
+
+The import command runs a 6-step pipeline:
+
+1. **Resolve** — Read source file(s) from disk or registry
+2. **Extract** — Parse YAML frontmatter (name, tools, model)
+3. **Decompose** — Send to LLM for skill decomposition
+4. **Validate** — Run `lint`, `doctor`, and `score` on generated YAML
+5. **Preview** — Display decomposition with scores and warnings
+6. **Write** — Save `skills/*.skill.yaml` and `agents/*.agent.yaml`
+
+### Example
+
+```
+$ forgent import .claude/agents/ci-reviewer.md
+
+  Analyzing: .claude/agents/ci-reviewer.md
+  Provider: anthropic
+
+  Decomposition:
+    Input agent → 4 skills + 1 agent
+
+    Skills:
+      ts-linter                    score: 72/100
+        consumes: [file_tree, source_code]
+        produces: [lint_results]
+        ⚠ lint: missing observability.metrics
+
+      review-commenter             score: 85/100
+        consumes: [git_diff, lint_results]
+        produces: [review_comments]
+        ✓ all checks pass
+
+  Write 4 skill(s) + 1 agent(s)? [y/N]
+```
