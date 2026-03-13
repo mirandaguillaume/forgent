@@ -202,7 +202,7 @@ The reference implementation ships with the following types (see Appendix A for 
 | `coverage_report` | Intermediate | Line and branch coverage data |
 | `review_comments` | Output | Actionable PR review comments |
 | `risk_score` | Output | Numeric risk score (0–10) with justification |
-| `approval_gate` | Intermediate | Human approval decision (approve/reject/comment) |
+| `approval_gate` | Intermediate | Human decision: approve, reject, or request changes with questions |
 | `human_feedback` | Input | Free-form human input injected mid-pipeline |
 
 These types are conventions, not constraints. A team building a security-focused agent might define `vulnerability_scan`, `dependency_audit`, or `compliance_report`. A documentation agent might use `api_schema` and `generated_docs`. The linter validates the wiring — that every `consumes` is satisfied by a `produces` — regardless of type names.
@@ -710,15 +710,18 @@ for modified files dropped from 82% to 71%.
 <dd>
 
 **Category:** Intermediate
-**Description:** A human approval decision injected at a defined point in the pipeline. The skill that produces an `approval_gate` pauses execution and requests human review before downstream skills proceed. The value carries the decision (approve, reject, or comment) and optionally the reviewer's notes. This type enables human-in-the-loop workflows where automated analysis is followed by manual validation.
+**Description:** A human decision injected at a defined point in the pipeline. The skill that produces an `approval_gate` pauses execution and requests human review before downstream skills proceed. The decision can be an approval, a rejection, or a request for changes — including questions that the human needs answered before proceeding. When the decision includes questions, the pipeline may loop back to a prior skill to address them before re-requesting approval.
 **Typical producer:** A gate skill that presents prior results to a human reviewer.
-**Typical consumers:** Any downstream skill that should only run after human approval (e.g., a deployment skill, a merge-trigger skill).
+**Typical consumers:** Any downstream skill that should only run after human approval (e.g., a deployment skill, a merge-trigger skill). A skill that addresses questions raised in a rejected gate.
 **Example:**
 ```yaml
-decision: approved
+decision: request_changes
 reviewer: "alice@example.com"
 timestamp: "2026-03-12T14:30:00Z"
-notes: "LGTM — the auth changes look safe. Proceed with merge."
+questions:
+  - "What's the rollback strategy if the auth migration fails?"
+  - "Have we tested this against the staging LDAP server?"
+notes: "The approach looks reasonable but I need answers before approving."
 ```
 
 </dd>
@@ -727,7 +730,7 @@ notes: "LGTM — the auth changes look safe. Proceed with merge."
 <dd>
 
 **Category:** Input
-**Description:** Free-form human input injected into the pipeline at any point. Unlike `approval_gate` (which is binary), `human_feedback` carries unstructured guidance — clarifications, priority adjustments, or domain-specific instructions that the agent cannot infer from code alone. This type enables semi-automated workflows where human expertise supplements automated analysis.
+**Description:** Free-form human input injected into the pipeline at any point. Unlike `approval_gate` (which is a structured decision with a clear outcome), `human_feedback` carries unstructured guidance — clarifications, priority adjustments, or domain-specific instructions that the agent cannot infer from code alone. This type enables semi-automated workflows where human expertise supplements automated analysis.
 **Typical producer:** Agent input (user prompt, Slack message, PR comment).
 **Typical consumers:** Any skill that benefits from human context (e.g., `review-commenter` adjusting focus based on reviewer priorities).
 **Example:**
