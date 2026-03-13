@@ -2,9 +2,11 @@ package importer
 
 import (
 	"encoding/json"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -331,4 +333,108 @@ func TestRunImport_DirectoryImport(t *testing.T) {
 		"RunImport processes only the first file from a directory")
 	assert.Equal(t, "agent-a-skill", result.Skills[0].Skill.Skill)
 	assert.Nil(t, result.Agent)
+}
+
+// --- Real Vercel skills integration tests ---
+// These tests fetch real SKILL.md files from GitHub and verify our
+// frontmatter extraction and source resolution work with real-world data.
+// They skip automatically when there's no network access.
+
+func canReachGitHub(t *testing.T) {
+	t.Helper()
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Head("https://raw.githubusercontent.com")
+	if err != nil || resp.StatusCode != http.StatusOK {
+		t.Skip("skipping: cannot reach raw.githubusercontent.com")
+	}
+}
+
+func TestVercelSkill_FindSkills(t *testing.T) {
+	canReachGitHub(t)
+
+	sources, err := ResolveSources("vercel:find-skills")
+	require.NoError(t, err)
+	require.Len(t, sources, 1)
+
+	source := sources[0]
+	assert.Equal(t, "find-skills/SKILL.md", source.Name)
+	assert.Contains(t, source.Content, "find-skills")
+
+	// Verify frontmatter extraction works with real content
+	fm, body, err := ExtractFrontmatter(source.Content)
+	require.NoError(t, err)
+	assert.Equal(t, "find-skills", fm.Name)
+	assert.NotEmpty(t, fm.Description)
+	assert.NotEmpty(t, body)
+}
+
+func TestVercelSkill_UseAiSdk(t *testing.T) {
+	canReachGitHub(t)
+
+	// This skill lives in vercel/ai, not vercel-labs/skills
+	sources, err := ResolveSources("vercel:use-ai-sdk")
+	require.NoError(t, err)
+	require.Len(t, sources, 1)
+
+	source := sources[0]
+	assert.Contains(t, source.Content, "AI SDK")
+
+	// Verify frontmatter extraction
+	fm, body, err := ExtractFrontmatter(source.Content)
+	require.NoError(t, err)
+	// The name in frontmatter is "ai-sdk" not "use-ai-sdk"
+	assert.NotEmpty(t, fm.Name)
+	assert.NotEmpty(t, fm.Description)
+	assert.NotEmpty(t, body)
+}
+
+func TestVercelSkill_AdrSkill(t *testing.T) {
+	canReachGitHub(t)
+
+	sources, err := ResolveSources("vercel:adr-skill")
+	require.NoError(t, err)
+	require.Len(t, sources, 1)
+
+	source := sources[0]
+	assert.Contains(t, source.Content, "ADR")
+
+	fm, body, err := ExtractFrontmatter(source.Content)
+	require.NoError(t, err)
+	assert.Equal(t, "adr-skill", fm.Name)
+	assert.NotEmpty(t, body)
+}
+
+func TestVercelSkill_FullImportPipeline(t *testing.T) {
+	canReachGitHub(t)
+
+	// Fetch a real skill and run it through the full import pipeline
+	// (with a mock LLM — we're testing source resolution + frontmatter, not the LLM)
+	sources, err := ResolveSources("vercel:find-skills")
+	require.NoError(t, err)
+	require.Len(t, sources, 1)
+
+	// Write fetched content to a temp file (RunImport reads from disk)
+	dir := t.TempDir()
+	inputPath := filepath.Join(dir, "find-skills.md")
+	require.NoError(t, os.WriteFile(inputPath, []byte(sources[0].Content), 0644))
+
+	provider := &testProvider{
+		response: buildMockResponse([]string{"find-skills"}, ""),
+	}
+
+	result := RunImport(ImportOptions{
+		Source:   inputPath,
+		Provider: provider,
+		MinScore: 0,
+		OutputDir: dir,
+	})
+
+	require.True(t, result.Success, "import failed: %s", result.Error)
+	require.Len(t, result.Skills, 1)
+	assert.Equal(t, "find-skills", result.Skills[0].Skill.Skill)
+
+	// Write the result and verify
+	written, err := WriteImportResult(result, dir)
+	require.NoError(t, err)
+	assert.Len(t, written, 1)
 }

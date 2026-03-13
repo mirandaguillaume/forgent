@@ -2,9 +2,12 @@ package importer
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // SourceType indicates where an import source comes from.
@@ -67,7 +70,7 @@ func ResolveSources(input string) ([]Source, error) {
 	st := DetectSourceType(input)
 	switch st {
 	case SourceVercel:
-		return nil, fmt.Errorf("vercel source not yet implemented")
+		return resolveVercel(input)
 	case SourceLocalDir:
 		return resolveDir(input)
 	default:
@@ -114,4 +117,66 @@ func resolveDir(dir string) ([]Source, error) {
 		return nil, fmt.Errorf("no .md files found in %s", dir)
 	}
 	return sources, nil
+}
+
+// defaultVercelRepos lists the GitHub repos to search for Vercel skills.
+// Format: "owner/repo"
+var defaultVercelRepos = []string{
+	"vercel-labs/skills",
+	"vercel/ai",
+}
+
+var httpClient = &http.Client{Timeout: 30 * time.Second}
+
+// resolveVercel fetches a skill's SKILL.md from GitHub repos.
+// Input format: "vercel:skill-name" or "vercel:owner/repo:skill-name"
+func resolveVercel(input string) ([]Source, error) {
+	ref := strings.TrimPrefix(input, "vercel:")
+
+	// Check if user specified a repo: "vercel:owner/repo:skill-name"
+	if parts := strings.SplitN(ref, ":", 2); len(parts) == 2 {
+		repo := parts[0]
+		skillName := parts[1]
+		return fetchSkillFromRepo(repo, skillName)
+	}
+
+	// Search default repos for the skill name
+	skillName := ref
+	for _, repo := range defaultVercelRepos {
+		sources, err := fetchSkillFromRepo(repo, skillName)
+		if err == nil {
+			return sources, nil
+		}
+	}
+
+	return nil, fmt.Errorf("skill %q not found in default repos (%s)", skillName, strings.Join(defaultVercelRepos, ", "))
+}
+
+func fetchSkillFromRepo(repo, skillName string) ([]Source, error) {
+	url := fmt.Sprintf("https://raw.githubusercontent.com/%s/main/skills/%s/SKILL.md", repo, skillName)
+	return fetchSkillFromURL(url, skillName)
+}
+
+func fetchSkillFromURL(url, skillName string) ([]Source, error) {
+	resp, err := httpClient.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("fetch %s: %w", url, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("skill %q not found (HTTP %d)", skillName, resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	return []Source{{
+		Name:      skillName + "/SKILL.md",
+		Path:      url,
+		Content:   string(body),
+		Framework: FrameworkUnknown,
+	}}, nil
 }

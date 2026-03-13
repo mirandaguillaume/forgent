@@ -1,6 +1,9 @@
 package importer
 
 import (
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -88,11 +91,56 @@ func TestResolveLocalDirectory(t *testing.T) {
 	assert.Contains(t, names, "b.md")
 }
 
-func TestResolveVercel_ReturnsError(t *testing.T) {
-	_, err := ResolveSources("vercel:my-project")
+func TestResolveVercel_FetchesFromGitHub(t *testing.T) {
+	skillContent := "---\nname: test-skill\ndescription: A test skill\n---\n# Test Skill\nDoes things."
 
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Expect path: /{owner}/{repo}/main/skills/{name}/SKILL.md
+		expected := "/test-org/test-repo/main/skills/my-skill/SKILL.md"
+		if r.URL.Path == expected {
+			fmt.Fprint(w, skillContent)
+		} else {
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	// Use fetchSkillFromRepo with a URL that points to our mock server
+	// We need to temporarily override the raw GitHub URL base
+	sources, err := fetchSkillFromURL(
+		server.URL+"/test-org/test-repo/main/skills/my-skill/SKILL.md",
+		"my-skill",
+	)
+	require.NoError(t, err)
+	require.Len(t, sources, 1)
+	assert.Equal(t, "my-skill/SKILL.md", sources[0].Name)
+	assert.Contains(t, sources[0].Content, "Test Skill")
+	assert.Equal(t, FrameworkUnknown, sources[0].Framework)
+}
+
+func TestResolveVercel_SkillNotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	_, err := fetchSkillFromURL(server.URL+"/org/repo/main/skills/nope/SKILL.md", "nope")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not yet implemented")
+	assert.Contains(t, err.Error(), "not found")
+}
+
+func TestResolveVercel_ExplicitRepo(t *testing.T) {
+	skillContent := "---\nname: custom-skill\ndescription: Custom\n---\n# Custom"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, skillContent)
+	}))
+	defer server.Close()
+
+	sources, err := fetchSkillFromURL(server.URL+"/custom/repo/main/skills/custom-skill/SKILL.md", "custom-skill")
+	require.NoError(t, err)
+	require.Len(t, sources, 1)
+	assert.Contains(t, sources[0].Content, "Custom")
 }
 
 func TestResolveLocalFile_NotFound(t *testing.T) {
