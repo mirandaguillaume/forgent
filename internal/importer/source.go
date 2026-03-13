@@ -110,5 +110,8 @@ func resolveDir(dir string) ([]Source, error) {
 			Framework: DetectFramework(m),
 		})
 	}
+	if len(sources) == 0 {
+		return nil, fmt.Errorf("no .md files found in %s", dir)
+	}
 	return sources, nil
 }
