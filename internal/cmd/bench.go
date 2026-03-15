@@ -34,6 +34,7 @@ func init() {
 	benchCmd.Flags().String("agents", "agents", "Agents directory")
 	benchCmd.Flags().Int("passes", 5, "Number of passes for consistency bench")
 	benchCmd.Flags().String("eval-tasks", "", "YAML file with evaluation tasks (eval level only)")
+	benchCmd.Flags().String("provider", "", "LLM provider: anthropic or openrouter (auto-detected from env)")
 	rootCmd.AddCommand(benchCmd)
 }
 
@@ -372,9 +373,9 @@ func runEvalBench(cmd *cobra.Command, repoPath string) error {
 		return fmt.Errorf("--eval-tasks is required for eval level")
 	}
 
-	apiKey := os.Getenv("ANTHROPIC_API_KEY")
-	if apiKey == "" {
-		return fmt.Errorf("ANTHROPIC_API_KEY environment variable required for eval bench")
+	provider, err := resolveLLMProvider(cmd)
+	if err != nil {
+		return err
 	}
 
 	bold := color.New(color.Bold)
@@ -406,11 +407,6 @@ func runEvalBench(cmd *cobra.Command, repoPath string) error {
 	}
 
 	monolithicPrompt := "You are a code reviewer. Review the code for bugs, security issues, performance problems, and best practice violations. Be thorough and specific."
-
-	provider, err := llm.GetProvider("anthropic", apiKey)
-	if err != nil {
-		return err
-	}
 
 	result, err := bench.RunEval(tasks, composedPrompt, monolithicPrompt, provider)
 	if err != nil {
@@ -446,20 +442,15 @@ func runConsistencyBench(cmd *cobra.Command, repoPath string) error {
 		return fmt.Errorf("--eval-tasks is required for consistency level")
 	}
 
-	apiKey := os.Getenv("ANTHROPIC_API_KEY")
-	if apiKey == "" {
-		return fmt.Errorf("ANTHROPIC_API_KEY environment variable required for consistency bench")
+	provider, err := resolveLLMProvider(cmd)
+	if err != nil {
+		return err
 	}
 
 	bold := color.New(color.Bold)
 	bold.Fprintf(cmd.OutOrStdout(), "Pass@k Consistency Benchmark (k=%d)\n", passes)
 
 	tasks, err := bench.LoadEvalTasks(evalTasksFile)
-	if err != nil {
-		return err
-	}
-
-	provider, err := llm.GetProvider("anthropic", apiKey)
 	if err != nil {
 		return err
 	}
@@ -483,9 +474,9 @@ func runSWEBenchCmd(cmd *cobra.Command, repoPath string) error {
 	skillsDir, _ := cmd.Flags().GetString("skills")
 	agentsDir, _ := cmd.Flags().GetString("agents")
 
-	apiKey := os.Getenv("ANTHROPIC_API_KEY")
-	if apiKey == "" {
-		return fmt.Errorf("ANTHROPIC_API_KEY environment variable required for SWE-bench")
+	provider, err := resolveLLMProvider(cmd)
+	if err != nil {
+		return err
 	}
 
 	bold := color.New(color.Bold)
@@ -507,11 +498,6 @@ func runSWEBenchCmd(cmd *cobra.Command, repoPath string) error {
 	}
 
 	composedPrompt, err := readAllFiles(tmpDir)
-	if err != nil {
-		return err
-	}
-
-	provider, err := llm.GetProvider("anthropic", apiKey)
 	if err != nil {
 		return err
 	}
@@ -599,6 +585,40 @@ func loadSkillsAndAgents(skillsDir, agentsDir string) ([]model.SkillBehavior, []
 	}
 
 	return skills, agents, nil
+}
+
+// resolveLLMProvider picks the LLM provider from --provider flag or env vars.
+func resolveLLMProvider(cmd *cobra.Command) (llm.Provider, error) {
+	providerName, _ := cmd.Flags().GetString("provider")
+
+	// Auto-detect from env if not explicitly set
+	if providerName == "" {
+		if os.Getenv("ANTHROPIC_API_KEY") != "" {
+			providerName = "anthropic"
+		} else if os.Getenv("OPENROUTER_API_KEY") != "" {
+			providerName = "openrouter"
+		} else {
+			return nil, fmt.Errorf("no LLM API key found — set ANTHROPIC_API_KEY or OPENROUTER_API_KEY")
+		}
+	}
+
+	var apiKey string
+	switch providerName {
+	case "anthropic":
+		apiKey = os.Getenv("ANTHROPIC_API_KEY")
+		if apiKey == "" {
+			return nil, fmt.Errorf("ANTHROPIC_API_KEY required for provider %q", providerName)
+		}
+	case "openrouter":
+		apiKey = os.Getenv("OPENROUTER_API_KEY")
+		if apiKey == "" {
+			return nil, fmt.Errorf("OPENROUTER_API_KEY required for provider %q", providerName)
+		}
+	default:
+		return nil, fmt.Errorf("unknown provider %q (use 'anthropic' or 'openrouter')", providerName)
+	}
+
+	return llm.GetProvider(providerName, apiKey)
 }
 
 func runMutateBench(cmd *cobra.Command, repoPath string) error {
