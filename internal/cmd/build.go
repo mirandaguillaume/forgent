@@ -64,12 +64,22 @@ func GetOutputDir(target, override string) string {
 
 // RunBuild executes the full build pipeline: parse, lint, generate skills/agents/instructions.
 func RunBuild(skillsDir, agentsDir, outputDir, target string, enrichMode scanner.EnrichMode) BuildResult {
+	return RunBuildWithOptions(skillsDir, agentsDir, outputDir, target, enrichMode, false)
+}
+
+// RunBuildWithOptions is like RunBuild but accepts a compact flag for inlined output.
+func RunBuildWithOptions(skillsDir, agentsDir, outputDir, target string, enrichMode scanner.EnrichMode, compact bool) BuildResult {
 	result := BuildResult{Target: target, OutputDir: outputDir}
 
 	gen, err := spec.Get(target)
 	if err != nil {
 		result.Error = err.Error()
 		return result
+	}
+
+	// Apply build-time options if generator supports them
+	if c, ok := gen.(spec.Configurable); ok {
+		c.SetOptions(spec.GeneratorOptions{Compact: compact})
 	}
 
 	// 1. Parse all skills
@@ -133,9 +143,9 @@ func RunBuild(skillsDir, agentsDir, outputDir, target string, enrichMode scanner
 		}
 	}
 
-	// 3. Generate skills (enrich consumer skills or globally via --enrich)
+	// 3. Generate skills (skip when compact — skills are inlined in agent file)
 	sg, hasSG := gen.(spec.SkillGenerator)
-	if hasSG {
+	if hasSG && !compact {
 		for _, skill := range skillMap {
 			md := sg.GenerateSkill(skill)
 			if codebaseCtx != nil {
@@ -285,7 +295,7 @@ func PrintBuildResult(result BuildResult) {
 
 func init() {
 	var target, skillsDir, agentsDir, outputDirFlag, enrichFlag string
-	var watchFlag bool
+	var watchFlag, compactFlag bool
 
 	buildCmd := &cobra.Command{
 		Use:   "build",
@@ -323,7 +333,7 @@ func init() {
 				return
 			}
 
-			result := RunBuild(skillsDir, agentsDir, outputDir, target, enrichMode)
+			result := RunBuildWithOptions(skillsDir, agentsDir, outputDir, target, enrichMode, compactFlag)
 			PrintBuildResult(result)
 			if !result.Success {
 				os.Exit(1)
@@ -336,6 +346,7 @@ func init() {
 	buildCmd.Flags().StringVarP(&agentsDir, "agents", "a", "agents", "agents directory")
 	buildCmd.Flags().StringVarP(&outputDirFlag, "output", "o", "", "output directory")
 	buildCmd.Flags().BoolVarP(&watchFlag, "watch", "w", false, "watch for changes")
+	buildCmd.Flags().BoolVar(&compactFlag, "compact", false, "inline skills into agent file for lower token overhead")
 	buildCmd.Flags().StringVar(&enrichFlag, "enrich", "", "enrich skills with codebase context (index|full)")
 	buildCmd.Flag("enrich").NoOptDefVal = "index"
 

@@ -106,6 +106,60 @@ func FormatExamples(exs []model.CodeExample) string {
 	return sb.String()
 }
 
+// FormatCompactSkill formats a skill as a terse inline block for compact mode.
+// Output is ~4 lines: header, I/O, steps, guardrails (omitted if empty).
+func FormatCompactSkill(skill model.SkillBehavior) string {
+	var sb strings.Builder
+
+	// Line 1: **name** | approach | FS: x | Net: x
+	sb.WriteString(fmt.Sprintf("**%s** | %s | FS: %s | Net: %s\n",
+		skill.Skill, skill.Strategy.Approach,
+		skill.Security.Filesystem, skill.Security.Network))
+
+	// Line 2: In: ... → Out: ... | Mem: ...
+	var ioParts []string
+	if len(skill.Context.Consumes) > 0 {
+		ioParts = append(ioParts, "In: "+strings.Join(skill.Context.Consumes, ", "))
+	}
+	if len(skill.Context.Produces) > 0 {
+		ioParts = append(ioParts, "Out: "+strings.Join(skill.Context.Produces, ", "))
+	}
+	ioLine := strings.Join(ioParts, " → ")
+	if skill.Context.Memory != "" {
+		ioLine += " | Mem: " + string(skill.Context.Memory)
+	}
+	sb.WriteString(ioLine + "\n")
+
+	// Line 3: Steps (collapsed)
+	if len(skill.Strategy.Steps) > 0 {
+		numbered := make([]string, len(skill.Strategy.Steps))
+		for i, s := range skill.Strategy.Steps {
+			numbered[i] = fmt.Sprintf("%d. %s", i+1, s)
+		}
+		sb.WriteString("Steps: " + strings.Join(numbered, "  ") + "\n")
+	}
+
+	// Line 4: Guardrails (collapsed, only if non-empty)
+	if len(skill.Guardrails) > 0 {
+		var parts []string
+		for _, g := range skill.Guardrails {
+			if s, ok := g.StringValue(); ok {
+				parts = append(parts, s)
+			}
+			if m, ok := g.MapValue(); ok {
+				for k, v := range m {
+					parts = append(parts, fmt.Sprintf("%s: %v", k, v))
+				}
+			}
+		}
+		if len(parts) > 0 {
+			sb.WriteString("Guardrails: " + strings.Join(parts, "; ") + "\n")
+		}
+	}
+
+	return sb.String()
+}
+
 // BuildSkillDescription creates a description from skill facets.
 func BuildSkillDescription(skill model.SkillBehavior) string {
 	parts := []string{skill.Strategy.Approach + "-based skill"}
