@@ -240,6 +240,55 @@ func CanFuse(s1, s2 model.SkillBehavior, agent model.AgentComposition, allSkills
 	return true
 }
 
+// ConsumesOverlap returns the types consumed by both skills.
+func ConsumesOverlap(s1, s2 model.SkillBehavior) []string {
+	set := toSet(s1.Context.Consumes)
+	var overlap []string
+	for _, c := range s2.Context.Consumes {
+		if set[c] {
+			overlap = append(overlap, c)
+		}
+	}
+	return overlap
+}
+
+// DisjointProduces returns true if no two skills produce the same type.
+func DisjointProduces(skills []model.SkillBehavior) bool {
+	seen := make(map[string]bool)
+	for _, s := range skills {
+		for _, p := range s.Context.Produces {
+			if seen[p] {
+				return false
+			}
+			seen[p] = true
+		}
+	}
+	return true
+}
+
+// AccessLevelContained returns true if child ⊆ parent in the permission lattice.
+func AccessLevelContained(child, parent model.AccessLevel) bool {
+	return accessOrder[child] <= accessOrder[parent]
+}
+
+// NetworkContained returns true if child ⊆ parent in the permission lattice.
+func NetworkContained(child, parent model.NetworkAccess) bool {
+	return networkOrder[child] <= networkOrder[parent]
+}
+
+var accessOrder = map[model.AccessLevel]int{
+	model.AccessNone:      0,
+	model.AccessReadOnly:  1,
+	model.AccessReadWrite: 2,
+	model.AccessFull:      3,
+}
+
+var networkOrder = map[model.NetworkAccess]int{
+	model.NetworkNone:      0,
+	model.NetworkAllowlist: 1,
+	model.NetworkFull:      2,
+}
+
 func contains(slice []string, item string) bool {
 	for _, s := range slice {
 		if s == item {

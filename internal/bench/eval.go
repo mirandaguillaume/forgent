@@ -137,7 +137,11 @@ Respond with ONLY valid JSON (no markdown):
 		return nil, err
 	}
 
-	// Extract JSON from response (handle possible markdown wrapping)
+	return parseJudgeResponse(response)
+}
+
+// parseJudgeResponse extracts JSON from a judge response, handling markdown wrapping.
+func parseJudgeResponse(response string) (*judgeResponse, error) {
 	response = strings.TrimSpace(response)
 	if idx := strings.Index(response, "{"); idx >= 0 {
 		if end := strings.LastIndex(response, "}"); end >= idx {
