@@ -346,6 +346,140 @@ Generated skill files use a deliberate section ordering motivated by LLM attenti
 
 ---
 
+## 4. Formal Properties
+
+The preceding sections define the Skill Behavior Model informally. This section gives it semi-formal grounding — precise definitions, stated properties, and an algebraic characterization of composition. The goal is not full formalization but sufficient rigor to reason about structural guarantees.
+
+### 4.1 Definitions
+
+A **skill** is a triple S = (C, P, F) where:
+- C ⊆ T is a finite set of consumed type names (the skill's inputs)
+- P ∈ T is a single produced type name (the skill's output)
+- F is a record of facets: strategy, guardrails, observability, security, negotiation
+
+An **agent** is a tuple A = (S₁, ..., Sₙ, Cₐ, Pₐ, σ) where:
+- S₁, ..., Sₙ are the agent's skills
+- Cₐ ⊆ T is the agent's consumed types (external inputs)
+- Pₐ ⊆ T is the agent's produced types (final outputs)
+- σ ∈ {sequential, parallel, parallel-then-merge, adaptive} is the orchestration strategy
+
+The **data flow graph** G(A) is a directed graph where:
+- Nodes are the skills S₁, ..., Sₙ
+- An edge (Sᵢ, Sⱼ) exists when P(Sᵢ) ∈ C(Sⱼ) — skill i produces a type that skill j consumes
+
+T is the universe of type names — free-form strings like `git_diff`, `lint_results`, `review_comments`. Types are nominal: two types match if and only if their names are identical strings. There is no structural subtyping.
+
+### 4.2 Structural Properties
+
+The Skill Behavior Model guarantees six structural properties when an agent passes validation (`forgent lint` + `forgent doctor`):
+
+| Property | Formal statement | Verified by |
+|----------|-----------------|-------------|
+| **Acyclicity** | G(A) is a directed acyclic graph | `forgent doctor` — cycle detection |
+| **Contract completeness** | ∀ Sᵢ ∈ A, ∀ t ∈ C(Sᵢ): ∃ Sⱼ ∈ A where P(Sⱼ) = t, or t ∈ Cₐ | `forgent lint` — unmet dependencies |
+| **Single responsibility** | ∀ Sᵢ ∈ A: |{P(Sᵢ)}| = 1 | Lint rule SRP |
+| **Build idempotence** | build(spec) = build(spec) — deterministic generation | Generator implementation |
+| **Additivity** | Adding S' to A does not alter any existing Sᵢ's behavior if P(S') ∉ ⋃ C(Sᵢ) | Structural independence of skills |
+| **Monotonicity** | If A passes validation and A' = A ∪ {S'}, then every dependency satisfied in A remains satisfied in A' | Consequence of additivity |
+
+Acyclicity, contract completeness, and single responsibility are checked by tooling. Build idempotence is a property of the deterministic generator. Additivity and monotonicity follow from the model's design: skills have no shared mutable state and no implicit dependencies.
+
+### 4.3 The I/O Contract as a Type System
+
+The `consumes`/`produces` declarations form a lightweight type system. Each skill's signature can be written as:
+
+```
+S : C₁ × C₂ × ... × Cₙ → P
+```
+
+where C₁, ..., Cₙ are the consumed types and P is the produced type. The linter acts as a type checker: it verifies that every input type is provided by some source (another skill's output or the agent's external input). In the terminology of type theory:
+
+**Well-typed agents don't have structural defects.** This is the analogue of Milner's "well-typed programs don't go wrong" [20] — if the linter accepts an agent, a specific class of defects (missing data, circular dependencies, responsibility overload) is eliminated before any LLM executes.
+
+The analogy has deliberate limits:
+
+| Type system property | Skill Behavior Model | Traditional type systems |
+|---------------------|---------------------|------------------------|
+| Type identity | Nominal (string equality) | Nominal or structural |
+| Subtyping | None | Subtype hierarchies |
+| Parametric types | None | Generics, type variables |
+| Type inference | None needed — types are declared | Hindley-Milner, bidirectional |
+| Soundness | Structural only (section 4.5) | Semantic (progress + preservation) |
+
+The type system is intentionally shallow. Types are names, not schemas — `review_comments` is a label, not a structural description of what review comments contain. Two skills can use the same type name with different expectations, and the linter cannot detect this mismatch. This is the trade-off: shallow types are trivial to author and compose, while deep types (JSON Schema, Protocol Buffers) would add authoring cost for a benefit that matters most at scale.
+
+### 4.4 Composition Algebra
+
+Skills and their compositions can be characterized as a category.
+
+**The category Skill.** Define a category **Skill** where:
+- **Objects** are elements of T — the I/O type names
+- **Morphisms** are skills: S : C₁ × C₂ × ... × Cₙ → P
+- **Composition** S₂ ∘ S₁ is defined when P(S₁) ∈ C(S₂) — the output of S₁ feeds an input of S₂
+
+The composition satisfies four properties:
+
+| Property | Statement | Practical consequence |
+|----------|-----------|----------------------|
+| **Associativity** | (S₃ ∘ S₂) ∘ S₁ = S₃ ∘ (S₂ ∘ S₁) | The order of grouping does not affect the pipeline |
+| **Non-commutativity** | S₂ ∘ S₁ ≠ S₁ ∘ S₂ in general | Sequential order matters — `tdd-runner` before `review-commenter`, not the reverse |
+| **Identity** | For every type T, an identity skill id_T : T → T exists (a pass-through that forwards its input unchanged) | Agents can include transparent relay skills |
+| **Product** | S₁ ⊗ S₂ : C₁ × C₂ → P₁ × P₂ — parallel execution of independent skills | The `parallel` orchestration strategy is the tensor product |
+
+The four orchestration strategies (section 2.3) correspond to categorical constructions:
+
+| Orchestration | Construction | Notation |
+|---------------|-------------|----------|
+| `sequential` | Morphism composition | S₃ ∘ S₂ ∘ S₁ |
+| `parallel` | Tensor product | S₁ ⊗ S₂ ⊗ S₃ |
+| `parallel-then-merge` | Product then composition | merge ∘ (S₁ ⊗ S₂ ⊗ S₃) |
+| `adaptive` | Coproduct (conditional choice) | S₁ + S₂ |
+
+**The build functor.** A build target defines a functor B : **Skill** → **Target** that:
+- Maps each type T ∈ T to its framework-specific representation (e.g., a section header in the generated prompt)
+- Maps each morphism S to a generated artifact (a `.md` skill file, a `.mdc` rule, etc.)
+- Preserves composition: B(S₂ ∘ S₁) = B(S₂) ∘ B(S₁) — the build of a pipeline equals the pipeline of builds
+
+Build idempotence follows from the functor being deterministic: same input specification → same output artifacts.
+
+**Honest limitations.** The category is *loose* in three ways:
+
+1. **Non-deterministic morphisms.** Skills are executed by LLMs. The same skill applied to the same input may produce different outputs across invocations. The algebraic model captures *structural* composition, not *behavioral* determinism.
+
+2. **Nominal type matching.** Types are strings, not schemas. Two skills using `review_comments` with different internal expectations will compose structurally but may fail semantically. The category verifies wiring, not meaning.
+
+3. **Structure ≠ correctness.** The algebraic model guarantees that a well-formed agent has no structural defects — analogous to a well-typed program having no type errors. It does not guarantee that the agent produces correct, useful, or safe outputs. The gap between structural soundness and semantic correctness is inherent to any specification that runs on non-deterministic executors.
+
+### 4.5 Linter Soundness
+
+The linter is *sound* with respect to structural properties: when it reports no diagnostics, certain classes of defects are guaranteed absent.
+
+**Theorem (Structural Soundness).** If `forgent lint` and `forgent doctor` report no diagnostics for an agent A = (S₁, ..., Sₙ, Cₐ, Pₐ, σ), then:
+
+1. **I/O completeness.** For every skill Sᵢ ∈ A, for every type t ∈ C(Sᵢ), either there exists Sⱼ ∈ A such that P(Sⱼ) = t, or t ∈ Cₐ. Every skill's inputs are satisfied.
+
+2. **Acyclicity.** The data flow graph G(A) contains no directed cycles. No skill transitively depends on its own output.
+
+3. **Single responsibility.** For every skill Sᵢ ∈ A, Sᵢ produces exactly one type. No skill is a merged responsibility.
+
+The proof follows from construction: the linter explicitly checks each property and reports a diagnostic for any violation. If no diagnostic is reported, no violation exists.
+
+**What soundness does not guarantee.** The following properties are explicitly outside the scope of structural soundness:
+
+| Property | Why it is not guaranteed |
+|----------|------------------------|
+| **Semantic correctness** | The type `review_comments` is a name, not a schema. A skill that produces `review_comments` containing random text is structurally sound. |
+| **Output quality** | A sound skill can produce mediocre output. LLM non-determinism means the same skill may produce excellent results on one invocation and poor results on another. |
+| **Termination** | The format declares `timeout: 5min` as a guardrail, but the linter does not enforce termination. A skill may run indefinitely if the framework does not enforce the declared timeout. |
+| **Runtime security** | `filesystem: read-only` is a declaration, not a sandbox. The linter verifies the declaration exists; it cannot verify that the framework enforces it. |
+| **Data flow injection** | A malicious or misconfigured skill can produce output that, when consumed by a downstream skill, causes unintended behavior. The format assumes trusted authorship. |
+
+**Completeness.** The linter is *not* complete — there exist structural defects it does not detect. For example, a skill with an empty `approach` field is syntactically valid but semantically vacuous. Each new lint rule narrows the completeness gap. Completeness is an asymptotic goal, not a binary property: the linter catches more defects as its rule set grows.
+
+The relationship between soundness and completeness mirrors that of traditional type systems: soundness is a hard guarantee (no false negatives for checked properties), while completeness is an engineering trade-off (some defects are not checked).
+
+---
+
 ## 5. Design Rationale
 
 The Skill Behavior Model applies established software design principles to agent engineering.
@@ -532,6 +666,8 @@ Future directions include new facets for emerging concerns (cost budgets, latenc
 [18] Microsoft, "Semantic Kernel — Integrate cutting-edge LLM technology quickly and easily into your apps," 2023. [GitHub](https://github.com/microsoft/semantic-kernel)
 
 [19] D. Wu et al., "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation," arXiv:2308.08155, 2023. [arXiv](https://arxiv.org/abs/2308.08155)
+
+[20] R. Milner, "A Theory of Type Polymorphism in Programming," *Journal of Computer and System Sciences*, vol. 17, no. 3, pp. 348–375, 1978. The origin of "well-typed programs don't go wrong." [ScienceDirect](https://doi.org/10.1016/0022-0000(78)90014-4)
 
 ---
 
