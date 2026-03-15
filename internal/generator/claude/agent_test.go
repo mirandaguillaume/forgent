@@ -157,3 +157,54 @@ func TestResolveAgentTools(t *testing.T) {
 	assert.Contains(t, tools, "Read")
 	assert.Contains(t, tools, "Bash")
 }
+
+// --- Compact format tests ---
+
+func TestGenerateCompactAgentMd_Frontmatter(t *testing.T) {
+	md := claude.GenerateCompactAgentMd(testAgent(), testResolvedSkills())
+	assert.Contains(t, md, "---\nname: code-reviewer\n")
+	assert.Contains(t, md, "description: Reviews code for quality and security issues")
+	assert.Contains(t, md, "tools: ")
+}
+
+func TestGenerateCompactAgentMd_NoStepHeaders(t *testing.T) {
+	md := claude.GenerateCompactAgentMd(testAgent(), testResolvedSkills())
+	assert.NotContains(t, md, "### Step")
+	assert.NotContains(t, md, "Read `.claude/skills/")
+	assert.NotContains(t, md, "follow its instructions")
+}
+
+func TestGenerateCompactAgentMd_InlinedSkills(t *testing.T) {
+	md := claude.GenerateCompactAgentMd(testAgent(), testResolvedSkills())
+	assert.Contains(t, md, "**code-review**")
+	assert.Contains(t, md, "**security-scan**")
+	assert.Contains(t, md, "FS: read-only")
+	assert.Contains(t, md, "FS: read-write")
+}
+
+func TestGenerateCompactAgentMd_FewerWords(t *testing.T) {
+	standard := claude.GenerateAgentMd(testAgent(), testResolvedSkills(), ".claude")
+	compact := claude.GenerateCompactAgentMd(testAgent(), testResolvedSkills())
+	stdWords := len(strings.Fields(standard))
+	cmpWords := len(strings.Fields(compact))
+	assert.Less(t, cmpWords, stdWords, "compact should have fewer words")
+}
+
+func TestGenerateCompactAgentMd_OutputSection(t *testing.T) {
+	md := claude.GenerateCompactAgentMd(testAgent(), testResolvedSkills())
+	assert.Contains(t, md, "## Output")
+	assert.Contains(t, md, "review-report")
+	assert.Contains(t, md, "security-report")
+}
+
+func TestGenerateCompactAgentMd_Orchestration(t *testing.T) {
+	md := claude.GenerateCompactAgentMd(testAgent(), testResolvedSkills())
+	assert.Contains(t, md, "Execute 2 skills in order.")
+}
+
+func TestGenerateCompactAgentMd_NoSkills(t *testing.T) {
+	agent := testAgent()
+	md := claude.GenerateCompactAgentMd(agent, nil)
+	assert.NotContains(t, md, "tools:")
+	assert.NotContains(t, md, "## Output")
+}

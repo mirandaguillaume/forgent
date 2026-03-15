@@ -5,7 +5,9 @@ import (
 	"github.com/mirandaguillaume/forgent/pkg/spec"
 )
 
-type copilotGenerator struct{}
+type copilotGenerator struct {
+	compact bool
+}
 
 func (g *copilotGenerator) Target() string           { return "copilot" }
 func (g *copilotGenerator) DefaultOutputDir() string { return ".github" }
@@ -14,7 +16,14 @@ func (g *copilotGenerator) GenerateSkill(skill model.SkillBehavior) string {
 	return GenerateCopilotSkillMd(skill)
 }
 
+func (g *copilotGenerator) SetOptions(opts spec.GeneratorOptions) {
+	g.compact = opts.Compact
+}
+
 func (g *copilotGenerator) GenerateAgent(agent model.AgentComposition, skills []model.SkillBehavior, outputDir string) string {
+	if g.compact {
+		return GenerateCompactCopilotAgentMd(agent, skills)
+	}
 	return GenerateCopilotAgentMd(agent, skills, outputDir)
 }
 
