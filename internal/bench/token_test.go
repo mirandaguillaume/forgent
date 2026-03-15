@@ -39,6 +39,62 @@ func TestTokenOverhead_MissingDir(t *testing.T) {
 	require.Error(t, err, "should fail for missing directories")
 }
 
+func TestTokenOverhead_WordCountIsPositive(t *testing.T) {
+	// Lines 66/67: word counting in generated files.
+	// If CountWords returns 0 or negative, this test catches it.
+	result, err := RunTokenOverhead("../../skills", "../../agents", "claude")
+	require.NoError(t, err)
+	assert.Greater(t, result.ComposedWords, 0, "composed output must have words")
+	assert.Greater(t, result.MonolithicWords, 0, "monolithic output must have words")
+	// The composed should have at least as many words as monolithic (due to overhead).
+	assert.GreaterOrEqual(t, result.ComposedWords, result.MonolithicWords,
+		"composed should have at least as many words due to structural overhead")
+}
+
+func TestTokenOverhead_OverheadCalculation(t *testing.T) {
+	// Line 67: overhead formula: (composed - monolithic) / monolithic * 100.
+	// Mutation: changing + to - or * to / would produce wrong result.
+	result, err := RunTokenOverhead("../../skills", "../../agents", "claude")
+	require.NoError(t, err)
+	// Manually verify the overhead calculation.
+	expectedOverhead := float64(result.ComposedWords-result.MonolithicWords) / float64(result.MonolithicWords) * 100
+	assert.InDelta(t, expectedOverhead, result.OverheadPct, 0.001,
+		"overhead should match manual calculation")
+}
+
+func TestTokenOverhead_MonolithicContent(t *testing.T) {
+	// Line 129: monolithic content should include all skill/agent semantic content.
+	// If countMonolithic is broken, it would return 0.
+	result, err := RunTokenOverhead("../../skills", "../../agents", "copilot")
+	require.NoError(t, err)
+	assert.Greater(t, result.MonolithicWords, 0, "monolithic should have content")
+}
+
+func TestTokenOverhead_FileTraversal(t *testing.T) {
+	// Lines 147/172: file traversal for skills and agents.
+	// Verify that the number of composed files matches expected count.
+	result, err := RunTokenOverhead("../../skills", "../../agents", "claude")
+	require.NoError(t, err)
+	// claude target: 6 skills + 1 agent = 7 files
+	assert.Equal(t, 7, result.ComposedFiles)
+}
+
+func TestTokenOverhead_CopilotFileCount(t *testing.T) {
+	// Copilot target generates additional files (instructions, toolmap).
+	result, err := RunTokenOverhead("../../skills", "../../agents", "copilot")
+	require.NoError(t, err)
+	assert.Greater(t, result.ComposedFiles, 0, "copilot should generate files")
+}
+
+func TestTokenOverhead_ZeroMonolithicSafeDivision(t *testing.T) {
+	// Line 66: `if monolithicWords > 0` — when monolithic is 0, overhead should be 0.
+	tmpSkills := t.TempDir()
+	tmpAgents := t.TempDir()
+	result, err := RunTokenOverhead(tmpSkills, tmpAgents, "claude")
+	require.NoError(t, err)
+	assert.Equal(t, 0.0, result.OverheadPct, "zero monolithic → zero overhead (safe division)")
+}
+
 func TestTokenOverhead_EmptyDir(t *testing.T) {
 	tmpSkills := t.TempDir()
 	tmpAgents := t.TempDir()
