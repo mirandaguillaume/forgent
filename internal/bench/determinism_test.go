@@ -35,6 +35,57 @@ func TestDeterminism_MinimumRuns(t *testing.T) {
 	assert.True(t, result.Identical)
 }
 
+func TestDeterminism_ClampAtExactly2(t *testing.T) {
+	// Line 19: `runs < 2` → `runs < 1` or `runs <= 2` would break this.
+	// Requesting exactly 2 should NOT be clamped — it should stay 2.
+	result, err := RunDeterminism("../../skills", "../../agents", "claude", 2)
+	require.NoError(t, err)
+	assert.Equal(t, 2, result.Runs, "requesting 2 runs should yield exactly 2, not clamped")
+	assert.True(t, result.Identical)
+}
+
+func TestDeterminism_ClampZeroToTwo(t *testing.T) {
+	// Requesting 0 runs should be clamped to 2.
+	result, err := RunDeterminism("../../skills", "../../agents", "claude", 0)
+	require.NoError(t, err)
+	assert.Equal(t, 2, result.Runs)
+}
+
+func TestDeterminism_ClampNegativeToTwo(t *testing.T) {
+	// Requesting negative runs should be clamped to 2.
+	result, err := RunDeterminism("../../skills", "../../agents", "claude", -5)
+	require.NoError(t, err)
+	assert.Equal(t, 2, result.Runs)
+}
+
+func TestDeterminism_FourRuns(t *testing.T) {
+	// 4 runs should not be clamped.
+	result, err := RunDeterminism("../../skills", "../../agents", "claude", 4)
+	require.NoError(t, err)
+	assert.Equal(t, 4, result.Runs)
+	assert.True(t, result.Identical)
+}
+
+func TestDeterminism_NormalizationRemovesTempPaths(t *testing.T) {
+	// Lines 53/64: normalization replaces temp dir paths with <OUTPUT>.
+	// If normalization is broken, identical builds in different temp dirs would show diffs.
+	// This test verifies identical builds are detected as such.
+	result, err := RunDeterminism("../../skills", "../../agents", "claude", 3)
+	require.NoError(t, err)
+	assert.True(t, result.Identical, "normalization should make identical builds compare equal")
+	assert.Equal(t, 0, result.DiffCount, "no diffs expected")
+	assert.Empty(t, result.DiffFiles, "no diff files expected")
+}
+
+func TestDeterminism_ComparisonLogic(t *testing.T) {
+	// Lines 55/65: the comparison loop runs for i=1..N against refDir.
+	// Build 3 runs and verify the comparison catches all of them.
+	result, err := RunDeterminism("../../skills", "../../agents", "copilot", 3)
+	require.NoError(t, err)
+	assert.Equal(t, 3, result.Runs)
+	assert.True(t, result.Identical)
+}
+
 func TestDeterminism_DetectsDiff(t *testing.T) {
 	// Build once, then tamper with a file to verify diffs are detected.
 	tmpDir := t.TempDir()

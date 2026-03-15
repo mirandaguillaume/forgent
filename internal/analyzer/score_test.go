@@ -785,3 +785,1210 @@ func TestCalibration_Ordering(t *testing.T) {
 	assert.Greater(t, medium.Total, vercelGuide.Total, "Workflow with anti-patterns > guidelines without")
 	assert.Greater(t, vercelGuide.Total, minimal.Total, "Guidelines > empty template")
 }
+
+// ---------------------------------------------------------------------------
+// Exact-value tests to kill ARITHMETIC_BASE and CONDITIONALS_BOUNDARY gremlins
+// ---------------------------------------------------------------------------
+
+func TestScoreContext_ExactValues(t *testing.T) {
+	tests := []struct {
+		name     string
+		skill    model.SkillBehavior
+		expected int
+	}{
+		{
+			name: "full context: consumes + produces + conversation memory + bonus",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Context = model.ContextFacet{
+					Consumes: []string{"x"},
+					Produces: []string{"y"},
+					Memory:   model.MemoryConversation,
+				}
+			}),
+			// 18*(0.35 + 0.35 + 0.15 + 0.15) = 18*1.0 = 18
+			expected: 18,
+		},
+		{
+			name: "consumes only, no memory",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Context = model.ContextFacet{
+					Consumes: []string{"x"},
+					Produces: []string{},
+					Memory:   "",
+				}
+			}),
+			// 18*0.35 = 6.3 → round = 6
+			expected: 6,
+		},
+		{
+			name: "produces only + long-term memory",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Context = model.ContextFacet{
+					Consumes: []string{},
+					Produces: []string{"y"},
+					Memory:   model.MemoryLongTerm,
+				}
+			}),
+			// 18*(0.35 + 0.1) = 18*0.45 = 8.1 → round = 8
+			expected: 8,
+		},
+		{
+			name: "short-term memory only",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Context = model.ContextFacet{
+					Consumes: []string{},
+					Produces: []string{},
+					Memory:   model.MemoryShortTerm,
+				}
+			}),
+			// 18*0.15 = 2.7 → round = 3
+			expected: 3,
+		},
+		{
+			name: "completely empty context",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Context = model.ContextFacet{}
+			}),
+			expected: 0,
+		},
+		{
+			name: "consumes + produces + short-term memory + bonus",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Context = model.ContextFacet{
+					Consumes: []string{"a"},
+					Produces: []string{"b"},
+					Memory:   model.MemoryShortTerm,
+				}
+			}),
+			// 18*(0.35 + 0.35 + 0.15 + 0.15) = 18
+			expected: 18,
+		},
+		{
+			name: "consumes + produces + long-term memory + bonus",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Context = model.ContextFacet{
+					Consumes: []string{"a"},
+					Produces: []string{"b"},
+					Memory:   model.MemoryLongTerm,
+				}
+			}),
+			// 18*(0.35 + 0.35 + 0.1 + 0.15) = 18*0.95 = 17.1 → round = 17
+			expected: 17,
+		},
+		{
+			name: "consumes only + conversation memory",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Context = model.ContextFacet{
+					Consumes: []string{"x"},
+					Produces: []string{},
+					Memory:   model.MemoryConversation,
+				}
+			}),
+			// 18*(0.35 + 0.15) = 18*0.5 = 9
+			expected: 9,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := ScoreSkill(tc.skill)
+			assert.Equal(t, tc.expected, result.Breakdown.Context,
+				"scoreContext mismatch for %s", tc.name)
+		})
+	}
+}
+
+func TestScoreStrategy_ExactValues(t *testing.T) {
+	tests := []struct {
+		name     string
+		skill    model.SkillBehavior
+		expected int
+	}{
+		{
+			name: "tools + approach + 2 steps (no bonus)",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Strategy = model.StrategyFacet{
+					Tools:    []string{"t"},
+					Approach: "a",
+					Steps:    []string{"s1", "s2"},
+				}
+			}),
+			// 22*(0.35 + 0.25 + 0.25) = 22*0.85 = 18.7 → round = 19
+			expected: 19,
+		},
+		{
+			name: "tools + approach + 3 steps (with bonus)",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Strategy = model.StrategyFacet{
+					Tools:    []string{"t"},
+					Approach: "a",
+					Steps:    []string{"s1", "s2", "s3"},
+				}
+			}),
+			// 22*(0.35 + 0.25 + 0.25 + 0.15) = 22*1.0 = 22
+			expected: 22,
+		},
+		{
+			name: "approach only",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Strategy = model.StrategyFacet{
+					Tools:    []string{},
+					Approach: "a",
+					Steps:    []string{},
+				}
+			}),
+			// 22*0.25 = 5.5 → round = 6
+			expected: 6,
+		},
+		{
+			name: "tools only",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Strategy = model.StrategyFacet{
+					Tools:    []string{"t"},
+					Approach: "",
+					Steps:    []string{},
+				}
+			}),
+			// 22*0.35 = 7.7 → round = 8
+			expected: 8,
+		},
+		{
+			name: "tools + 1 step, no approach",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Strategy = model.StrategyFacet{
+					Tools:    []string{"t"},
+					Approach: "",
+					Steps:    []string{"s1"},
+				}
+			}),
+			// 22*(0.35 + 0.25) = 22*0.6 = 13.2 → round = 13
+			expected: 13,
+		},
+		{
+			name: "everything empty",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Strategy = model.StrategyFacet{}
+			}),
+			expected: 0,
+		},
+		{
+			name: "tools + approach + exactly 3 steps boundary",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Strategy = model.StrategyFacet{
+					Tools:    []string{"a", "b"},
+					Approach: "seq",
+					Steps:    []string{"s1", "s2", "s3"},
+				}
+			}),
+			// 22*(0.35+0.25+0.25+0.15) = 22
+			expected: 22,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := ScoreSkill(tc.skill)
+			assert.Equal(t, tc.expected, result.Breakdown.Strategy,
+				"scoreStrategy mismatch for %s", tc.name)
+		})
+	}
+}
+
+func TestScoreGuardrails_ExactValues(t *testing.T) {
+	tests := []struct {
+		name     string
+		skill    model.SkillBehavior
+		expected int
+	}{
+		{
+			name: "no guardrails",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Guardrails = nil
+			}),
+			expected: 0,
+		},
+		{
+			name: "empty guardrails slice",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Guardrails = []model.GuardrailRule{}
+			}),
+			expected: 0,
+		},
+		{
+			name: "1 guardrail, no timeout",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Guardrails = []model.GuardrailRule{makeGuardrail("do not do X")}
+			}),
+			// 18*0.5 = 9
+			expected: 9,
+		},
+		{
+			name: "1 guardrail with timeout map",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Guardrails = []model.GuardrailRule{makeGuardrailMap("timeout", "5min")}
+			}),
+			// 18*(0.5 + 0.3) = 18*0.8 = 14.4 → round = 14
+			expected: 14,
+		},
+		{
+			name: "2 guardrails with timeout",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Guardrails = []model.GuardrailRule{
+					makeGuardrail("rule-one"),
+					makeGuardrailMap("timeout", "10min"),
+				}
+			}),
+			// 18*(0.5 + 0.3 + 0.2) = 18*1.0 = 18
+			expected: 18,
+		},
+		{
+			name: "2 guardrails no timeout",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Guardrails = []model.GuardrailRule{
+					makeGuardrail("rule-one"),
+					makeGuardrail("rule-two"),
+				}
+			}),
+			// 18*(0.5 + 0.2) = 18*0.7 = 12.6 → round = 13
+			expected: 13,
+		},
+		{
+			name: "1 guardrail with timeout in string value",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Guardrails = []model.GuardrailRule{makeGuardrail("timeout: 30min")}
+			}),
+			// String contains "timeout" → hasTimeout = true
+			// 18*(0.5 + 0.3) = 14.4 → round = 14
+			expected: 14,
+		},
+		{
+			name: "3 guardrails with timeout via map",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Guardrails = []model.GuardrailRule{
+					makeGuardrail("rule-one"),
+					makeGuardrail("rule-two"),
+					makeGuardrailMap("timeout", "5min"),
+				}
+			}),
+			// len >= 2, hasTimeout → 18*(0.5+0.3+0.2) = 18
+			expected: 18,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := ScoreSkill(tc.skill)
+			assert.Equal(t, tc.expected, result.Breakdown.Guardrails,
+				"scoreGuardrails mismatch for %s", tc.name)
+		})
+	}
+}
+
+func TestScoreObservability_ExactValues(t *testing.T) {
+	tests := []struct {
+		name     string
+		skill    model.SkillBehavior
+		expected int
+	}{
+		{
+			name: "1 metric + detailed trace",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Observability = model.ObservabilityFacet{
+					Metrics:    []string{"m1"},
+					TraceLevel: model.TraceLevelDetailed,
+				}
+			}),
+			// 14*(0.4 + 0.45) = 14*0.85 = 11.9 → round = 12
+			expected: 12,
+		},
+		{
+			name: "2 metrics + standard trace",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Observability = model.ObservabilityFacet{
+					Metrics:    []string{"m1", "m2"},
+					TraceLevel: model.TraceLevelStandard,
+				}
+			}),
+			// 14*(0.4 + 0.15 + 0.3) = 14*0.85 = 11.9 → round = 12
+			expected: 12,
+		},
+		{
+			name: "no metrics + minimal trace",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Observability = model.ObservabilityFacet{
+					Metrics:    []string{},
+					TraceLevel: model.TraceLevelMinimal,
+				}
+			}),
+			// 14*0.1 = 1.4 → round = 1
+			expected: 1,
+		},
+		{
+			name: "2 metrics + detailed trace (max)",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Observability = model.ObservabilityFacet{
+					Metrics:    []string{"m1", "m2"},
+					TraceLevel: model.TraceLevelDetailed,
+				}
+			}),
+			// 14*(0.4 + 0.15 + 0.45) = 14*1.0 = 14
+			expected: 14,
+		},
+		{
+			name: "1 metric + minimal trace",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Observability = model.ObservabilityFacet{
+					Metrics:    []string{"m1"},
+					TraceLevel: model.TraceLevelMinimal,
+				}
+			}),
+			// 14*(0.4 + 0.1) = 14*0.5 = 7
+			expected: 7,
+		},
+		{
+			name: "no metrics + no trace level",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Observability = model.ObservabilityFacet{
+					Metrics:    []string{},
+					TraceLevel: "",
+				}
+			}),
+			expected: 0,
+		},
+		{
+			name: "1 metric + standard trace",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Observability = model.ObservabilityFacet{
+					Metrics:    []string{"m1"},
+					TraceLevel: model.TraceLevelStandard,
+				}
+			}),
+			// 14*(0.4 + 0.3) = 14*0.7 = 9.8 → round = 10
+			expected: 10,
+		},
+		{
+			name: "no metrics + detailed trace",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Observability = model.ObservabilityFacet{
+					Metrics:    []string{},
+					TraceLevel: model.TraceLevelDetailed,
+				}
+			}),
+			// 14*0.45 = 6.3 → round = 6
+			expected: 6,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := ScoreSkill(tc.skill)
+			assert.Equal(t, tc.expected, result.Breakdown.Observability,
+				"scoreObservability mismatch for %s", tc.name)
+		})
+	}
+}
+
+func TestScoreSecurity_ExactValues(t *testing.T) {
+	tests := []struct {
+		name     string
+		skill    model.SkillBehavior
+		expected int
+	}{
+		{
+			name: "AccessNone + NetworkNone + no secrets + no sandbox",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Security = model.SecurityFacet{
+					Filesystem: model.AccessNone,
+					Network:    model.NetworkNone,
+					Secrets:    []string{},
+				}
+			}),
+			// 18*(0.4 + 0.35 + 0.15) = 18*0.9 = 16.2 → round = 16
+			expected: 16,
+		},
+		{
+			name: "AccessReadOnly + NetworkNone + no secrets + no sandbox",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Security = model.SecurityFacet{
+					Filesystem: model.AccessReadOnly,
+					Network:    model.NetworkNone,
+					Secrets:    []string{},
+				}
+			}),
+			// 18*(0.35 + 0.35 + 0.15) = 18*0.85 = 15.3 → round = 15
+			expected: 15,
+		},
+		{
+			name: "AccessFull + NetworkFull + with secrets + no sandbox",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Security = model.SecurityFacet{
+					Filesystem: model.AccessFull,
+					Network:    model.NetworkFull,
+					Secrets:    []string{"API_KEY"},
+				}
+			}),
+			// 18*(0.05 + 0.05 + 0.05) = 18*0.15 = 2.7 → round = 3
+			expected: 3,
+		},
+		{
+			name: "AccessReadWrite + NetworkAllowlist + no secrets + SandboxContainer",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Security = model.SecurityFacet{
+					Filesystem: model.AccessReadWrite,
+					Network:    model.NetworkAllowlist,
+					Secrets:    []string{},
+					Sandbox:    model.SandboxContainer,
+				}
+			}),
+			// 18*(0.15 + 0.2 + 0.15 + 0.1) = 18*0.6 = 10.8 → round = 11
+			expected: 11,
+		},
+		{
+			name: "AccessNone + NetworkNone + no secrets + SandboxVM (max)",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Security = model.SecurityFacet{
+					Filesystem: model.AccessNone,
+					Network:    model.NetworkNone,
+					Secrets:    []string{},
+					Sandbox:    model.SandboxVM,
+				}
+			}),
+			// 18*(0.4 + 0.35 + 0.15 + 0.1) = 18*1.0 = 18
+			expected: 18,
+		},
+		{
+			name: "AccessReadOnly + NetworkAllowlist + with secrets + SandboxContainer",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Security = model.SecurityFacet{
+					Filesystem: model.AccessReadOnly,
+					Network:    model.NetworkAllowlist,
+					Secrets:    []string{"TOKEN"},
+					Sandbox:    model.SandboxContainer,
+				}
+			}),
+			// 18*(0.35 + 0.2 + 0.05 + 0.1) = 18*0.7 = 12.6 → round = 13
+			expected: 13,
+		},
+		{
+			name: "AccessReadWrite + NetworkFull + no secrets + no sandbox",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Security = model.SecurityFacet{
+					Filesystem: model.AccessReadWrite,
+					Network:    model.NetworkFull,
+					Secrets:    []string{},
+				}
+			}),
+			// 18*(0.15 + 0.05 + 0.15) = 18*0.35 = 6.3 → round = 6
+			expected: 6,
+		},
+		{
+			name: "AccessNone + NetworkAllowlist + with secrets + SandboxVM",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Security = model.SecurityFacet{
+					Filesystem: model.AccessNone,
+					Network:    model.NetworkAllowlist,
+					Secrets:    []string{"SECRET"},
+					Sandbox:    model.SandboxVM,
+				}
+			}),
+			// 18*(0.4 + 0.2 + 0.05 + 0.1) = 18*0.75 = 13.5 → round = 14
+			expected: 14,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := ScoreSkill(tc.skill)
+			assert.Equal(t, tc.expected, result.Breakdown.Security,
+				"scoreSecurity mismatch for %s", tc.name)
+		})
+	}
+}
+
+func TestScoreWhenToUse_ExactValues(t *testing.T) {
+	tests := []struct {
+		name     string
+		skill    model.SkillBehavior
+		expected int
+	}{
+		{
+			name: "triggers only",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.WhenToUse = model.WhenToUseFacet{Triggers: []string{"bug"}}
+			}),
+			// 3*0.4 = 1.2 → round = 1
+			expected: 1,
+		},
+		{
+			name: "dont_use only",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.WhenToUse = model.WhenToUseFacet{DontUse: []string{"typos"}}
+			}),
+			// 3*0.3 = 0.9 → round = 1
+			expected: 1,
+		},
+		{
+			name: "especially only",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.WhenToUse = model.WhenToUseFacet{Especially: []string{"pressure"}}
+			}),
+			// 3*0.3 = 0.9 → round = 1
+			expected: 1,
+		},
+		{
+			name: "all three sub-facets",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.WhenToUse = model.WhenToUseFacet{
+					Triggers:   []string{"bugs"},
+					DontUse:    []string{"typos"},
+					Especially: []string{"pressure"},
+				}
+			}),
+			// 3*(0.4 + 0.3 + 0.3) = 3*1.0 = 3
+			expected: 3,
+		},
+		{
+			name: "empty (all zero)",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.WhenToUse = model.WhenToUseFacet{}
+			}),
+			expected: 0,
+		},
+		{
+			name: "triggers + dont_use only",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.WhenToUse = model.WhenToUseFacet{
+					Triggers: []string{"bugs"},
+					DontUse:  []string{"typos"},
+				}
+			}),
+			// 3*(0.4 + 0.3) = 3*0.7 = 2.1 → round = 2
+			expected: 2,
+		},
+		{
+			name: "triggers + especially only",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.WhenToUse = model.WhenToUseFacet{
+					Triggers:   []string{"bugs"},
+					Especially: []string{"pressure"},
+				}
+			}),
+			// 3*(0.4 + 0.3) = 3*0.7 = 2.1 → round = 2
+			expected: 2,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := ScoreSkill(tc.skill)
+			assert.Equal(t, tc.expected, result.Breakdown.WhenToUse,
+				"scoreWhenToUse mismatch for %s", tc.name)
+		})
+	}
+}
+
+func TestScoreAntiPatterns_ExactValues(t *testing.T) {
+	tests := []struct {
+		name     string
+		skill    model.SkillBehavior
+		expected int
+	}{
+		{
+			name: "no anti-patterns",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.AntiPatterns = nil
+			}),
+			expected: 0,
+		},
+		{
+			name: "1 anti-pattern",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.AntiPatterns = []model.AntiPattern{{Excuse: "a", Reality: "b"}}
+			}),
+			// 2*0.5 = 1.0 → round = 1
+			expected: 1,
+		},
+		{
+			name: "2 anti-patterns (boundary)",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.AntiPatterns = []model.AntiPattern{
+					{Excuse: "a", Reality: "b"},
+					{Excuse: "c", Reality: "d"},
+				}
+			}),
+			// score = float64(2) = 2
+			expected: 2,
+		},
+		{
+			name: "3 anti-patterns (above boundary)",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.AntiPatterns = []model.AntiPattern{
+					{Excuse: "a", Reality: "b"},
+					{Excuse: "c", Reality: "d"},
+					{Excuse: "e", Reality: "f"},
+				}
+			}),
+			// score = float64(2) clamped to 2
+			expected: 2,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := ScoreSkill(tc.skill)
+			assert.Equal(t, tc.expected, result.Breakdown.AntiPatterns,
+				"scoreAntiPatterns mismatch for %s", tc.name)
+		})
+	}
+}
+
+func TestScoreExamples_ExactValues(t *testing.T) {
+	tests := []struct {
+		name     string
+		skill    model.SkillBehavior
+		expected int
+	}{
+		{
+			name: "no examples",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Examples = nil
+			}),
+			expected: 0,
+		},
+		{
+			name: "1 example",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Examples = []model.CodeExample{{Label: "x", Code: "y"}}
+			}),
+			// 5*0.5 = 2.5 → round = 3 (half away from zero)
+			expected: 3,
+		},
+		{
+			name: "2 examples (boundary)",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Examples = []model.CodeExample{
+					{Label: "x", Code: "y"},
+					{Label: "a", Code: "b"},
+				}
+			}),
+			// score = float64(5) = 5
+			expected: 5,
+		},
+		{
+			name: "3 examples (above boundary)",
+			skill: makeFullSkill(func(s *model.SkillBehavior) {
+				s.Examples = []model.CodeExample{
+					{Label: "x", Code: "y"},
+					{Label: "a", Code: "b"},
+					{Label: "c", Code: "d"},
+				}
+			}),
+			// score = float64(5) clamped to 5
+			expected: 5,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := ScoreSkill(tc.skill)
+			assert.Equal(t, tc.expected, result.Breakdown.Examples,
+				"scoreExamples mismatch for %s", tc.name)
+		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Agent scoring — exact values via ScoreAgent (since sub-functions are unexported)
+// ---------------------------------------------------------------------------
+
+func TestScoreDescription_ExactValues(t *testing.T) {
+	tests := []struct {
+		name     string
+		desc     string
+		expected int
+	}{
+		{
+			name:     "empty description",
+			desc:     "",
+			expected: 0,
+		},
+		{
+			name:     "4 words (below 5-word threshold)",
+			desc:     "four words here ok",
+			expected: 12, // 20*0.6 = 12
+		},
+		{
+			name:     "exactly 5 words (hits first bonus)",
+			desc:     "five words are here ok",
+			expected: 16, // 20*(0.6+0.2) = 16
+		},
+		{
+			name:     "exactly 10 words (hits both bonuses)",
+			desc:     "one two three four five six seven eight nine ten",
+			expected: 20, // 20*(0.6+0.2+0.2) = 20
+		},
+		{
+			name:     "1 word",
+			desc:     "short",
+			expected: 12, // 20*0.6 = 12
+		},
+		{
+			name:     "7 words (above 5 below 10)",
+			desc:     "this is a seven word desc here",
+			expected: 16, // 20*(0.6+0.2) = 16
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			agent := makeFullAgent(func(a *model.AgentComposition) {
+				a.Description = tc.desc
+			})
+			result := ScoreAgent(agent, nil)
+			assert.Equal(t, tc.expected, result.Breakdown.Description,
+				"scoreDescription mismatch for %s", tc.name)
+		})
+	}
+}
+
+func TestScoreComposition_ExactValues(t *testing.T) {
+	tests := []struct {
+		name     string
+		skills   []string
+		expected int
+	}{
+		{
+			name:     "0 skills",
+			skills:   []string{},
+			expected: 5, // 25*0.2 = 5 (unique check: 0==0 true)
+		},
+		{
+			name:     "1 skill",
+			skills:   []string{"a"},
+			expected: 13, // 25*(0.3 + 0.2) = 12.5 → round = 13
+		},
+		{
+			name:     "2 unique skills",
+			skills:   []string{"a", "b"},
+			expected: 20, // 25*(0.6 + 0.2) = 20
+		},
+		{
+			name:     "3 unique skills",
+			skills:   []string{"a", "b", "c"},
+			expected: 25, // 25*(0.6 + 0.2 + 0.2) = 25
+		},
+		{
+			name:     "2 duplicate skills",
+			skills:   []string{"a", "a"},
+			expected: 15, // 25*0.6 = 15 (unique check fails: 1 != 2)
+		},
+		{
+			name:     "3 skills with 1 duplicate",
+			skills:   []string{"a", "b", "a"},
+			expected: 20, // 25*(0.6 + 0.2) = 20 (unique check fails: 2 != 3)
+		},
+		{
+			name:     "4 unique skills",
+			skills:   []string{"a", "b", "c", "d"},
+			expected: 25, // 25*(0.6 + 0.2 + 0.2) = 25
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			agent := makeFullAgent(func(a *model.AgentComposition) {
+				a.Skills = tc.skills
+			})
+			result := ScoreAgent(agent, nil)
+			assert.Equal(t, tc.expected, result.Breakdown.Composition,
+				"scoreComposition mismatch for %s", tc.name)
+		})
+	}
+}
+
+func TestScoreDataFlow_ExactValues(t *testing.T) {
+	tests := []struct {
+		name           string
+		agent          model.AgentComposition
+		resolvedSkills []model.SkillBehavior
+		expected       int
+	}{
+		{
+			name: "less than 2 resolved skills",
+			agent: makeFullAgent(func(a *model.AgentComposition) {
+				a.Skills = []string{"a"}
+			}),
+			resolvedSkills: []model.SkillBehavior{
+				makeFullSkill(func(s *model.SkillBehavior) { s.Skill = "a" }),
+			},
+			// round(35 * 0.5) = round(17.5) = 18
+			expected: 18,
+		},
+		{
+			name: "nil resolved skills",
+			agent: makeFullAgent(func(a *model.AgentComposition) {
+				a.Skills = []string{"a", "b"}
+			}),
+			resolvedSkills: nil,
+			// len(nil) < 2 → round(35*0.5) = 18
+			expected: 18,
+		},
+		{
+			name: "parallel orchestration with 2+ skills",
+			agent: makeFullAgent(func(a *model.AgentComposition) {
+				a.Skills = []string{"a", "b"}
+				a.Orchestration = model.OrchestrationParallel
+			}),
+			resolvedSkills: []model.SkillBehavior{
+				makeFullSkill(func(s *model.SkillBehavior) {
+					s.Skill = "a"
+					s.Context = model.ContextFacet{Produces: []string{"x"}}
+				}),
+				makeFullSkill(func(s *model.SkillBehavior) {
+					s.Skill = "b"
+					s.Context = model.ContextFacet{Consumes: []string{"x"}}
+				}),
+			},
+			// parallel → return max = 35
+			expected: 35,
+		},
+		{
+			name: "sequential, no inter-skill data flow (independent skills)",
+			agent: makeFullAgent(func(a *model.AgentComposition) {
+				a.Skills = []string{"a", "b"}
+				a.Orchestration = model.OrchestrationSequential
+			}),
+			resolvedSkills: []model.SkillBehavior{
+				makeFullSkill(func(s *model.SkillBehavior) {
+					s.Skill = "a"
+					s.Context = model.ContextFacet{
+						Consumes: []string{"env_input"},
+						Produces: []string{"x"},
+					}
+				}),
+				makeFullSkill(func(s *model.SkillBehavior) {
+					s.Skill = "b"
+					s.Context = model.ContextFacet{
+						Consumes: []string{"env_other"},
+						Produces: []string{"y"},
+					}
+				}),
+			},
+			// interSkillConsumes=0 → 35*0.8 = 28
+			expected: 28,
+		},
+		{
+			name: "sequential, all inter-skill deps satisfied",
+			agent: makeFullAgent(func(a *model.AgentComposition) {
+				a.Skills = []string{"a", "b"}
+				a.Orchestration = model.OrchestrationSequential
+			}),
+			resolvedSkills: []model.SkillBehavior{
+				makeFullSkill(func(s *model.SkillBehavior) {
+					s.Skill = "a"
+					s.Context = model.ContextFacet{
+						Produces: []string{"data"},
+					}
+				}),
+				makeFullSkill(func(s *model.SkillBehavior) {
+					s.Skill = "b"
+					s.Context = model.ContextFacet{
+						Consumes: []string{"data"},
+						Produces: []string{"result"},
+					}
+				}),
+			},
+			// 1/1 satisfied → ratio=1.0 → 35*1.0 = 35
+			expected: 35,
+		},
+		{
+			name: "sequential, all inter-skill deps broken (reverse order)",
+			agent: makeFullAgent(func(a *model.AgentComposition) {
+				a.Skills = []string{"b", "a"}
+				a.Orchestration = model.OrchestrationSequential
+			}),
+			resolvedSkills: []model.SkillBehavior{
+				makeFullSkill(func(s *model.SkillBehavior) {
+					s.Skill = "a"
+					s.Context = model.ContextFacet{
+						Produces: []string{"data"},
+					}
+				}),
+				makeFullSkill(func(s *model.SkillBehavior) {
+					s.Skill = "b"
+					s.Context = model.ContextFacet{
+						Consumes: []string{"data"},
+						Produces: []string{"result"},
+					}
+				}),
+			},
+			// b runs first, consumes "data" which is produced by a (runs later)
+			// "data" is in allProduced, so it's inter-skill. producedBefore["data"]=false → 0 satisfied
+			// ratio = 0/1 = 0 → 35*0 = 0
+			expected: 0,
+		},
+		{
+			name: "sequential, 3 skills, partial satisfaction",
+			agent: makeFullAgent(func(a *model.AgentComposition) {
+				a.Skills = []string{"a", "b", "c"}
+				a.Orchestration = model.OrchestrationSequential
+			}),
+			resolvedSkills: []model.SkillBehavior{
+				makeFullSkill(func(s *model.SkillBehavior) {
+					s.Skill = "a"
+					s.Context = model.ContextFacet{
+						Produces: []string{"x"},
+					}
+				}),
+				makeFullSkill(func(s *model.SkillBehavior) {
+					s.Skill = "b"
+					s.Context = model.ContextFacet{
+						Consumes: []string{"x", "z"},
+						Produces: []string{"y"},
+					}
+				}),
+				makeFullSkill(func(s *model.SkillBehavior) {
+					s.Skill = "c"
+					s.Context = model.ContextFacet{
+						Consumes: []string{"y"},
+						Produces: []string{"z"},
+					}
+				}),
+			},
+			// allProduced: x, y, z
+			// Skill a: no consumes
+			// Skill b: consumes x (in allProduced, producedBefore has x → satisfied), consumes z (in allProduced, not yet produced → unsatisfied)
+			// Skill c: consumes y (in allProduced, producedBefore has x,y → satisfied)
+			// interSkillConsumes=3, satisfiedConsumes=2 → ratio=2/3
+			// 35*(2/3) = 23.333... → round = 23
+			expected: 23,
+		},
+		{
+			name: "sequential, 2 resolved but only 1 matches agent skill names",
+			agent: makeFullAgent(func(a *model.AgentComposition) {
+				a.Skills = []string{"a", "unknown"}
+				a.Orchestration = model.OrchestrationSequential
+			}),
+			resolvedSkills: []model.SkillBehavior{
+				makeFullSkill(func(s *model.SkillBehavior) {
+					s.Skill = "a"
+					s.Context = model.ContextFacet{Produces: []string{"x"}}
+				}),
+				makeFullSkill(func(s *model.SkillBehavior) {
+					s.Skill = "other"
+					s.Context = model.ContextFacet{Consumes: []string{"x"}}
+				}),
+			},
+			// orderedSkills has only "a" (1 item < 2) → round(35*0.5) = 18
+			expected: 18,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := ScoreAgent(tc.agent, tc.resolvedSkills)
+			assert.Equal(t, tc.expected, result.Breakdown.DataFlow,
+				"scoreDataFlow mismatch for %s", tc.name)
+		})
+	}
+}
+
+func TestScoreOrchestration_ExactValues(t *testing.T) {
+	tests := []struct {
+		name           string
+		agent          model.AgentComposition
+		resolvedSkills []model.SkillBehavior
+		expected       int
+	}{
+		{
+			name: "sequential + 2 resolved + description",
+			agent: makeFullAgent(func(a *model.AgentComposition) {
+				a.Orchestration = model.OrchestrationSequential
+				a.Description = "A well-described agent"
+			}),
+			resolvedSkills: []model.SkillBehavior{
+				makeFullSkill(func(s *model.SkillBehavior) { s.Skill = "a" }),
+				makeFullSkill(func(s *model.SkillBehavior) { s.Skill = "b" }),
+			},
+			// 20*(0.5 + 0.3 + 0.2) = 20
+			expected: 20,
+		},
+		{
+			name: "sequential + 2 resolved + no description",
+			agent: makeFullAgent(func(a *model.AgentComposition) {
+				a.Orchestration = model.OrchestrationSequential
+				a.Description = ""
+			}),
+			resolvedSkills: []model.SkillBehavior{
+				makeFullSkill(func(s *model.SkillBehavior) { s.Skill = "a" }),
+				makeFullSkill(func(s *model.SkillBehavior) { s.Skill = "b" }),
+			},
+			// 20*(0.5 + 0.3) = 16
+			expected: 16,
+		},
+		{
+			name: "parallel + with description",
+			agent: makeFullAgent(func(a *model.AgentComposition) {
+				a.Orchestration = model.OrchestrationParallel
+				a.Description = "A parallel agent"
+			}),
+			resolvedSkills: []model.SkillBehavior{
+				makeFullSkill(func(s *model.SkillBehavior) { s.Skill = "a" }),
+				makeFullSkill(func(s *model.SkillBehavior) { s.Skill = "b" }),
+			},
+			// 20*(0.5 + 0.2) = 14
+			expected: 14,
+		},
+		{
+			name: "parallel + no description",
+			agent: makeFullAgent(func(a *model.AgentComposition) {
+				a.Orchestration = model.OrchestrationParallel
+				a.Description = ""
+			}),
+			resolvedSkills: nil,
+			// 20*0.5 = 10
+			expected: 10,
+		},
+		{
+			name: "sequential + fewer than 2 resolved + with description",
+			agent: makeFullAgent(func(a *model.AgentComposition) {
+				a.Orchestration = model.OrchestrationSequential
+				a.Description = "Some description"
+			}),
+			resolvedSkills: []model.SkillBehavior{
+				makeFullSkill(func(s *model.SkillBehavior) { s.Skill = "a" }),
+			},
+			// sequential but <2 resolved → no +0.3 bonus. +0.2 for description.
+			// 20*(0.5 + 0.2) = 14
+			expected: 14,
+		},
+		{
+			name: "sequential + 0 resolved + no description",
+			agent: makeFullAgent(func(a *model.AgentComposition) {
+				a.Orchestration = model.OrchestrationSequential
+				a.Description = ""
+			}),
+			resolvedSkills: nil,
+			// 20*0.5 = 10
+			expected: 10,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := ScoreAgent(tc.agent, tc.resolvedSkills)
+			assert.Equal(t, tc.expected, result.Breakdown.Orchestration,
+				"scoreOrchestration mismatch for %s", tc.name)
+		})
+	}
+}
+
+// TestScoreSkill_ExactTotal verifies the total is the exact sum of breakdown fields
+// for a known skill configuration.
+func TestScoreSkill_ExactTotal(t *testing.T) {
+	skill := makeFullSkill(func(s *model.SkillBehavior) {
+		s.Context = model.ContextFacet{
+			Consumes: []string{"input"},
+			Produces: []string{"output"},
+			Memory:   model.MemoryConversation,
+		}
+		s.Strategy = model.StrategyFacet{
+			Tools:    []string{"read_file"},
+			Approach: "seq",
+			Steps:    []string{"s1", "s2", "s3"},
+		}
+		s.Guardrails = []model.GuardrailRule{
+			makeGuardrail("rule1"),
+			makeGuardrailMap("timeout", "5min"),
+		}
+		s.Observability = model.ObservabilityFacet{
+			Metrics:    []string{"m1", "m2"},
+			TraceLevel: model.TraceLevelDetailed,
+		}
+		s.Security = model.SecurityFacet{
+			Filesystem: model.AccessNone,
+			Network:    model.NetworkNone,
+			Secrets:    []string{},
+			Sandbox:    model.SandboxVM,
+		}
+		s.WhenToUse = model.WhenToUseFacet{
+			Triggers:   []string{"x"},
+			DontUse:    []string{"y"},
+			Especially: []string{"z"},
+		}
+		s.AntiPatterns = []model.AntiPattern{
+			{Excuse: "a", Reality: "b"},
+			{Excuse: "c", Reality: "d"},
+		}
+		s.Examples = []model.CodeExample{
+			{Label: "x", Code: "y"},
+			{Label: "a", Code: "b"},
+		}
+	})
+
+	result := ScoreSkill(skill)
+
+	// Context: 18*(0.35+0.35+0.15+0.15) = 18
+	assert.Equal(t, 18, result.Breakdown.Context)
+	// Strategy: 22*(0.35+0.25+0.25+0.15) = 22
+	assert.Equal(t, 22, result.Breakdown.Strategy)
+	// Guardrails: 18*(0.5+0.3+0.2) = 18
+	assert.Equal(t, 18, result.Breakdown.Guardrails)
+	// Observability: 14*(0.4+0.15+0.45) = 14
+	assert.Equal(t, 14, result.Breakdown.Observability)
+	// Security: 18*(0.4+0.35+0.15+0.1) = 18
+	assert.Equal(t, 18, result.Breakdown.Security)
+	// WhenToUse: 3*(0.4+0.3+0.3) = 3
+	assert.Equal(t, 3, result.Breakdown.WhenToUse)
+	// AntiPatterns: 2
+	assert.Equal(t, 2, result.Breakdown.AntiPatterns)
+	// Examples: 5
+	assert.Equal(t, 5, result.Breakdown.Examples)
+
+	// Total: 18+22+18+14+18+3+2+5 = 100
+	assert.Equal(t, 100, result.Total)
+}
+
+// TestScoreAgent_ExactTotal tests a fully specified agent with exact breakdown values.
+func TestScoreAgent_ExactTotal(t *testing.T) {
+	agent := makeFullAgent(func(a *model.AgentComposition) {
+		a.Description = "one two three four five six seven eight nine ten"
+		a.Skills = []string{"a", "b", "c"}
+		a.Orchestration = model.OrchestrationSequential
+	})
+
+	resolvedSkills := []model.SkillBehavior{
+		makeFullSkill(func(s *model.SkillBehavior) {
+			s.Skill = "a"
+			s.Context = model.ContextFacet{Produces: []string{"data"}}
+		}),
+		makeFullSkill(func(s *model.SkillBehavior) {
+			s.Skill = "b"
+			s.Context = model.ContextFacet{
+				Consumes: []string{"data"},
+				Produces: []string{"result"},
+			}
+		}),
+		makeFullSkill(func(s *model.SkillBehavior) {
+			s.Skill = "c"
+			s.Context = model.ContextFacet{
+				Consumes: []string{"result"},
+				Produces: []string{"final"},
+			}
+		}),
+	}
+
+	result := ScoreAgent(agent, resolvedSkills)
+
+	// Description: 10 words → 20*(0.6+0.2+0.2) = 20
+	assert.Equal(t, 20, result.Breakdown.Description)
+	// Composition: 3 unique skills → 25*(0.6+0.2+0.2) = 25
+	assert.Equal(t, 25, result.Breakdown.Composition)
+	// DataFlow: all inter-skill deps satisfied → 35*1.0 = 35
+	assert.Equal(t, 35, result.Breakdown.DataFlow)
+	// Orchestration: sequential + 3 resolved + description → 20*(0.5+0.3+0.2) = 20
+	assert.Equal(t, 20, result.Breakdown.Orchestration)
+
+	// Total: 20+25+35+20 = 100
+	assert.Equal(t, 100, result.Total)
+}
