@@ -137,3 +137,116 @@ func TestWidth_Diamond(t *testing.T) {
 	g := BuildGraph(agent, skills)
 	assert.Equal(t, 3, g.Width(), "width should be 3 (a, b, c are parallel)")
 }
+
+// --- Mutation-testing-driven boundary tests ---
+
+func TestLayers_SingleSkill(t *testing.T) {
+	// Single source skill: should produce exactly 1 layer with 1 skill
+	skills := []model.SkillBehavior{
+		makeSkill("only", nil, []string{"out"}),
+	}
+	agent := makeAgent("single", []string{"only"}, nil, []string{"out"})
+
+	g := BuildGraph(agent, skills)
+	layers := g.Layers()
+
+	require.Equal(t, 1, len(layers), "single skill should produce 1 layer")
+	assert.Equal(t, []string{"only"}, layers[0])
+}
+
+func TestWidth_SingleSkill(t *testing.T) {
+	skills := []model.SkillBehavior{
+		makeSkill("only", nil, []string{"out"}),
+	}
+	agent := makeAgent("single", []string{"only"}, nil, []string{"out"})
+
+	g := BuildGraph(agent, skills)
+	assert.Equal(t, 1, g.Width(), "single skill width should be 1")
+}
+
+func TestLayers_LongestPathWins(t *testing.T) {
+	// Diamond where 'd' is reachable via short path (a→d) and long path (a→b→c→d).
+	// Layer assignment should use the LONGEST path (layer 3), not shortest (layer 1).
+	skills := []model.SkillBehavior{
+		makeSkill("a", nil, []string{"x", "p"}),
+		makeSkill("b", []string{"x"}, []string{"y"}),
+		makeSkill("c", []string{"y"}, []string{"z"}),
+		makeSkill("d", []string{"z", "p"}, []string{"out"}), // consumes both z (long path) and p (short path from a)
+	}
+	agent := makeAgent("longpath", []string{"a", "b", "c", "d"}, nil, []string{"out"})
+
+	g := BuildGraph(agent, skills)
+	layers := g.Layers()
+
+	// a=layer0, b=layer1, c=layer2, d=layer3 (longest path from ⊤ through a→b→c→d)
+	require.Equal(t, 4, len(layers), "should have 4 layers due to longest path")
+	assert.Contains(t, layers[0], "a")
+	assert.Contains(t, layers[1], "b")
+	assert.Contains(t, layers[2], "c")
+	assert.Contains(t, layers[3], "d")
+}
+
+func TestWidth_EmptyGraph(t *testing.T) {
+	// No skills — graph has only ⊤ and ⊥
+	agent := makeAgent("empty", nil, nil, nil)
+	g := BuildGraph(agent, nil)
+	assert.Equal(t, 0, g.Width(), "empty graph width should be 0")
+	assert.Empty(t, g.Layers(), "empty graph should have no layers")
+}
+
+func TestLayers_ExcludesTopAndBottom(t *testing.T) {
+	// ⊤ and ⊥ must never appear in any layer
+	skills := []model.SkillBehavior{
+		makeSkill("a", nil, []string{"x"}),
+		makeSkill("b", []string{"x"}, []string{"y"}),
+	}
+	agent := makeAgent("pair", []string{"a", "b"}, nil, []string{"y"})
+
+	g := BuildGraph(agent, skills)
+	layers := g.Layers()
+
+	for i, layer := range layers {
+		for _, name := range layer {
+			assert.NotEqual(t, Top, name, "⊤ should not appear in layer %d", i)
+			assert.NotEqual(t, Bottom, name, "⊥ should not appear in layer %d", i)
+		}
+	}
+}
+
+func TestWidth_ExactBoundary(t *testing.T) {
+	// Width must be exactly the max layer size, not off-by-one.
+	// Layer 0 has 2 skills, layer 1 has 1 skill → width = 2.
+	skills := []model.SkillBehavior{
+		makeSkill("a", nil, []string{"x"}),
+		makeSkill("b", nil, []string{"y"}),
+		makeSkill("c", []string{"x", "y"}, []string{"z"}),
+	}
+	agent := makeAgent("bounded", []string{"a", "b", "c"}, nil, []string{"z"})
+
+	g := BuildGraph(agent, skills)
+	layers := g.Layers()
+
+	// Verify actual layer sizes to confirm boundary
+	require.Equal(t, 2, len(layers))
+	assert.Equal(t, 2, len(layers[0]), "layer 0 should have exactly 2 skills")
+	assert.Equal(t, 1, len(layers[1]), "layer 1 should have exactly 1 skill")
+	assert.Equal(t, 2, g.Width(), "width should equal largest layer")
+}
+
+func TestLayers_NoTrailingEmpty(t *testing.T) {
+	// Verify that layer output has no trailing empty slices.
+	// Two parallel source skills producing disjoint outputs.
+	skills := []model.SkillBehavior{
+		makeSkill("x", nil, []string{"a"}),
+		makeSkill("y", nil, []string{"b"}),
+	}
+	agent := makeAgent("flat", []string{"x", "y"}, nil, []string{"a", "b"})
+
+	g := BuildGraph(agent, skills)
+	layers := g.Layers()
+
+	require.Equal(t, 1, len(layers))
+	for _, l := range layers {
+		assert.NotEmpty(t, l, "no layer should be empty")
+	}
+}

@@ -3,7 +3,9 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/fatih/color"
@@ -24,7 +26,7 @@ func init() {
 		Args:  cobra.ExactArgs(1),
 		RunE:  runBench,
 	}
-	benchCmd.Flags().String("level", "proxy", "Benchmark level: proxy, agent, token, determinism, isomorphism, formal, eval, consistency, swebench, all")
+	benchCmd.Flags().String("level", "proxy", "Benchmark level: proxy, agent, token, determinism, isomorphism, formal, eval, consistency, swebench, mutate, all")
 	benchCmd.Flags().String("tasks", "", "YAML file with navigation tasks (agent level only)")
 	benchCmd.Flags().Int("samples", 100, "Number of files to sample (proxy level only)")
 	benchCmd.Flags().String("model", "haiku", "Claude model for agent bench")
@@ -62,10 +64,12 @@ func runBench(cmd *cobra.Command, args []string) error {
 		return runConsistencyBench(cmd, repoPath)
 	case "swebench":
 		return runSWEBenchCmd(cmd, repoPath)
+	case "mutate":
+		return runMutateBench(cmd, repoPath)
 	case "all":
 		return runAllStructural(cmd, repoPath)
 	default:
-		return fmt.Errorf("unknown level %q (use 'proxy', 'agent', 'token', 'determinism', 'isomorphism', 'formal', 'eval', 'consistency', 'swebench', or 'all')", level)
+		return fmt.Errorf("unknown level %q (use 'proxy', 'agent', 'token', 'determinism', 'isomorphism', 'formal', 'eval', 'consistency', 'swebench', 'mutate', or 'all')", level)
 	}
 }
 
@@ -595,6 +599,52 @@ func loadSkillsAndAgents(skillsDir, agentsDir string) ([]model.SkillBehavior, []
 	}
 
 	return skills, agents, nil
+}
+
+func runMutateBench(cmd *cobra.Command, repoPath string) error {
+	bold := color.New(color.Bold)
+	bold.Fprintln(cmd.OutOrStdout(), "Mutation Testing (gremlins)")
+
+	// Check if gremlins is installed
+	gremlinsPath, err := exec.LookPath("gremlins")
+	if err != nil {
+		return fmt.Errorf("gremlins not found in PATH — install with: go install github.com/go-gremlins/gremlins/cmd/gremlins@latest")
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "  Using: %s\n", gremlinsPath)
+
+	// Build args
+	args := []string{"unleash",
+		"--coverpkg", "./internal/bench/...,./internal/bench/formal/...,./internal/analyzer/...,./internal/linter/...,./pkg/model/...",
+	}
+
+	// Check for --dry-run via env var
+	if os.Getenv("GREMLINS_DRY_RUN") == "1" {
+		args = append(args, "--dry-run")
+	}
+
+	gremlinsCmd := exec.Command(gremlinsPath, args...)
+	gremlinsCmd.Dir = repoPath
+	gremlinsCmd.Stdout = cmd.OutOrStdout()
+	gremlinsCmd.Stderr = cmd.ErrOrStderr()
+
+	fmt.Fprintf(cmd.OutOrStdout(), "  Running: gremlins %s\n\n", strings.Join(args, " "))
+	if err := gremlinsCmd.Run(); err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			switch exitErr.ExitCode() {
+			case 10:
+				color.New(color.FgYellow).Fprintln(cmd.OutOrStdout(), "\nTest efficacy below threshold")
+			case 11:
+				color.New(color.FgYellow).Fprintln(cmd.OutOrStdout(), "\nMutant coverage below threshold")
+			default:
+				return fmt.Errorf("gremlins exited with code %d", exitErr.ExitCode())
+			}
+			return nil // threshold warnings are not hard errors
+		}
+		return fmt.Errorf("gremlins: %w", err)
+	}
+
+	color.New(color.FgGreen).Fprintln(cmd.OutOrStdout(), "\nMutation testing passed all thresholds")
+	return nil
 }
 
 // readAllFiles concatenates all files in a directory tree.

@@ -23,5 +23,8 @@ resources/_gen/
 # GoReleaser
 dist/
 
+# Gremlins mutation testing
+mutation-report.json
+
 # Claude
 .claude/
