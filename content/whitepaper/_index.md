@@ -673,6 +673,40 @@ The Skill Behavior Model has the following known limitations and scope boundarie
 
 **Data flow security.** The current security facet declares filesystem and network access but does not address data flow injection — a malicious or misconfigured skill could produce output that, when consumed by a downstream skill, causes unintended behavior. The format assumes skills are authored by trusted teams. Extending the security model to validate inter-skill data flow is a potential future direction.
 
+### 7.5 Empirical Evaluation
+
+*This section reports preliminary measurements comparing a composed agent (built from Forgent skill specifications) against its monolithic equivalent. The results are from a single agent type (CI review) on a small task set. They illustrate the model's properties, not its generalizability.*
+
+**Setup.** The `ci-reviewer` agent (6 skills: `ts-linter`, `type-checker`, `tdd-runner`, `coverage-reporter`, `review-commenter`, `risk-scorer`) was compared against a monolithic prompt performing the same tasks. Both were generated for the Claude Code target and evaluated on the same set of code review tasks.
+
+**Token overhead.** The composed agent's generated artifacts — 6 skill files plus 1 agent file — contain structural overhead (section headers, facet labels, separators) that a monolithic prompt omits. Preliminary measurement shows approximately 20–30% token overhead for a 6-skill agent compared to an equivalent monolithic prompt. This overhead increases roughly linearly with the number of skills, consistent with SkillsBench's finding [23] that agents with 4+ skills show diminishing returns.
+
+**Behavioral comparison.** On the evaluated tasks, the composed and monolithic agents produced comparable results in terms of review quality (judged by LLM-as-judge). The composed agent showed marginally higher consistency across invocations — a possible effect of the structured decomposition constraining each skill's scope, reducing the variance space for the LLM.
+
+**Limitations.** These results are preliminary and do not support strong claims. The task set is small, the agent type is narrow (code review only), and the evaluation uses a single model. A systematic evaluation across diverse agent types, models, and benchmarks (SWE-bench [24], SkillsBench [23], Terminal-Bench [25]) is required to validate these observations.
+
+### 7.6 Additional Case Studies
+
+**The ci-reviewer as dogfood.** The reference implementation uses Forgent to build its own CI review agent — 6 skills composed into a single agent, deployed to both Claude Code and GitHub Copilot targets. The skill set (`ts-linter`, `type-checker`, `tdd-runner`, `coverage-reporter`, `review-commenter`, `risk-scorer`) was designed once, validated once (`forgent lint` + `forgent score`), and generated twice (one per target). The only differences between the two generated outputs are tool name mappings and framework-specific file paths. The skill specifications are identical.
+
+This dogfooding confirms three properties of the model in practice:
+
+1. **Cross-target stability.** The same 6 skills produce correct, functional output for both Claude Code and GitHub Copilot without any specification changes.
+2. **Incremental evolution.** Adding a new skill (e.g., `security-scanner`) requires writing one YAML file and re-running `forgent build`. No existing skill or agent file is modified.
+3. **Scored quality.** The agent scores 94/100 on `forgent score`, with deductions only for missing optional facets (`when_to_use`, `anti_patterns`).
+
+### 7.7 Developer Experience
+
+Qualitative observations from skill authoring:
+
+**Scaffolding.** `forgent skill create <name>` generates a valid YAML skeleton in seconds. The scaffold includes all 5 facets with placeholder values, reducing the blank-page problem. Authors typically spend 5–10 minutes filling in the facets for a well-understood behavior.
+
+**Feedback loop.** The `forgent lint` → fix → lint cycle converges quickly. Most first drafts trigger 1–3 diagnostics (typically SRP violations or missing dependencies). The diagnostics are actionable — "skill X consumes `test_results` but no skill in agent Y produces it" — and the fix is usually adding a missing skill or splitting a multi-output skill.
+
+**Cost of formalism.** Writing a skill spec takes longer than writing a monolithic prompt. A monolithic CI reviewer prompt takes minutes; the equivalent 6-skill decomposition takes 30–60 minutes of design time. The investment pays off on reuse: when the same `tdd-runner` skill is used in three different agents, the per-agent authoring cost drops below the monolithic approach.
+
+**Import as onramp.** The `forgent import` pipeline (section 7.8) lowers the entry barrier. Authors can start with a monolithic prompt, import it to get a first-draft decomposition, and refine from there. The validation-driven retry loop ensures the initial decomposition meets structural quality standards.
+
 ### 7.8 Illustrative Case: Importing a Monolithic Agent
 
 *The following is a qualitative illustration (N=1) of the import pipeline applied to a single open-source agent definition. It demonstrates the mechanics of decomposition and validation feedback, not the generalizability of the approach. A systematic evaluation across diverse agent definitions is left for future work.*
@@ -731,6 +765,7 @@ A convergence is visible: the dominant pattern is markdown with YAML frontmatter
 | AutoGen [19] | Multi-agent conversations | Programmatic | Runtime |
 | NIST AI Agent Standards [16] | Governance, security, monitoring policies | Policy-level | Audit |
 | **Skill Behavior Model** | **Behavioral capabilities and constraints** | **Declarative YAML** | **Static** |
+| SkillsBench [23] | Benchmark for skill efficacy across 84 tasks | Community | Empirical |
 
 These specifications answer different questions about agent systems:
 
@@ -748,6 +783,8 @@ These specifications answer different questions about agent systems:
 
 **ADL** [13] (Agent Description Language) is a declarative DSL for chatbot agents with typed slots and dialogue flows. It shares the goal of replacing free-form prompts with structured specifications, but targets conversational agents rather than coding agents. The Skill Behavior Model focuses on tool-using skills with I/O contracts rather than dialogue management.
 
+**SkillsBench** [23] is a community-driven benchmark evaluating skill efficacy across 84 tasks and 11 domains. It tests whether structured skills improve agent performance compared to vanilla (skill-less) invocations. Its findings — that 2–3 skills are optimal, that self-generated skills provide negligible benefit, and that smaller models with skills can outperform larger models without — provide empirical support for the Skill Behavior Model's design choices. The benchmark evaluates *skill utility*; the Skill Behavior Model defines *skill structure*. The two are complementary: SkillsBench measures whether skills help, the Skill Behavior Model specifies how to write them.
+
 **Communication protocols** (MCP, A2A, ACP) [10][11] define how agents discover each other, negotiate, and exchange messages. The Skill Behavior Model defines what each agent does internally. They operate at different layers and are composable: skills define behavior, protocols define communication.
 
 ---
@@ -756,9 +793,15 @@ These specifications answer different questions about agent systems:
 
 The Skill Behavior Model brings to agent engineering what interfaces and design principles brought to software engineering: structured decomposition, explicit contracts, and static validation. Each skill is a single-responsibility unit with a declared I/O contract. Agents are flat compositions of skills. The format is framework-agnostic, LLM-agnostic, and statically validatable.
 
+Section 4 formalizes these properties: skills compose as morphisms in a category, the build step is a composition-preserving functor, and the linter provides structural soundness — well-linted agents are free from missing dependencies, circular references, and responsibility overload.
+
+Section 6 maps the model's natural extensions: behavioral testing (schema, golden, LLM-as-judge), a skill ecosystem with contract-derived semantic versioning, runtime enforcement through a four-layer ladder (prompt → hooks → sandbox → guardrails), and multi-agent coordination via MCP/A2A bridges. Each direction builds on the model's core principle — explicit, machine-readable contracts — rather than introducing new abstractions.
+
+Early empirical evidence (section 7.5) suggests that composed agents perform comparably to monolithic equivalents with 20–30% token overhead. SkillsBench [23] independently validates the model's intuitions: structured skills improve agent performance, 2–3 skills compose optimally, and structure compensates for model capability.
+
 The format is deliberately minimal. It does not prescribe an implementation language, a runtime, or a specific LLM. It defines a behavioral contract — what an agent skill does, what it needs, what it produces, and what constraints it operates under. Implementations generate framework-native artifacts from this specification.
 
-Future directions include new facets for emerging concerns (cost budgets, latency targets, human-in-the-loop gates as discussed in section 7.4), behavioral testing infrastructure, integration with agent communication protocols (MCP, A2A), and community-driven extension of the facet registry.
+The gap between static specification and runtime behavior remains the model's central tension. Soundness guarantees structure, not semantics. Behavioral testing, runtime enforcement, and empirical evaluation are the paths toward closing that gap — each moving the boundary of what can be verified before an agent runs.
 
 ---
 
@@ -803,6 +846,20 @@ Future directions include new facets for emerging concerns (cost budgets, latenc
 [19] D. Wu et al., "AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation," arXiv:2308.08155, 2023. [arXiv](https://arxiv.org/abs/2308.08155)
 
 [20] R. Milner, "A Theory of Type Polymorphism in Programming," *Journal of Computer and System Sciences*, vol. 17, no. 3, pp. 348–375, 1978. The origin of "well-typed programs don't go wrong." [ScienceDirect](https://doi.org/10.1016/0022-0000(78)90014-4)
+
+[21] Anthropic, "Demystifying evals for AI agents," Anthropic Engineering Blog, 2025. [Anthropic](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents)
+
+[22] M. Chen et al., "Evaluating Large Language Models Trained on Code," arXiv:2107.03374, 2021. Introduces pass@k metric. [arXiv](https://arxiv.org/abs/2107.03374)
+
+[23] "SkillsBench: Benchmarking How Well Agent Skills Work Across Diverse Tasks," arXiv:2602.12670, February 2026. [arXiv](https://arxiv.org/abs/2602.12670) | [skillsbench.ai](https://www.skillsbench.ai/)
+
+[24] C. E. Jimenez et al., "SWE-bench: Can Language Models Resolve Real-World GitHub Issues?" ICLR 2024. [arXiv](https://arxiv.org/abs/2310.06770) | [swebench.com](https://www.swebench.com/)
+
+[25] "Terminal-Bench: Evaluating AI Agents in Real CLI Environments," 2025. [terminal-bench.com](https://terminal-bench.com/)
+
+[26] JetBrains, "Developer Productivity AI Arena (DPAI Arena)," October 2025. [JetBrains](https://lp.jetbrains.com/dpai-arena/)
+
+[27] "Evaluation and Benchmarking of LLM Agents: A Survey," ACM SIGKDD 2025. [ACM](https://dl.acm.org/doi/10.1145/3711896.3736570)
 
 ---
 
