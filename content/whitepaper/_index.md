@@ -346,7 +346,7 @@ Generated skill files use a deliberate section ordering motivated by LLM attenti
 
 ---
 
-## 4. Design Rationale
+## 5. Design Rationale
 
 The Skill Behavior Model applies established software design principles to agent engineering.
 
@@ -364,23 +364,23 @@ The Skill Behavior Model applies established software design principles to agent
 
 ---
 
-## 5. Experience
+## 7. Experience
 
 *The Skill Behavior Model is early-stage. The observations below come from the reference implementation and its test suite, not from large-scale production adoption. They illustrate the model's properties, not its maturity.*
 
-### 5.1 Reusability
+### 7.1 Reusability
 
 In practice, skills compose across agents without modification. The `tdd-runner` skill — which produces `test_results` — is consumed by `review-commenter`, `risk-scorer`, and `coverage-reporter` across different agents. Each consumer declares `test_results` in its `consumes`; the `tdd-runner` skill is unaware of its consumers. Adding a new consumer requires zero changes to `tdd-runner`.
 
-### 5.2 Cross-Framework Deployment
+### 7.2 Cross-Framework Deployment
 
 The same set of 6 skills and 1 agent has been generated for both Claude Code and GitHub Copilot targets. The skill specifications are identical across both. The only differences are in the generated output: tool name mappings, file paths, and framework-specific conventions (e.g., Copilot's `copilot-instructions.md` global file, which Claude Code does not use).
 
-### 5.3 Static Validation
+### 7.3 Static Validation
 
 The DAG structure enables validation before any agent executes. Missing dependencies, circular references, and unmet context are caught at specification time. This is analogous to type checking in programming languages — errors are found before runtime, not during a costly LLM invocation.
 
-### 5.4 Limitations
+### 7.4 Limitations
 
 The Skill Behavior Model has the following known limitations and scope boundaries:
 
@@ -394,7 +394,7 @@ The Skill Behavior Model has the following known limitations and scope boundarie
 
 **Error handling and recovery.** The format does not define what happens when a skill fails — no retry policies, fallback skills, or error propagation rules. If `tdd-runner` fails to produce `test_results`, skills that consume it (e.g., `review-commenter`) have no declared recovery path. Error handling is delegated entirely to the target framework's runtime. This is a deliberate scope boundary: the format defines the success path, not the failure path.
 
-**Human-in-the-loop.** The format has no mechanism for declaring human approval gates within a skill pipeline — for example, requiring a human to approve before a `risk-scorer` result triggers a merge block. Human-in-the-loop gates are a future facet direction discussed in section 7.
+**Human-in-the-loop.** The format has no mechanism for declaring human approval gates within a skill pipeline — for example, requiring a human to approve before a `risk-scorer` result triggers a merge block. Human-in-the-loop gates are a future facet direction discussed in section 9.
 
 **Non-determinism.** Skills are executed by LLMs, which are inherently non-deterministic. The same `review-commenter` skill may produce different comments on the same input across invocations. The format defines behavioral *intent*, not deterministic *output*. Static validation ensures structural correctness (all inputs are satisfied), but it cannot guarantee behavioral consistency at runtime.
 
@@ -404,7 +404,7 @@ The Skill Behavior Model has the following known limitations and scope boundarie
 
 **Data flow security.** The current security facet declares filesystem and network access but does not address data flow injection — a malicious or misconfigured skill could produce output that, when consumed by a downstream skill, causes unintended behavior. The format assumes skills are authored by trusted teams. Extending the security model to validate inter-skill data flow is a potential future direction.
 
-### 5.5 Illustrative Case: Importing a Monolithic Agent
+### 7.8 Illustrative Case: Importing a Monolithic Agent
 
 *The following is a qualitative illustration (N=1) of the import pipeline applied to a single open-source agent definition. It demonstrates the mechanics of decomposition and validation feedback, not the generalizability of the approach. A systematic evaluation across diverse agent definitions is left for future work.*
 
@@ -422,9 +422,9 @@ Three observations:
 
 ---
 
-## 6. Related Work
+## 8. Related Work
 
-### 6.1 The Coding Agent Ecosystem
+### 8.1 The Coding Agent Ecosystem
 
 The following table maps how each major coding agent framework handles customization as of early 2026:
 
@@ -448,7 +448,7 @@ The following table maps how each major coding agent framework handles customiza
 
 A convergence is visible: the dominant pattern is markdown with YAML frontmatter declaring `name`, `description`, `tools`, and `model`. But across **all** frameworks, the same concerns remain unstructured: guardrails, security, observability, and I/O contracts.
 
-### 6.2 Complementary Specifications
+### 8.2 Complementary Specifications
 
 | Approach | What it defines | Composition | Validation |
 |----------|----------------|:-----------:|:----------:|
@@ -483,13 +483,13 @@ These specifications answer different questions about agent systems:
 
 ---
 
-## 7. Conclusion
+## 9. Conclusion
 
 The Skill Behavior Model brings to agent engineering what interfaces and design principles brought to software engineering: structured decomposition, explicit contracts, and static validation. Each skill is a single-responsibility unit with a declared I/O contract. Agents are flat compositions of skills. The format is framework-agnostic, LLM-agnostic, and statically validatable.
 
 The format is deliberately minimal. It does not prescribe an implementation language, a runtime, or a specific LLM. It defines a behavioral contract — what an agent skill does, what it needs, what it produces, and what constraints it operates under. Implementations generate framework-native artifacts from this specification.
 
-Future directions include new facets for emerging concerns (cost budgets, latency targets, human-in-the-loop gates as discussed in section 5.4), behavioral testing infrastructure, integration with agent communication protocols (MCP, A2A), and community-driven extension of the facet registry.
+Future directions include new facets for emerging concerns (cost budgets, latency targets, human-in-the-loop gates as discussed in section 7.4), behavioral testing infrastructure, integration with agent communication protocols (MCP, A2A), and community-driven extension of the facet registry.
 
 ---
 
