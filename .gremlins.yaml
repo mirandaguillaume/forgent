@@ -1,0 +1,42 @@
+# Gremlins mutation testing configuration
+# Install: go install github.com/go-gremlins/gremlins/cmd/gremlins@latest
+# Run:     gremlins unleash
+# Docs:    https://gremlins.dev
+
+unleash:
+  dry-run: false
+  workers: 0  # use all CPU cores
+  timeout-coefficient: 0  # default (5x test timeout)
+  threshold:
+    efficacy: 70       # exit code 10 if below 70%
+    mutant-coverage: 60 # exit code 11 if below 60%
+  output: mutation-report.json
+  exclude-files:
+    - "_test\\.go$"
+    - "testdata/"
+    - "cmd/"
+    - "templates/"
+
+mutants:
+  arithmetic-base:
+    enabled: true
+  conditionals-boundary:
+    enabled: true
+  conditionals-negation:
+    enabled: true
+  increment-decrement:
+    enabled: true
+  invert-assignments:
+    enabled: false
+  invert-bitwise:
+    enabled: false
+  invert-bwassign:
+    enabled: false
+  invert-negatives:
+    enabled: true
+  invert-logical:
+    enabled: true
+  invert-loopctrl:
+    enabled: false
+  remove-self-assignments:
+    enabled: false
