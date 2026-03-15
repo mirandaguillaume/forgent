@@ -161,3 +161,72 @@ func TestDetectLoopRisks_AlwaysFalseChecker_TriggersNoTimeoutRisk(t *testing.T) 
 	}
 	assert.True(t, hasNoTimeout, "alwaysFalseChecker should trigger LoopNoTimeout risk")
 }
+
+// --- Mutation-killing tests ---
+
+// Kills: loop.go Line 34:35 INVERT_LOGICAL — ok && strings.Contains(...) → ok || strings.Contains(...)
+// When the guardrail is a map (ok=false for StringValue), with && the condition short-circuits to false.
+// With || the condition would evaluate strings.Contains on s="" which returns false for "timeout".
+// But if capability is "" then strings.Contains(anything, "") returns true.
+// So to kill it: use a map-only guardrail that does NOT have the "timeout" key,
+// and ensure the skill with conversation memory IS flagged.
+// With &&: ok is false => skip string check => HasKey("timeout") also false => returns false => flagged.
+// With ||: ok is false, but strings.Contains(strings.ToLower(""), "timeout") is false too => still false.
+// Hmm, that won't differentiate. Let me reconsider.
+//
+// The full code at line 33-34:
+//   if s, ok := g.StringValue(); ok && strings.Contains(strings.ToLower(s), capability) {
+//       return true
+//   }
+// With INVERT_LOGICAL (&&→||):
+//   if s, ok := g.StringValue(); ok || strings.Contains(strings.ToLower(s), capability) {
+//       return true
+//   }
+// When ok is true but strings.Contains is false: && returns false, || returns true.
+// So: a string guardrail that does NOT contain "timeout" keyword.
+// With &&: ok=true, Contains=false => false => not returned true.
+// With ||: ok=true => true => returns true immediately.
+// This means: skill with conversation memory and a string guardrail like "max-retries: 3"
+// (no "timeout" substring). With correct code: HasCapability returns false => LoopNoTimeout flagged.
+// With mutation: HasCapability returns true => LoopNoTimeout NOT flagged.
+func TestDetectLoopRisks_StringGuardrailWithoutTimeoutKeyword(t *testing.T) {
+	// String guardrail that does NOT contain "timeout"
+	gr := guardrailFromString(t, "max-retries: 3")
+	skill := makeLoopSkill("no-timeout-str", []string{"input"}, []string{"output"},
+		model.MemoryConversation, []model.GuardrailRule{gr})
+
+	risks := DetectLoopRisks(skill, &DefaultGuardrailChecker{})
+
+	hasNoTimeout := false
+	for _, r := range risks {
+		if r.Type == LoopNoTimeout {
+			hasNoTimeout = true
+		}
+	}
+	assert.True(t, hasNoTimeout,
+		"should flag no-timeout risk when string guardrail does not contain 'timeout'")
+}
+
+// Additional test to differentiate && vs || more clearly:
+// Map guardrail with a key that is NOT "timeout", combined with conversation memory.
+// With correct code (&&): ok=false for StringValue => short-circuit, check HasKey("timeout")=false => not found.
+// With || mutation: ok=false but strings.Contains(strings.ToLower(""), "timeout")=false => false.
+// Then HasKey("timeout")=false => returns false. Both paths give false. This won't differentiate.
+// The key differentiator is the string guardrail case above.
+func TestDetectLoopRisks_MapGuardrailWithoutTimeoutKey(t *testing.T) {
+	// Map guardrail without "timeout" key
+	gr := guardrailFromMap(t, "retries", "3")
+	skill := makeLoopSkill("map-no-timeout", []string{"input"}, []string{"output"},
+		model.MemoryConversation, []model.GuardrailRule{gr})
+
+	risks := DetectLoopRisks(skill, &DefaultGuardrailChecker{})
+
+	hasNoTimeout := false
+	for _, r := range risks {
+		if r.Type == LoopNoTimeout {
+			hasNoTimeout = true
+		}
+	}
+	assert.True(t, hasNoTimeout,
+		"should flag no-timeout when map guardrail lacks timeout key")
+}

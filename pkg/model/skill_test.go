@@ -196,6 +196,61 @@ func TestWhenToUseFacetEmpty(t *testing.T) {
 	assert.True(t, w.IsEmpty())
 }
 
+// --- Mutation-killing tests for WhenToUseFacet.IsEmpty (line 168) ---
+
+func TestWhenToUseFacet_OnlyTriggers(t *testing.T) {
+	// Mutation: removing `len(w.Triggers) == 0` from the AND chain would make this return true.
+	w := model.WhenToUseFacet{Triggers: []string{"bug fix"}}
+	assert.False(t, w.IsEmpty(), "having only Triggers should not be empty")
+}
+
+func TestWhenToUseFacet_OnlyDontUse(t *testing.T) {
+	// Mutation: removing `len(w.DontUse) == 0` from the AND chain would make this return true.
+	w := model.WhenToUseFacet{DontUse: []string{"trivial changes"}}
+	assert.False(t, w.IsEmpty(), "having only DontUse should not be empty")
+}
+
+func TestWhenToUseFacet_OnlyEspecially(t *testing.T) {
+	// Mutation: removing `len(w.Especially) == 0` from the AND chain would make this return true.
+	w := model.WhenToUseFacet{Especially: []string{"complex refactors"}}
+	assert.False(t, w.IsEmpty(), "having only Especially should not be empty")
+}
+
+func TestWhenToUseFacet_AllEmpty(t *testing.T) {
+	w := model.WhenToUseFacet{
+		Triggers:   []string{},
+		DontUse:    []string{},
+		Especially: []string{},
+	}
+	assert.True(t, w.IsEmpty(), "all empty slices should be empty")
+}
+
+func TestWhenToUseFacet_AllNil(t *testing.T) {
+	w := model.WhenToUseFacet{
+		Triggers:   nil,
+		DontUse:    nil,
+		Especially: nil,
+	}
+	assert.True(t, w.IsEmpty(), "all nil slices should be empty")
+}
+
+func TestWhenToUseFacet_TwoOfThreePopulated(t *testing.T) {
+	w := model.WhenToUseFacet{
+		Triggers: []string{"x"},
+		DontUse:  []string{"y"},
+	}
+	assert.False(t, w.IsEmpty())
+}
+
+func TestWhenToUseFacet_AllPopulated(t *testing.T) {
+	w := model.WhenToUseFacet{
+		Triggers:   []string{"a"},
+		DontUse:    []string{"b"},
+		Especially: []string{"c"},
+	}
+	assert.False(t, w.IsEmpty())
+}
+
 func TestAntiPatternsParsing(t *testing.T) {
 	input := `
 skill: debug
