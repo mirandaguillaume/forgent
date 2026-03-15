@@ -1,0 +1,61 @@
+- id: "missing-error-handling"
+  input: |
+    func readConfig(path string) Config {
+        data, _ := os.ReadFile(path)
+        var cfg Config
+        yaml.Unmarshal(data, &cfg)
+        return cfg
+    }
+  expected_criteria:
+    - "error handling"
+    - "return error"
+
+- id: "sql-injection"
+  input: |
+    func getUser(db *sql.DB, name string) (*User, error) {
+        row := db.QueryRow("SELECT * FROM users WHERE name = '" + name + "'")
+        var u User
+        err := row.Scan(&u.ID, &u.Name)
+        return &u, err
+    }
+  expected_criteria:
+    - "SQL injection"
+    - "parameterized"
+
+- id: "missing-nil-check"
+  input: |
+    func processItems(items []*Item) int {
+        total := 0
+        for _, item := range items {
+            total += item.Value
+        }
+        return total
+    }
+  expected_criteria:
+    - "nil"
+    - "check"
+
+- id: "hardcoded-secret"
+  input: |
+    func connectDB() (*sql.DB, error) {
+        dsn := "postgres://admin:s3cret@localhost:5432/mydb"
+        return sql.Open("postgres", dsn)
+    }
+  expected_criteria:
+    - "hardcoded"
+    - "environment variable"
+
+- id: "race-condition"
+  input: |
+    var counter int
+
+    func increment() {
+        counter++
+    }
+
+    func getCount() int {
+        return counter
+    }
+  expected_criteria:
+    - "race condition"
+    - "mutex"
