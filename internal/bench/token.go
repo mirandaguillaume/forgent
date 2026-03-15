@@ -79,9 +79,23 @@ func RunTokenOverhead(skillsDir, agentsDir, target string) (*TokenResult, error)
 // It avoids importing internal/cmd (which would create a cycle) by calling
 // the spec/generator packages directly.
 func buildToDir(skillsDir, agentsDir, outputDir, target string) error {
+	return buildToDirWithOptions(skillsDir, agentsDir, outputDir, target, false)
+}
+
+// buildToDirCompact builds with compact mode enabled (skills inlined in agent).
+func buildToDirCompact(skillsDir, agentsDir, outputDir, target string) error {
+	return buildToDirWithOptions(skillsDir, agentsDir, outputDir, target, true)
+}
+
+func buildToDirWithOptions(skillsDir, agentsDir, outputDir, target string, compact bool) error {
 	gen, err := spec.Get(target)
 	if err != nil {
 		return err
+	}
+
+	// Apply compact option if supported
+	if c, ok := gen.(spec.Configurable); ok {
+		c.SetOptions(spec.GeneratorOptions{Compact: compact})
 	}
 
 	// Parse skills
@@ -90,9 +104,9 @@ func buildToDir(skillsDir, agentsDir, outputDir, target string) error {
 		return err
 	}
 
-	// Generate skills
+	// Generate skill files (skip when compact — they're inlined in the agent)
 	sg, ok := gen.(spec.SkillGenerator)
-	if ok {
+	if ok && !compact {
 		for _, skill := range skills {
 			md := sg.GenerateSkill(skill)
 			relPath := sg.SkillPath(skill.Skill)
@@ -245,6 +259,54 @@ func countMonolithic(skillsDir, agentsDir string) (int, error) {
 	}
 
 	return generator.CountWords(sb.String()), nil
+}
+
+// RunTokenOverheadCompact measures token overhead with compact mode enabled.
+func RunTokenOverheadCompact(skillsDir, agentsDir, target string) (*TokenResult, error) {
+	tmpDir, err := os.MkdirTemp("", "bench-token-compact-*")
+	if err != nil {
+		return nil, err
+	}
+	defer os.RemoveAll(tmpDir)
+
+	if err := buildToDirCompact(skillsDir, agentsDir, tmpDir, target); err != nil {
+		return nil, err
+	}
+
+	composedWords := 0
+	composedFiles := 0
+	err = filepath.Walk(tmpDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return err
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		composedWords += generator.CountWords(string(data))
+		composedFiles++
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	monolithicWords, err := countMonolithic(skillsDir, agentsDir)
+	if err != nil {
+		return nil, err
+	}
+
+	overheadPct := 0.0
+	if monolithicWords > 0 {
+		overheadPct = float64(composedWords-monolithicWords) / float64(monolithicWords) * 100
+	}
+
+	return &TokenResult{
+		ComposedWords:   composedWords,
+		MonolithicWords: monolithicWords,
+		OverheadPct:     overheadPct,
+		ComposedFiles:   composedFiles,
+	}, nil
 }
 
 type benchError struct {

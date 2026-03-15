@@ -103,3 +103,35 @@ func TestTokenOverhead_EmptyDir(t *testing.T) {
 	assert.Equal(t, 0, result.ComposedWords, "empty dirs should produce 0 words")
 	assert.Equal(t, 0, result.MonolithicWords)
 }
+
+func TestTokenOverhead_Compact_Claude(t *testing.T) {
+	standard, err := RunTokenOverhead("../../skills", "../../agents", "claude")
+	require.NoError(t, err)
+
+	compact, err := RunTokenOverheadCompact("../../skills", "../../agents", "claude")
+	require.NoError(t, err)
+
+	assert.Less(t, compact.OverheadPct, standard.OverheadPct,
+		"compact should have lower overhead than standard")
+	assert.Equal(t, 1, compact.ComposedFiles,
+		"compact should produce a single agent file")
+	assert.Less(t, compact.ComposedWords, standard.ComposedWords,
+		"compact should have fewer words than standard")
+	t.Logf("Standard: %d words (%.1f%%) → Compact: %d words (%.1f%%)",
+		standard.ComposedWords, standard.OverheadPct,
+		compact.ComposedWords, compact.OverheadPct)
+}
+
+func TestTokenOverhead_Compact_Copilot(t *testing.T) {
+	standard, err := RunTokenOverhead("../../skills", "../../agents", "copilot")
+	require.NoError(t, err)
+
+	compact, err := RunTokenOverheadCompact("../../skills", "../../agents", "copilot")
+	require.NoError(t, err)
+
+	assert.Less(t, compact.OverheadPct, standard.OverheadPct,
+		"compact should have lower overhead than standard")
+	t.Logf("Standard: %d words (%.1f%%) → Compact: %d words (%.1f%%)",
+		standard.ComposedWords, standard.OverheadPct,
+		compact.ComposedWords, compact.OverheadPct)
+}

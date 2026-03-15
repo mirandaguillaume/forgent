@@ -162,3 +162,42 @@ func TestResolveCopilotAgentTools(t *testing.T) {
 	assert.Contains(t, tools, "read")
 	assert.Contains(t, tools, "execute")
 }
+
+// --- Compact format tests ---
+
+func TestGenerateCompactCopilotAgentMd_Frontmatter(t *testing.T) {
+	md := copilot.GenerateCompactCopilotAgentMd(testAgent(), testResolvedSkills())
+	assert.Contains(t, md, "---\nname: code-reviewer\n")
+	assert.Contains(t, md, "description: Reviews code for quality and security issues")
+	assert.Contains(t, md, "tools: [")
+}
+
+func TestGenerateCompactCopilotAgentMd_NoStepHeaders(t *testing.T) {
+	md := copilot.GenerateCompactCopilotAgentMd(testAgent(), testResolvedSkills())
+	assert.NotContains(t, md, "### Step")
+	assert.NotContains(t, md, "Read `.github/skills/")
+	assert.NotContains(t, md, "follow its instructions")
+}
+
+func TestGenerateCompactCopilotAgentMd_InlinedSkills(t *testing.T) {
+	md := copilot.GenerateCompactCopilotAgentMd(testAgent(), testResolvedSkills())
+	assert.Contains(t, md, "**code-review**")
+	assert.Contains(t, md, "**security-scan**")
+	assert.Contains(t, md, "FS: read-only")
+	assert.Contains(t, md, "FS: read-write")
+}
+
+func TestGenerateCompactCopilotAgentMd_FewerWords(t *testing.T) {
+	standard := copilot.GenerateCopilotAgentMd(testAgent(), testResolvedSkills(), ".github")
+	compact := copilot.GenerateCompactCopilotAgentMd(testAgent(), testResolvedSkills())
+	stdWords := len(strings.Fields(standard))
+	cmpWords := len(strings.Fields(compact))
+	assert.Less(t, cmpWords, stdWords, "compact should have fewer words")
+}
+
+func TestGenerateCompactCopilotAgentMd_OutputSection(t *testing.T) {
+	md := copilot.GenerateCompactCopilotAgentMd(testAgent(), testResolvedSkills())
+	assert.Contains(t, md, "## Output")
+	assert.Contains(t, md, "review-report")
+	assert.Contains(t, md, "security-report")
+}

@@ -5,7 +5,9 @@ import (
 	"github.com/mirandaguillaume/forgent/pkg/spec"
 )
 
-type claudeGenerator struct{}
+type claudeGenerator struct {
+	compact bool
+}
 
 func (g *claudeGenerator) Target() string           { return "claude" }
 func (g *claudeGenerator) DefaultOutputDir() string { return ".claude" }
@@ -14,7 +16,14 @@ func (g *claudeGenerator) GenerateSkill(skill model.SkillBehavior) string {
 	return GenerateSkillMd(skill)
 }
 
+func (g *claudeGenerator) SetOptions(opts spec.GeneratorOptions) {
+	g.compact = opts.Compact
+}
+
 func (g *claudeGenerator) GenerateAgent(agent model.AgentComposition, skills []model.SkillBehavior, outputDir string) string {
+	if g.compact {
+		return GenerateCompactAgentMd(agent, skills)
+	}
 	return GenerateAgentMd(agent, skills, outputDir)
 }
 

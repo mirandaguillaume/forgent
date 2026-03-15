@@ -40,6 +40,16 @@ type FullGenerator interface {
 	AgentGenerator
 }
 
+// GeneratorOptions holds build-time options for generators.
+type GeneratorOptions struct {
+	Compact bool
+}
+
+// Configurable is an optional interface for generators that accept build-time options.
+type Configurable interface {
+	SetOptions(opts GeneratorOptions)
+}
+
 // GeneratorFactory creates a new Generator instance.
 type GeneratorFactory func() Generator
 
