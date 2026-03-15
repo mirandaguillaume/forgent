@@ -1,6 +1,7 @@
 package formal
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/mirandaguillaume/forgent/pkg/model"
@@ -10,59 +11,75 @@ import (
 
 // --- P10: Reachability ---
 
-func TestP10_Reachability(t *testing.T) {
-	// Every skill is reachable from ⊤, and ⊥ is reachable from every skill.
+func TestP10_Reachability_SimpleChain(t *testing.T) {
 	skills := []model.SkillBehavior{
 		makeSkill("a", nil, []string{"x"}),
 		makeSkill("b", []string{"x"}, []string{"y"}),
 		makeSkill("c", []string{"y"}, []string{"z"}),
 	}
 	agent := makeAgent("test", []string{"a", "b", "c"}, nil, []string{"z"})
-
 	g := BuildGraph(agent, skills)
 
 	for _, s := range skills {
 		assert.True(t, g.Reachable(Top, s.Skill),
 			"skill %q should be reachable from ⊤", s.Skill)
 	}
+	// ⊥ reachable from every skill that produces agent output
 	assert.True(t, g.Reachable("c", Bottom), "⊥ should be reachable from c")
+	// Transitive: ⊥ reachable from a through the chain
+	assert.True(t, g.Reachable("a", Bottom), "⊥ should be transitively reachable from a")
 }
 
 func TestP10_Reachability_SourceSkill(t *testing.T) {
-	// A skill with C=∅ (no consumes) should still be reachable from ⊤.
+	// Skill with C=∅ (no consumes) must still be reachable from ⊤.
 	skills := []model.SkillBehavior{
 		makeSkill("source", nil, []string{"data"}),
 		makeSkill("sink", []string{"data"}, []string{"result"}),
 	}
 	agent := makeAgent("test", []string{"source", "sink"}, nil, []string{"result"})
-
 	g := BuildGraph(agent, skills)
-	assert.True(t, g.Reachable(Top, "source"), "source skill should be reachable from ⊤")
-	assert.True(t, g.Reachable(Top, "sink"), "sink skill should be reachable from ⊤")
+
+	assert.True(t, g.Reachable(Top, "source"))
+	assert.True(t, g.Reachable(Top, "sink"))
+}
+
+func TestP10_Reachability_CIReviewer(t *testing.T) {
+	// Full ci-reviewer graph: all 6 skills reachable from ⊤,
+	// ⊥ reachable from all output-producing skills.
+	skills, agent := ciReviewerFixture()
+	g := BuildGraph(agent, skills)
+
+	for _, s := range skills {
+		assert.True(t, g.Reachable(Top, s.Skill),
+			"skill %q should be reachable from ⊤", s.Skill)
+	}
+	// All skills produce agent outputs in ci-reviewer
+	for _, s := range skills {
+		assert.True(t, g.Reachable(s.Skill, Bottom),
+			"⊥ should be reachable from %q", s.Skill)
+	}
+}
+
+func TestP10_Reachability_NotReachable(t *testing.T) {
+	// Skill b does NOT reach a (no backward reachability in a DAG).
+	skills := []model.SkillBehavior{
+		makeSkill("a", nil, []string{"x"}),
+		makeSkill("b", []string{"x"}, []string{"y"}),
+	}
+	agent := makeAgent("test", []string{"a", "b"}, nil, []string{"y"})
+	g := BuildGraph(agent, skills)
+
+	assert.False(t, g.Reachable("b", "a"), "b should NOT reach a in a DAG")
 }
 
 // --- Corollary 3.1: Layer Decomposition ---
 
-func TestCor31_LayerDecomposition(t *testing.T) {
-	// Layers form a unique partition; intra-layer skills are independent.
-	skills := []model.SkillBehavior{
-		makeSkill("ts-linter", []string{"file_tree", "source_code"}, []string{"lint_results"}),
-		makeSkill("type-checker", []string{"file_tree", "source_code"}, []string{"type_errors"}),
-		makeSkill("tdd-runner", []string{"file_tree", "source_code"}, []string{"test_results"}),
-		makeSkill("coverage-reporter", []string{"file_tree", "source_code"}, []string{"coverage_report"}),
-		makeSkill("review-commenter", []string{"git_diff", "test_results", "lint_results"}, []string{"review_comments"}),
-		makeSkill("risk-scorer", []string{"git_diff", "test_results", "lint_results"}, []string{"risk_score"}),
-	}
-	agent := makeAgent("ci-reviewer",
-		[]string{"ts-linter", "type-checker", "tdd-runner", "coverage-reporter", "review-commenter", "risk-scorer"},
-		nil,
-		[]string{"lint_results", "type_errors", "test_results", "coverage_report", "review_comments", "risk_score"},
-	)
-
+func TestCor31_LayerDecomposition_CIReviewer(t *testing.T) {
+	skills, agent := ciReviewerFixture()
 	g := BuildGraph(agent, skills)
 	layers := g.Layers()
 
-	// Verify partition: every skill appears exactly once
+	// 1. Verify partition: every skill appears exactly once
 	seen := make(map[string]bool)
 	for _, layer := range layers {
 		for _, s := range layer {
@@ -71,25 +88,35 @@ func TestCor31_LayerDecomposition(t *testing.T) {
 		}
 	}
 	for _, s := range skills {
-		assert.True(t, seen[s.Skill], "skill %q not in any layer", s.Skill)
+		assert.True(t, seen[s.Skill], "skill %q missing from layers", s.Skill)
 	}
 
-	// Verify intra-layer independence: no edge between skills in the same layer
-	for _, layer := range layers {
+	// 2. Verify intra-layer independence: no edge between skills in same layer
+	for li, layer := range layers {
 		layerSet := toSet(layer)
 		for _, s := range layer {
 			for _, neighbor := range g.Adj[s] {
+				if neighbor == Bottom {
+					continue
+				}
 				assert.False(t, layerSet[neighbor],
-					"intra-layer edge %s → %s violates independence", s, neighbor)
+					"intra-layer edge %s → %s in layer %d", s, neighbor, li)
 			}
 		}
 	}
+
+	// 3. Verify expected structure: layer 0 has 4 independent skills,
+	//    layer 1 has 2 dependent skills
+	require.Equal(t, 2, len(layers), "ci-reviewer should have 2 layers")
+	sort.Strings(layers[0])
+	sort.Strings(layers[1])
+	assert.Equal(t, []string{"coverage-reporter", "tdd-runner", "ts-linter", "type-checker"}, layers[0])
+	assert.Equal(t, []string{"review-commenter", "risk-scorer"}, layers[1])
 }
 
 // --- Corollary 3.2: Dilworth Width ---
 
 func TestCor32_DilworthWidth(t *testing.T) {
-	// Width = max layer size.
 	skills := []model.SkillBehavior{
 		makeSkill("a", nil, []string{"x"}),
 		makeSkill("b", nil, []string{"y"}),
@@ -98,232 +125,288 @@ func TestCor32_DilworthWidth(t *testing.T) {
 	agent := makeAgent("test", []string{"a", "b", "c"}, nil, []string{"z"})
 
 	g := BuildGraph(agent, skills)
-	layers := g.Layers()
-
-	maxSize := 0
-	for _, l := range layers {
-		if len(l) > maxSize {
-			maxSize = len(l)
-		}
-	}
-	assert.Equal(t, maxSize, g.Width())
 	assert.Equal(t, 2, g.Width(), "a and b are parallel → width 2")
+}
+
+func TestCor32_DilworthWidth_CIReviewer(t *testing.T) {
+	skills, agent := ciReviewerFixture()
+	g := BuildGraph(agent, skills)
+	// 4 skills in layer 0 → width 4
+	assert.Equal(t, 4, g.Width())
 }
 
 // --- P11: Skill Fusion ---
 
-func TestP11_Fusion(t *testing.T) {
-	// S₁ produces x, only S₂ consumes x, x is not an agent output → fusible.
+func TestP11_Fusion_ExclusivelyConnected(t *testing.T) {
+	// F1+F2+F3 all satisfied → fusible
 	s1 := makeSkill("producer", nil, []string{"intermediate"})
 	s2 := makeSkill("consumer", []string{"intermediate"}, []string{"result"})
-	agent := makeAgent("test",
-		[]string{"producer", "consumer"}, nil, []string{"result"})
+	all := []model.SkillBehavior{s1, s2}
+	agent := makeAgent("test", []string{"producer", "consumer"}, nil, []string{"result"})
 
-	assert.True(t, CanFuse(s1, s2, agent, []model.SkillBehavior{s1, s2}),
-		"exclusively-connected pair should be fusible")
+	assert.True(t, CanFuse(s1, s2, agent, all))
 }
 
-func TestP11_Fusion_SharedConsumer(t *testing.T) {
-	// S₁ produces x, both S₂ and S₃ consume x → NOT fusible (F2 violated).
+func TestP11_Fusion_SharedConsumer_F2Violated(t *testing.T) {
+	// Two consumers of intermediate → F2 violated
 	s1 := makeSkill("producer", nil, []string{"intermediate"})
 	s2 := makeSkill("consumer1", []string{"intermediate"}, []string{"r1"})
 	s3 := makeSkill("consumer2", []string{"intermediate"}, []string{"r2"})
-	agent := makeAgent("test",
-		[]string{"producer", "consumer1", "consumer2"}, nil, []string{"r1", "r2"})
+	all := []model.SkillBehavior{s1, s2, s3}
+	agent := makeAgent("test", []string{"producer", "consumer1", "consumer2"}, nil, []string{"r1", "r2"})
 
-	assert.False(t, CanFuse(s1, s2, agent, []model.SkillBehavior{s1, s2, s3}),
-		"shared consumer violates F2 → not fusible")
+	assert.False(t, CanFuse(s1, s2, agent, all))
 }
 
-func TestP11_Fusion_AgentOutput(t *testing.T) {
-	// S₁ produces x which is an agent output → NOT fusible (F3 violated).
+func TestP11_Fusion_AgentOutput_F3Violated(t *testing.T) {
+	// intermediate is an agent output → F3 violated
 	s1 := makeSkill("producer", nil, []string{"intermediate"})
 	s2 := makeSkill("consumer", []string{"intermediate"}, []string{"result"})
-	agent := makeAgent("test",
-		[]string{"producer", "consumer"}, nil, []string{"intermediate", "result"})
+	all := []model.SkillBehavior{s1, s2}
+	agent := makeAgent("test", []string{"producer", "consumer"}, nil, []string{"intermediate", "result"})
 
-	assert.False(t, CanFuse(s1, s2, agent, []model.SkillBehavior{s1, s2}),
-		"agent output violates F3 → not fusible")
+	assert.False(t, CanFuse(s1, s2, agent, all))
+}
+
+func TestP11_Fusion_NotConsumed_F1Violated(t *testing.T) {
+	// S₂ does NOT consume S₁'s output → F1 violated
+	s1 := makeSkill("producer", nil, []string{"x"})
+	s2 := makeSkill("consumer", []string{"y"}, []string{"result"})
+	all := []model.SkillBehavior{s1, s2}
+	agent := makeAgent("test", []string{"producer", "consumer"}, nil, []string{"result"})
+
+	assert.False(t, CanFuse(s1, s2, agent, all))
+}
+
+func TestP11_Fusion_NoProduces(t *testing.T) {
+	// S₁ produces nothing → cannot fuse
+	s1 := makeSkill("empty", nil, nil)
+	s2 := makeSkill("consumer", nil, []string{"result"})
+	all := []model.SkillBehavior{s1, s2}
+	agent := makeAgent("test", []string{"empty", "consumer"}, nil, []string{"result"})
+
+	assert.False(t, CanFuse(s1, s2, agent, all))
 }
 
 // --- P12: Isolation ---
 
-func TestP12_Isolation(t *testing.T) {
-	// Disjoint consumes → no data sharing between skills.
-	s1 := makeSkill("linter", []string{"source_code"}, []string{"lint_results"})
-	s2 := makeSkill("tester", []string{"test_suite"}, []string{"test_results"})
-
-	// P12: C(S₁) ∩ C(S₂) = ∅ → they access disjoint data
-	c1 := toSet(s1.Context.Consumes)
-	c2 := toSet(s2.Context.Consumes)
-
-	for k := range c1 {
-		assert.False(t, c2[k],
-			"type %q in both consumes sets violates isolation", k)
+func TestP12_Isolation_DisjointConsumes(t *testing.T) {
+	// Two skills with disjoint consumes in the same layer → isolated.
+	// Build the graph and verify they share no data-flow edge.
+	skills := []model.SkillBehavior{
+		makeSkill("linter", []string{"source_code"}, []string{"lint_results"}),
+		makeSkill("tester", []string{"test_suite"}, []string{"test_results"}),
 	}
+	agent := makeAgent("test",
+		[]string{"linter", "tester"}, nil,
+		[]string{"lint_results", "test_results"})
+
+	g := BuildGraph(agent, skills)
+	layers := g.Layers()
+
+	// Both should be in layer 0 (parallel)
+	require.Equal(t, 1, len(layers))
+	assert.Len(t, layers[0], 2)
+
+	// No edge between them in either direction
+	assert.False(t, g.Reachable("linter", "tester"))
+	assert.False(t, g.Reachable("tester", "linter"))
 }
 
-func TestP12_Isolation_SharedInput(t *testing.T) {
-	// Shared input → isolation caveat applies.
+func TestP12_Isolation_SharedConsumes_NotIsolated(t *testing.T) {
+	// Two skills consuming the same type — they are parallel but share input.
+	// Under context resolver, this breaks isolation (whitepaper caveat).
 	s1 := makeSkill("linter", []string{"source_code"}, []string{"lint_results"})
 	s2 := makeSkill("checker", []string{"source_code"}, []string{"type_errors"})
 
-	c1 := toSet(s1.Context.Consumes)
-	c2 := toSet(s2.Context.Consumes)
+	shared := ConsumesOverlap(s1, s2)
+	assert.Equal(t, []string{"source_code"}, shared,
+		"shared consumes should be detected")
+}
 
-	hasOverlap := false
-	for k := range c1 {
-		if c2[k] {
-			hasOverlap = true
-			break
-		}
+func TestP12_Isolation_ProducerConsumerNotIsolated(t *testing.T) {
+	// S₁ produces what S₂ consumes — they are NOT isolated (data flows between them).
+	skills := []model.SkillBehavior{
+		makeSkill("a", nil, []string{"data"}),
+		makeSkill("b", []string{"data"}, []string{"result"}),
 	}
-	assert.True(t, hasOverlap,
-		"shared input means isolation depends on resolver type (context vs file)")
+	agent := makeAgent("test", []string{"a", "b"}, nil, []string{"result"})
+	g := BuildGraph(agent, skills)
+
+	assert.True(t, g.Reachable("a", "b"), "producer reaches consumer — not isolated")
 }
 
 // --- P13: Environment Containment ---
 
-func TestP13_Containment(t *testing.T) {
-	// Skill permissions ⊆ agent permissions.
-	// Here: skill has read-only fs, no network. Agent has read-write fs, full network.
-	skill := makeSkillWithSecurity("linter",
-		[]string{"source_code"}, []string{"lint_results"},
-		model.AccessReadOnly, model.NetworkNone)
-	agentSecurity := model.SecurityFacet{
-		Filesystem: model.AccessReadWrite,
-		Network:    model.NetworkFull,
+func TestP13_Containment_AllLevels(t *testing.T) {
+	// Exhaustive test of the permission lattice ordering.
+	tests := []struct {
+		child, parent model.AccessLevel
+		contained     bool
+	}{
+		{model.AccessNone, model.AccessNone, true},
+		{model.AccessNone, model.AccessFull, true},
+		{model.AccessReadOnly, model.AccessReadWrite, true},
+		{model.AccessReadWrite, model.AccessReadOnly, false},
+		{model.AccessFull, model.AccessNone, false},
+		{model.AccessFull, model.AccessFull, true},
 	}
-
-	assert.True(t, accessLevelContained(skill.Security.Filesystem, agentSecurity.Filesystem),
-		"skill filesystem ⊆ agent filesystem")
-	assert.True(t, networkContained(skill.Security.Network, agentSecurity.Network),
-		"skill network ⊆ agent network")
+	for _, tt := range tests {
+		assert.Equal(t, tt.contained, AccessLevelContained(tt.child, tt.parent),
+			"%s ⊆ %s should be %v", tt.child, tt.parent, tt.contained)
+	}
 }
 
-func TestP13_Containment_Violation(t *testing.T) {
-	// Skill has full fs, agent has read-only → violation.
-	skill := makeSkillWithSecurity("writer",
-		nil, []string{"output"},
-		model.AccessFull, model.NetworkFull)
-	agentSecurity := model.SecurityFacet{
-		Filesystem: model.AccessReadOnly,
-		Network:    model.NetworkNone,
+func TestP13_Containment_NetworkLevels(t *testing.T) {
+	tests := []struct {
+		child, parent model.NetworkAccess
+		contained     bool
+	}{
+		{model.NetworkNone, model.NetworkNone, true},
+		{model.NetworkNone, model.NetworkFull, true},
+		{model.NetworkAllowlist, model.NetworkFull, true},
+		{model.NetworkFull, model.NetworkNone, false},
+		{model.NetworkFull, model.NetworkAllowlist, false},
 	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.contained, NetworkContained(tt.child, tt.parent),
+			"%s ⊆ %s should be %v", tt.child, tt.parent, tt.contained)
+	}
+}
 
-	assert.False(t, accessLevelContained(skill.Security.Filesystem, agentSecurity.Filesystem),
-		"skill filesystem should NOT be contained in agent filesystem")
-	assert.False(t, networkContained(skill.Security.Network, agentSecurity.Network),
-		"skill network should NOT be contained in agent network")
+func TestP13_Containment_CIReviewer(t *testing.T) {
+	// Verify every skill's permissions ⊆ max(skill permissions) in ci-reviewer.
+	skills, _ := ciReviewerFixture()
+	// Agent envelope must contain max(skill permissions).
+	// tdd-runner has full filesystem access → agent needs full.
+	agentFS := model.AccessFull
+	agentNet := model.NetworkNone
+
+	for _, s := range skills {
+		assert.True(t, AccessLevelContained(s.Security.Filesystem, agentFS),
+			"skill %q filesystem %s should be ⊆ %s", s.Skill, s.Security.Filesystem, agentFS)
+		assert.True(t, NetworkContained(s.Security.Network, agentNet),
+			"skill %q network %s should be ⊆ %s", s.Skill, s.Security.Network, agentNet)
+	}
 }
 
 // --- P14: Parallel Independence ---
 
-func TestP14_ParallelIndependence(t *testing.T) {
-	// Parallel skills → disjoint produces (write sets).
-	s1 := makeSkill("linter", []string{"source_code"}, []string{"lint_results"})
-	s2 := makeSkill("tester", []string{"source_code"}, []string{"test_results"})
-
-	p1 := toSet(s1.Context.Produces)
-	p2 := toSet(s2.Context.Produces)
-
-	for k := range p1 {
-		assert.False(t, p2[k],
-			"type %q produced by both parallel skills violates P14", k)
-	}
-}
-
 func TestP14_ParallelIndependence_CIReviewer(t *testing.T) {
-	// In ci-reviewer, layer-0 skills (linter, checker, runner, reporter) are parallel.
-	// Their produces must be disjoint.
-	skills := []model.SkillBehavior{
-		makeSkill("ts-linter", []string{"file_tree", "source_code"}, []string{"lint_results"}),
-		makeSkill("type-checker", []string{"file_tree", "source_code"}, []string{"type_errors"}),
-		makeSkill("tdd-runner", []string{"file_tree", "source_code"}, []string{"test_results"}),
-		makeSkill("coverage-reporter", []string{"file_tree", "source_code"}, []string{"coverage_report"}),
-	}
-	agent := makeAgent("ci-reviewer",
-		[]string{"ts-linter", "type-checker", "tdd-runner", "coverage-reporter"},
-		nil,
-		[]string{"lint_results", "type_errors", "test_results", "coverage_report"},
-	)
-
+	// Layer-0 skills in ci-reviewer are parallel.
+	// P14: their write sets (produces) must be disjoint.
+	skills, agent := ciReviewerFixture()
 	g := BuildGraph(agent, skills)
 	layers := g.Layers()
 	require.GreaterOrEqual(t, len(layers), 1)
 
-	// Check all skills in layer 0 have disjoint produces
-	layer0Skills := layers[0]
-	allProduces := make(map[string]string) // type → producing skill
-	for _, sName := range layer0Skills {
-		for _, skill := range skills {
-			if skill.Skill == sName {
-				for _, p := range skill.Context.Produces {
-					existing, dup := allProduces[p]
-					assert.False(t, dup,
-						"type %q produced by both %q and %q in same layer", p, existing, sName)
-					allProduces[p] = sName
+	skillMap := make(map[string]model.SkillBehavior)
+	for _, s := range skills {
+		skillMap[s.Skill] = s
+	}
+
+	allProduces := make(map[string]string) // type → skill name
+	for _, sName := range layers[0] {
+		s := skillMap[sName]
+		for _, p := range s.Context.Produces {
+			existing, dup := allProduces[p]
+			assert.False(t, dup,
+				"type %q produced by both %q and %q in same layer", p, existing, sName)
+			allProduces[p] = sName
+		}
+	}
+}
+
+func TestP14_ParallelIndependence_Violation(t *testing.T) {
+	// Two parallel skills producing the same type → P14 violated.
+	s1 := makeSkill("a", nil, []string{"output"})
+	s2 := makeSkill("b", nil, []string{"output"})
+	agent := makeAgent("test", []string{"a", "b"}, nil, []string{"output"})
+
+	g := BuildGraph(agent, skills(s1, s2))
+	layers := g.Layers()
+	require.Equal(t, 1, len(layers))
+
+	// Both in layer 0 but produce same type — violation detected
+	seen := make(map[string]bool)
+	violation := false
+	for _, sName := range layers[0] {
+		for _, sk := range skills(s1, s2) {
+			if sk.Skill == sName {
+				for _, p := range sk.Context.Produces {
+					if seen[p] {
+						violation = true
+					}
+					seen[p] = true
 				}
 			}
 		}
 	}
+	assert.True(t, violation, "should detect duplicate produces in same layer")
+
+	// Also verify via DisjointProduces helper
+	assert.False(t, DisjointProduces([]model.SkillBehavior{s1, s2}))
 }
 
 // --- P15: Conflict-Free Merge ---
 
-func TestP15_ConflictFreeMerge(t *testing.T) {
-	// Disjoint write sets → commutative merge.
+func TestP15_ConflictFreeMerge_Disjoint(t *testing.T) {
+	// Disjoint write sets → merge is conflict-free.
 	s1 := makeSkill("linter", []string{"source_code"}, []string{"lint_results"})
 	s2 := makeSkill("tester", []string{"source_code"}, []string{"test_results"})
 
-	// Write sets = produces
-	w1 := toSet(s1.Context.Produces)
-	w2 := toSet(s2.Context.Produces)
+	assert.True(t, DisjointProduces([]model.SkillBehavior{s1, s2}),
+		"disjoint produces → conflict-free merge")
+}
 
-	disjoint := true
-	for k := range w1 {
-		if w2[k] {
-			disjoint = false
-		}
+func TestP15_ConflictFreeMerge_Conflict(t *testing.T) {
+	// Overlapping write sets → merge has conflicts.
+	s1 := makeSkill("writer1", nil, []string{"shared_output"})
+	s2 := makeSkill("writer2", nil, []string{"shared_output"})
+
+	assert.False(t, DisjointProduces([]model.SkillBehavior{s1, s2}),
+		"overlapping produces → merge conflict")
+}
+
+func TestP15_ConflictFreeMerge_CIReviewerLayer0(t *testing.T) {
+	// In ci-reviewer, all layer-0 skills have disjoint produces.
+	skills, agent := ciReviewerFixture()
+	g := BuildGraph(agent, skills)
+	layers := g.Layers()
+	require.GreaterOrEqual(t, len(layers), 1)
+
+	skillMap := make(map[string]model.SkillBehavior)
+	for _, s := range skills {
+		skillMap[s.Skill] = s
 	}
-	assert.True(t, disjoint, "disjoint write sets")
 
-	// Commutativity: merge(W₁, W₂) = merge(W₂, W₁)
-	// Simulated: combining outputs in either order produces the same set
-	merged12 := make(map[string]bool)
-	merged21 := make(map[string]bool)
-	for k := range w1 {
-		merged12[k] = true
-		merged21[k] = true
+	var layer0Skills []model.SkillBehavior
+	for _, name := range layers[0] {
+		layer0Skills = append(layer0Skills, skillMap[name])
 	}
-	for k := range w2 {
-		merged12[k] = true
-		merged21[k] = true
+	assert.True(t, DisjointProduces(layer0Skills),
+		"ci-reviewer layer 0 should have disjoint produces")
+}
+
+// --- Test fixtures ---
+
+func ciReviewerFixture() ([]model.SkillBehavior, model.AgentComposition) {
+	skills := []model.SkillBehavior{
+		makeSkillWithSecurity("ts-linter", []string{"file_tree", "source_code"}, []string{"lint_results"}, model.AccessReadOnly, model.NetworkNone),
+		makeSkillWithSecurity("type-checker", []string{"file_tree", "source_code"}, []string{"type_errors"}, model.AccessReadOnly, model.NetworkNone),
+		makeSkillWithSecurity("tdd-runner", []string{"file_tree", "source_code"}, []string{"test_results"}, model.AccessFull, model.NetworkNone),
+		makeSkillWithSecurity("coverage-reporter", []string{"file_tree", "source_code"}, []string{"coverage_report"}, model.AccessReadOnly, model.NetworkNone),
+		makeSkillWithSecurity("review-commenter", []string{"git_diff", "test_results", "lint_results"}, []string{"review_comments"}, model.AccessReadOnly, model.NetworkNone),
+		makeSkillWithSecurity("risk-scorer", []string{"git_diff", "test_results", "lint_results"}, []string{"risk_score"}, model.AccessReadOnly, model.NetworkNone),
 	}
-	assert.Equal(t, merged12, merged21, "merge should be commutative")
+	agent := makeAgent("ci-reviewer",
+		[]string{"ts-linter", "type-checker", "tdd-runner", "coverage-reporter", "review-commenter", "risk-scorer"},
+		nil,
+		[]string{"lint_results", "type_errors", "test_results", "coverage_report", "review_comments", "risk_score"},
+	)
+	return skills, agent
 }
 
-// --- Helper: permission ordering ---
-
-var accessOrder = map[model.AccessLevel]int{
-	model.AccessNone:      0,
-	model.AccessReadOnly:  1,
-	model.AccessReadWrite: 2,
-	model.AccessFull:      3,
-}
-
-var networkOrder = map[model.NetworkAccess]int{
-	model.NetworkNone:      0,
-	model.NetworkAllowlist: 1,
-	model.NetworkFull:      2,
-}
-
-// accessLevelContained returns true if child ⊆ parent in the permission lattice.
-func accessLevelContained(child, parent model.AccessLevel) bool {
-	return accessOrder[child] <= accessOrder[parent]
-}
-
-// networkContained returns true if child ⊆ parent in the permission lattice.
-func networkContained(child, parent model.NetworkAccess) bool {
-	return networkOrder[child] <= networkOrder[parent]
+func skills(ss ...model.SkillBehavior) []model.SkillBehavior {
+	return ss
 }
