@@ -113,6 +113,55 @@ func TestSampleFiles(t *testing.T) {
 	}
 }
 
+// --- Mutation-killing tests for sampleFiles boundary (line 99: len(files) <= n) ---
+
+func TestSampleFiles_ExactlyN(t *testing.T) {
+	// Line 99: `len(files) <= n` — mutation to `< n` would trigger shuffle when len == n.
+	// With len == n, should return all files unshuffled.
+	files := []string{"a", "b", "c"}
+	original := make([]string, len(files))
+	copy(original, files)
+	sampled := sampleFiles(files, 3, 42)
+	assert.Len(t, sampled, 3)
+	// When len == n, we return the original slice, so order should be preserved.
+	assert.Equal(t, original, sampled, "len(files) == n should return original slice without shuffle")
+}
+
+func TestSampleFiles_LessThanN(t *testing.T) {
+	files := []string{"a", "b"}
+	sampled := sampleFiles(files, 5, 42)
+	assert.Len(t, sampled, 2, "should return all files when len < n")
+}
+
+func TestSampleFiles_NPlus1(t *testing.T) {
+	// len(files) == n+1 should trigger shuffle and return n items.
+	files := []string{"a", "b", "c", "d"}
+	sampled := sampleFiles(files, 3, 42)
+	assert.Len(t, sampled, 3)
+}
+
+func TestSampleFiles_Empty(t *testing.T) {
+	var files []string
+	sampled := sampleFiles(files, 5, 42)
+	assert.Empty(t, sampled)
+}
+
+// --- Mutation-killing test for safePercent ---
+
+func TestSafePercent_ZeroDenominator(t *testing.T) {
+	assert.Equal(t, 0.0, safePercent(0, 0))
+	assert.Equal(t, 0.0, safePercent(5, 0))
+}
+
+func TestSafePercent_NonZero(t *testing.T) {
+	assert.InDelta(t, 50.0, safePercent(1, 2), 0.001)
+	assert.InDelta(t, 100.0, safePercent(3, 3), 0.001)
+}
+
+func TestSafePercent_ZeroNumerator(t *testing.T) {
+	assert.Equal(t, 0.0, safePercent(0, 10))
+}
+
 func TestAutoGenerateTasks(t *testing.T) {
 	ctx := &scanner.CodebaseContext{
 		Structure: []scanner.DirEntry{
@@ -129,4 +178,119 @@ func TestAutoGenerateTasks(t *testing.T) {
 		assert.NotEmpty(t, task.Query)
 		assert.NotEmpty(t, task.ExpectedPaths)
 	}
+}
+
+// --- Mutation-killing tests for AutoGenerateTasks boundary (line 170: len(tasks) >= 20) ---
+
+func TestAutoGenerateTasks_CapsAt20(t *testing.T) {
+	// Line 170: `len(tasks) >= 20` — mutation to `> 20` would allow 21 tasks.
+	// Build a context with more than 20 source files.
+	var entries []scanner.DirEntry
+	for i := 0; i < 30; i++ {
+		entries = append(entries, scanner.DirEntry{
+			Path:  "src/pkg" + string(rune('a'+i%26)),
+			Files: []string{"main.go"},
+		})
+	}
+	ctx := &scanner.CodebaseContext{Structure: entries}
+	tasks := AutoGenerateTasks(ctx)
+	assert.Equal(t, 20, len(tasks), "should cap at exactly 20 tasks, not 21")
+}
+
+func TestAutoGenerateTasks_Exactly20(t *testing.T) {
+	// If we have exactly 20 source files, should get exactly 20 tasks.
+	var entries []scanner.DirEntry
+	for i := 0; i < 20; i++ {
+		entries = append(entries, scanner.DirEntry{
+			Path:  "src/pkg" + string(rune('a'+i%26)) + string(rune('0'+i/26)),
+			Files: []string{"file.go"},
+		})
+	}
+	ctx := &scanner.CodebaseContext{Structure: entries}
+	tasks := AutoGenerateTasks(ctx)
+	assert.Equal(t, 20, len(tasks))
+}
+
+func TestAutoGenerateTasks_Exactly19(t *testing.T) {
+	// 19 source files should give exactly 19 tasks (below cap).
+	var entries []scanner.DirEntry
+	for i := 0; i < 19; i++ {
+		entries = append(entries, scanner.DirEntry{
+			Path:  "src/pkg" + string(rune('a'+i%26)) + string(rune('0'+i/26)),
+			Files: []string{"file.go"},
+		})
+	}
+	ctx := &scanner.CodebaseContext{Structure: entries}
+	tasks := AutoGenerateTasks(ctx)
+	assert.Equal(t, 19, len(tasks))
+}
+
+func TestAutoGenerateTasks_SkipsConfigFiles(t *testing.T) {
+	ctx := &scanner.CodebaseContext{
+		Structure: []scanner.DirEntry{
+			{Path: "config", Files: []string{"database.yaml", "settings.json"}},
+		},
+	}
+	tasks := AutoGenerateTasks(ctx)
+	assert.Empty(t, tasks, "config files should be skipped")
+}
+
+func TestAutoGenerateTasks_SkipsDirHints(t *testing.T) {
+	ctx := &scanner.CodebaseContext{
+		Structure: []scanner.DirEntry{
+			{Path: "src", Files: []string{"components/", "main.go"}},
+		},
+	}
+	tasks := AutoGenerateTasks(ctx)
+	// Only main.go should generate a task (components/ is a dir hint).
+	assert.Equal(t, 1, len(tasks))
+}
+
+// --- Mutation-killing tests for matchesExpected ---
+
+func TestMatchesExpected_ExactMatch(t *testing.T) {
+	assert.True(t, matchesExpected("src/main.go", []string{"src/main.go"}))
+}
+
+func TestMatchesExpected_NoMatch(t *testing.T) {
+	assert.False(t, matchesExpected("src/main.go", []string{"lib/util.go"}))
+}
+
+func TestMatchesExpected_ParentDirMatch(t *testing.T) {
+	assert.True(t, matchesExpected("src/controllers", []string{"src/controllers/auth.go"}))
+}
+
+func TestMatchesExpected_FileDirMatch(t *testing.T) {
+	assert.True(t, matchesExpected("src/controllers/auth.go", []string{"src/controllers"}))
+}
+
+func TestMatchesExpected_ReversePrefix(t *testing.T) {
+	assert.True(t, matchesExpected("scripts/build.sh", []string{"scripts"}))
+}
+
+func TestMatchesExpected_MultiLineResponse(t *testing.T) {
+	response := "src/main.go\nlib/util.go"
+	assert.True(t, matchesExpected(response, []string{"lib/util.go"}))
+}
+
+// --- Mutation-killing tests for extractCandidates ---
+
+func TestExtractCandidates_StripsBackticks(t *testing.T) {
+	candidates := extractCandidates("`src/main.go`")
+	assert.Contains(t, candidates, "src/main.go")
+}
+
+func TestExtractCandidates_StripsDotSlash(t *testing.T) {
+	candidates := extractCandidates("./src/main.go")
+	assert.Contains(t, candidates, "src/main.go")
+}
+
+func TestExtractCandidates_EmptyInput(t *testing.T) {
+	candidates := extractCandidates("")
+	assert.Empty(t, candidates)
+}
+
+func TestExtractCandidates_DotOnly(t *testing.T) {
+	candidates := extractCandidates(".")
+	assert.Empty(t, candidates, "single dot should be filtered")
 }
