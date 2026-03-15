@@ -13,11 +13,11 @@ weight: 2
 
 ## Abstract
 
-Most AI agent definitions today are monolithic prompt files — brittle, untestable, and locked to one framework.
+AI agent definitions are predominantly monolithic prompt files — unstructured, untestable, and coupled to a single framework. This paper presents the Skill Behavior Model, a declarative format for defining AI agents as compositions of reusable behavioral units called *skills*. Each skill declares a typed I/O contract (`consumes`/`produces`) and is governed by five facets: Context, Strategy, Guardrails, Observability, and Security. Agents are flat compositions of skills with their own I/O boundary and orchestration strategy.
 
-- **Skills as interfaces** — each skill declares `consumes`/`produces` and is governed by 5 facets (Context, Strategy, Guardrails, Observability, Security)
-- **Agents as compositions** — a named list of skills with its own I/O contract and orchestration strategy, validated statically by the linter
-- **Write once, deploy anywhere** — the same YAML generates output for Claude Code [1], GitHub Copilot [2], or any other target without modification
+We formalize the model's structural properties and prove fifteen results: well-formedness is decidable in linear time (P1), compatible skill substitution preserves agent validity — justifying contract-based semantic versioning (P2), independent skills are safely parallelizable with a canonical layer decomposition and computable maximum parallelism (P3, Corollaries 3.1–3.2), a URI-based data flow protocol guarantees resolution completeness (P4), output immutability under a write-once axiom (P5), cycle-free resolution (P6), skill addition under isolation conditions preserves well-formedness (P7), valid schedules exist for every well-formed agent (P8), artifacts generated for different frameworks are structurally isomorphic (P9), every skill is reachable from source to sink (P10), exclusively-connected skills can be fused while preserving well-formedness (P11), pure execution environments provide data isolation (P12), permission containment (P13), parallel independence (P14), and conflict-free merge under disjoint write sets (P15). The linter provides structural soundness — well-validated agents are free from missing dependencies, circular references, responsibility overload, and orphan outputs. We characterize the gap between structural soundness and semantic correctness, establish a Petri net correspondence and connections to linear logic, formalize a worktree-based isolation model with three-level merge strategies, and describe four frontier directions: behavioral testing, a skill ecosystem with contract-derived versioning, runtime enforcement through a four-layer ladder, and multi-agent coordination via protocol bridges.
+
+The format is framework-agnostic and LLM-agnostic: the same YAML specification generates output for Claude Code [1], GitHub Copilot [2], or other targets without modification.
 
 ---
 
@@ -354,35 +354,57 @@ The preceding sections define the Skill Behavior Model informally. This section 
 
 A **skill** is a triple S = (C, P, F) where:
 - C ⊆ T is a finite set of consumed type names (the skill's inputs)
-- P ∈ T is a single produced type name (the skill's output)
-- F is a record of facets: strategy, guardrails, observability, security, negotiation
+- P ∈ T is a single produced type name (the skill's output). Note: the YAML schema permits `produces` as a list, so a skill *file* can declare multiple outputs. The formal model assumes P is a singleton; the linter enforces this constraint (Single Responsibility, section 4.2). Skills violating SRP are syntactically valid YAML but are rejected by the linter before entering the formal model.
+- F is a record of the remaining facets: strategy, guardrails, observability, security, negotiation (the Context facet's I/O contract is captured by C and P)
 
 An **agent** is a tuple A = (S₁, ..., Sₙ, Cₐ, Pₐ, σ) where:
-- S₁, ..., Sₙ are the agent's skills
+- S₁, ..., Sₙ are the agent's skills (n ≥ 1)
 - Cₐ ⊆ T is the agent's consumed types (external inputs)
-- Pₐ ⊆ T is the agent's produced types (final outputs)
+- Pₐ ⊆ {P(S₁), ..., P(Sₙ)} is the agent's produced types (final outputs) — every agent output must be produced by some skill
 - σ ∈ {sequential, parallel, parallel-then-merge, adaptive} is the orchestration strategy
 
+**Edge cases.** A *source skill* has C = ∅: it requires no input and may generate content from its prompt alone (e.g., a skill that produces a boilerplate template). Source skills have no incoming edges in G(A) other than from ⊤ₐ. An agent with n = 0 is degenerate (no skills, no outputs) and is rejected by validation as vacuous. An agent with Cₐ = ∅ (no external inputs) is valid if all skills' inputs are satisfied internally — all skills form a closed system rooted in source skills. An agent with Pₐ = ∅ (no declared outputs) is degenerate — it performs computation but produces no deliverable — and should be flagged by the linter as a warning.
+
 The **data flow graph** G(A) is a directed graph where:
-- Nodes are the skills S₁, ..., Sₙ
+- Nodes are the skills S₁, ..., Sₙ, a virtual source node ⊤ₐ representing the agent's external inputs Cₐ, and a virtual sink node ⊥ₐ representing the agent's final outputs Pₐ
 - An edge (Sᵢ, Sⱼ) exists when P(Sᵢ) ∈ C(Sⱼ) — skill i produces a type that skill j consumes
+- An edge (⊤ₐ, Sⱼ) exists when some t ∈ C(Sⱼ) is in Cₐ — the skill consumes an external input
+- An edge (Sᵢ, ⊥ₐ) exists when P(Sᵢ) ∈ Pₐ — the skill's output is an agent-level output
 
 T is the universe of type names — free-form strings like `git_diff`, `lint_results`, `review_comments`. Types are nominal: two types match if and only if their names are identical strings. There is no structural subtyping.
 
 ### 4.2 Structural Properties
 
-The Skill Behavior Model guarantees six structural properties when an agent passes validation (`forgent lint` + `forgent doctor`):
+The Skill Behavior Model relies on three categories of structural properties.
 
-| Property | Formal statement | Verified by |
-|----------|-----------------|-------------|
-| **Acyclicity** | G(A) is a directed acyclic graph | `forgent doctor` — cycle detection |
-| **Contract completeness** | ∀ Sᵢ ∈ A, ∀ t ∈ C(Sᵢ): ∃ Sⱼ ∈ A where P(Sⱼ) = t, or t ∈ Cₐ | `forgent lint` — unmet dependencies |
-| **Single responsibility** | ∀ Sᵢ ∈ A: |{P(Sᵢ)}| = 1 | Lint rule SRP |
-| **Build idempotence** | build(spec) = build(spec) — deterministic generation | Generator implementation |
-| **Additivity** | Adding S' to A does not alter any existing Sᵢ's behavior if P(S') ∉ ⋃ C(Sᵢ) | Structural independence of skills |
-| **Monotonicity** | If A passes validation and A' = A ∪ {S'}, then every dependency satisfied in A remains satisfied in A' | Consequence of additivity |
+**Well-formedness invariants** (checked by tooling — an agent that violates any of these is rejected before entering the formal model):
 
-Acyclicity, contract completeness, and single responsibility are checked by tooling. Build idempotence is a property of the deterministic generator. Additivity and monotonicity follow from the model's design: skills have no shared mutable state and no implicit dependencies.
+| Invariant | Formal statement | Verified by |
+|-----------|-----------------|-------------|
+| **Acyclicity** | G(A) is a directed acyclic graph | Diagnostic checker — cycle detection |
+| **Contract completeness** | ∀ Sᵢ ∈ A, ∀ t ∈ C(Sᵢ): ∃ Sⱼ ∈ A where P(Sⱼ) = t, or t ∈ Cₐ | Linter — unmet dependencies |
+| **Single responsibility** | P(Sᵢ) is a singleton for every skill (the YAML schema permits lists; the linter rejects multi-output skills before they enter the formal model, where P ∈ T is definitionally a singleton) | Lint rule SRP |
+| **Producer uniqueness** | ∀ t ∈ T: \|{Sᵢ ∈ A : P(Sᵢ) = t}\| ≤ 1 — each type has at most one producer | Linter — duplicate producer detection |
+| **Output coverage** | Pₐ ⊆ {P(S₁), ..., P(Sₙ)} — every agent output is produced by some skill | Linter — orphan output detection |
+| **No dead inputs** | ∀ t ∈ Cₐ: ∃ Sᵢ ∈ A where t ∈ C(Sᵢ) — every declared external input is consumed by at least one skill | Linter — unused input warning |
+| **No dead skills** | ∀ Sᵢ ∈ A: P(Sᵢ) ∈ Pₐ or ∃ Sⱼ ∈ A where P(Sᵢ) ∈ C(Sⱼ) — every skill's output is either an agent output or consumed by another skill | Linter — dead skill warning |
+
+These are *preconditions*, not theorems: the tooling verifies them and rejects non-conforming agents (or warns for the last two). Their role is analogous to typing judgments — the type checker verifies them, but they are not "proved" from the definitions.
+
+**Derived properties** (provable from the definitions and the well-formedness invariants — see Propositions 7–8 in section 4.4):
+
+| Property | Statement | Proved in |
+|----------|-----------|-----------|
+| **Structural additivity** | Adding a skill S' under conditions H1–H3 preserves the incoming edges and well-formedness of existing skills | Proposition 7 |
+| **Monotonicity** | Adding any skill preserves existing dependency satisfaction (unconditionally) | Corollary of Proposition 7 |
+
+**Implementation contract** (property of the build tooling, not of the formal model):
+
+| Property | Statement | Verified by |
+|----------|-----------|-------------|
+| **Build determinism** | The build function B is empirically deterministic: same specification → same artifacts. Depends on absence of non-deterministic sources in the generator code. | Implementation discipline + empirical testing |
+
+Producer uniqueness ensures deterministic data flow: if two skills produced the same type, consumers would face ambiguous resolution. The derived properties (additivity, monotonicity) follow from the graph structure; their proofs appear in section 4.4.
 
 ### 4.3 The I/O Contract as a Type System
 
@@ -410,51 +432,232 @@ The type system is intentionally shallow. Types are names, not schemas — `revi
 
 ### 4.4 Composition Algebra
 
-Skills and their compositions can be characterized as a category.
+Skills compose into agents through a directed acyclic graph (DAG). This section formalizes the composition operations and proves properties of the resulting structure.
 
-**The category Skill.** Define a category **Skill** where:
-- **Objects** are elements of T — the I/O type names
-- **Morphisms** are skills: S : C₁ × C₂ × ... × Cₙ → P
-- **Composition** S₂ ∘ S₁ is defined when P(S₁) ∈ C(S₂) — the output of S₁ feeds an input of S₂
+The data flow graph G(A) (defined in section 4.1) is the foundation of the composition algebra.
 
-The composition satisfies four properties:
+Two composition operations build the DAG:
 
-| Property | Statement | Practical consequence |
-|----------|-----------|----------------------|
-| **Associativity** | (S₃ ∘ S₂) ∘ S₁ = S₃ ∘ (S₂ ∘ S₁) | The order of grouping does not affect the pipeline |
-| **Non-commutativity** | S₂ ∘ S₁ ≠ S₁ ∘ S₂ in general | Sequential order matters — `tdd-runner` before `review-commenter`, not the reverse |
-| **Identity** | For every type T, an identity skill id_T : T → T exists (a pass-through that forwards its input unchanged) | Agents can include transparent relay skills |
-| **Product** | S₁ ⊗ S₂ : C₁ × C₂ → P₁ × P₂ — parallel execution of independent skills | The `parallel` orchestration strategy is the tensor product |
+**Sequential composition.** S₂ ∘ S₁ connects the output of S₁ to an input of S₂. This is defined when P(S₁) ∈ C(S₂) and creates an edge (S₁, S₂) in the DAG. Note that S₂ may have additional inputs beyond P(S₁) — these are satisfied by other skills or by the agent's external inputs.
 
-The four orchestration strategies (section 2.3) correspond to categorical constructions:
+**Parallel composition.** S₁ ⊗ S₂ places two skills with no data dependency between them. This is defined when P(S₁) ∉ C(S₂) and P(S₂) ∉ C(S₁). Both skills draw from the agent's available inputs independently. The precondition is symmetric, so ⊗ is commutative: S₁ ⊗ S₂ = S₂ ⊗ S₁. It is also associative: if S₁ ⊗ S₂ and (S₁ ⊗ S₂) ⊗ S₃ are both defined, pairwise independence guarantees S₁ ⊗ (S₂ ⊗ S₃) is also defined and produces the same DAG.
 
-| Orchestration | Construction | Notation |
-|---------------|-------------|----------|
-| `sequential` | Morphism composition | S₃ ∘ S₂ ∘ S₁ |
-| `parallel` | Tensor product | S₁ ⊗ S₂ ⊗ S₃ |
-| `parallel-then-merge` | Product then composition | merge ∘ (S₁ ⊗ S₂ ⊗ S₃) |
-| `adaptive` | Coproduct (conditional choice) | S₁ + S₂ |
+**Important caveat.** The operators ∘ and ⊗ are *notational shorthands* for edge/independence relations in the DAG, not algebraic operations closed on skills. The "result" of S₂ ∘ S₁ is not a new skill but a DAG fragment. The notation is useful for describing DAG shapes concisely, but does not constitute a closed algebra with carrier set and internal operations.
 
-**The build functor.** A build target defines a functor B : **Skill** → **Target** that:
-- Maps each type T ∈ T to its framework-specific representation (e.g., a section header in the generated prompt)
-- Maps each morphism S to a generated artifact (a `.md` skill file, a `.mdc` rule, etc.)
-- Preserves composition: B(S₂ ∘ S₁) = B(S₂) ∘ B(S₁) — the build of a pipeline equals the pipeline of builds
+**Edge count bound.** By producer uniqueness, each consumed type resolves to at most one producer. Therefore the number of inter-skill edges satisfies |E| ≤ ∑ᵢ |C(Sᵢ)|. This bound is used implicitly in the complexity analysis of Proposition 1.
 
-Build idempotence follows from the functor being deterministic: same input specification → same output artifacts.
+The four orchestration strategies (section 2.3) correspond to DAG shapes:
 
-**Honest limitations.** The category is *loose* in three ways:
+| Orchestration | DAG shape | Notation |
+|---------------|-----------|----------|
+| `sequential` | Linear chain | S₃ ∘ S₂ ∘ S₁ |
+| `parallel` | Independent nodes | S₁ ⊗ S₂ ⊗ S₃ |
+| `parallel-then-merge` | Fan-in | Sₘ ∘ (S₁ ⊗ S₂ ⊗ S₃), where Sₘ consumes the outputs of S₁, S₂, S₃ |
+| `adaptive` | Conditional branching | Runtime-selected among {S₁, S₂} based on input content |
 
-1. **Non-deterministic morphisms.** Skills are executed by LLMs. The same skill applied to the same input may produce different outputs across invocations. The algebraic model captures *structural* composition, not *behavioral* determinism.
+Note: the `sequential` notation S₃ ∘ S₂ ∘ S₁ denotes a strict chain where P(S₁) ∈ C(S₂) and P(S₂) ∈ C(S₃). In practice, the `sequential` orchestration allows accumulation — S₃ may also consume P(S₁) directly. The strict chain is a special case.
 
-2. **Nominal type matching.** Types are strings, not schemas. Two skills using `review_comments` with different internal expectations will compose structurally but may fail semantically. The category verifies wiring, not meaning.
+**Proposition 1 (Decidability).** Given an agent specification A, determining whether G(A) is well-formed (acyclic, contract-complete, single-responsibility, producer-unique) is decidable in O(|S| + |E|) time, where |S| is the number of skills and |E| is the number of data flow edges.
 
-3. **Structure ≠ correctness.** The algebraic model guarantees that a well-formed agent has no structural defects — analogous to a well-typed program having no type errors. It does not guarantee that the agent produces correct, useful, or safe outputs. The gap between structural soundness and semantic correctness is inherent to any specification that runs on non-deterministic executors.
+*Proof.* Acyclicity is detected by topological sort (O(|S| + |E|)). Contract completeness is verified by building a hash map from produced types to skills (O(|S|)), then checking each consumed type against the map (O(∑|C(Sᵢ)|) = O(|E|)). Single responsibility and producer uniqueness are checked per skill (O(|S|)). □
+
+**Proposition 2 (Compatible substitution).** Let A be a well-formed agent containing skill S. Let S' be a skill with C(S') ⊆ C(S) and P(S') = P(S). Then A' = A[S ↦ S'] is well-formed.
+
+*Proof.* We verify each well-formedness property.
+
+*Acyclicity.* Let E(A) denote the edge set of G(A). An edge (Sᵢ, Sⱼ) exists iff P(Sᵢ) ∈ C(Sⱼ). In G(A'):
+- Outgoing edges from S': {(S', Sⱼ) : P(S') ∈ C(Sⱼ)} = {(S, Sⱼ) : P(S) ∈ C(Sⱼ)} (since P(S') = P(S)). Identical to S's outgoing edges.
+- Incoming edges to S': {(Sᵢ, S') : P(Sᵢ) ∈ C(S')} ⊆ {(Sᵢ, S) : P(Sᵢ) ∈ C(S)} (since C(S') ⊆ C(S)). A subset of S's incoming edges.
+- All other edges are unchanged.
+
+Therefore E(A') ⊆ E(A). A subgraph of a DAG is acyclic. ✓
+
+*Contract completeness.* We must show: ∀ Sⱼ ∈ A', ∀ t ∈ C(Sⱼ): t is produced by some skill in A' or t ∈ Cₐ.
+- Case Sⱼ ≠ S': C(Sⱼ) is unchanged. If t was produced by S in A, it is now produced by S' in A' (since P(S') = P(S)). If t was produced by some Sₖ ≠ S, the producer is unchanged. ✓
+- Case Sⱼ = S': For every t ∈ C(S'), we have t ∈ C(S) (since C(S') ⊆ C(S)). The type t was satisfied in A — its producer is unchanged in A'. ✓
+
+*Single responsibility.* P(S') = P(S), which is a singleton because A is well-formed. ✓
+
+*Producer uniqueness.* S was the unique producer of P(S) in A. In A', S' produces P(S') = P(S). No other skill changed. Therefore S' is the unique producer of that type. ✓ □
+
+*Corollary (Contravariant substitutability).* The substitution condition — C(S') ⊆ C(S) for inputs, P(S') = P(S) for output — is *contravariant* in inputs and *invariant* in output. A skill that requires *fewer* inputs is always substitutable. A skill that requires *more* inputs may break contract completeness (the new inputs may have no producer). This matches the Liskov Substitution Principle [4] and directly justifies the semantic versioning scheme in section 6.2.
+
+**Proposition 3 (Parallelizability).** In a well-formed agent A, skills S₁ and S₂ are *independent* if there is no directed path between them in G(A). Independent skills can be scheduled in any relative order or concurrently: every such scheduling respects the data flow constraints of G(A).
+
+*Proof.* Independence means S₁ and S₂ are *incomparable* in the partial order induced by G(A) — neither is an ancestor of the other. By the order extension principle (Szpilrajn's theorem), any partial order can be extended to a total order. Since S₁ and S₂ are incomparable, both extensions (S₁ < S₂ and S₂ < S₁) are consistent with the partial order. Therefore, valid topological orderings (i.e., valid schedules) exist with S₁ before S₂, and valid orderings with S₂ before S₁.
+
+Data flow correctness is scheduling-independent: each consumed type t requires ∃ Sⱼ : P(Sⱼ) = t — a structural property of the DAG, not a property of any particular execution order. At runtime, a scheduler need only ensure that a skill executes after all of its predecessors in G(A) have completed; independent skills have no such ordering constraint between them. ✓
+
+*Consequence.* The set of maximal independent groups is computable by topological layer decomposition: skills at the same layer of the DAG (same longest-path distance from any source) are pairwise independent. This directly yields the `parallel` orchestration strategy. □
+
+**The build mapping.** A build target defines a deterministic mapping B from agent specifications to generated artifacts (see Proposition 9, cross-target structural isomorphism):
+- B maps each type t ∈ T to its framework-specific representation
+- B maps each skill S to a generated artifact (a prompt file, a rule file, etc.)
+- B maps the DAG structure to orchestration logic in the generated agent file
+
+**A note on categorical structure.** The notation above (∘ for sequential, ⊗ for parallel) suggests a categorical reading — skills as morphisms, types as objects, the build mapping as a functor. This analogy is useful vocabulary but requires care. Multi-input skills require a *multicategory* rather than an ordinary category, and the morphisms are LLM transformations (non-deterministic) rather than pure functions. The propositions above are stated and proved directly on the DAG structure rather than relying on categorical machinery — the proofs are self-contained.
+
+**Limitations.**
+
+1. **Specification, not execution.** The algebra describes how skills *wire together*, not how they *behave*. Two invocations of the same skill may produce different outputs. The composition properties hold at the structural level (data flows correctly) but not at the behavioral level (outputs may vary).
+
+2. **Nominal type matching.** Types are strings, not schemas. Two skills using `review_comments` with different expectations compose structurally but may fail semantically. The algebra verifies wiring, not meaning.
+
+3. **No shared state.** The model assumes skills communicate only through their declared I/O contracts. If two skills read the same file (a shared implicit dependency), their outputs may conflict. The DAG captures declared dependencies, not implicit ones.
+
+**Proposition 7 (Structural additivity).** Let A be a well-formed agent and S' = (C', P', F') a skill satisfying:
+- (H1) P' ∉ C(Sᵢ) for all Sᵢ ∈ A — no existing skill consumes S''s output
+- (H2) P' ≠ P(Sⱼ) for all Sⱼ ∈ A — no producer uniqueness violation
+- (H3) P' ∉ C' — no self-loop
+
+If the dependencies of S' are satisfied in A' = A ∪ {S'} (i.e., ∀ t ∈ C': ∃ Sⱼ ∈ A with P(Sⱼ) = t, or t ∈ Cₐ), then:
+1. For every Sᵢ ∈ A, the set of *incoming* edges to Sᵢ in G(A') is identical to that in G(A).
+2. A' is well-formed.
+
+*Proof.*
+
+*Part 1 (Incoming edge preservation).* An incoming edge (Sₓ, Sᵢ) exists iff P(Sₓ) ∈ C(Sᵢ). The only new node is S'. The edge (S', Sᵢ) exists iff P' ∈ C(Sᵢ). By H1, P' ∉ C(Sᵢ) for all existing Sᵢ. Therefore no new incoming edge is created for any existing skill. ✓
+
+Note: *outgoing* edges from existing skills may increase — if P(Sₖ) ∈ C', the edge (Sₖ, S') is created. This does not affect what data Sₖ receives, only who consumes its output.
+
+*Part 2 (Well-formedness of A').*
+
+*Acyclicity.* S' has no outgoing edges to existing nodes (by H1, P' ∉ C(Sᵢ)). Therefore every path through S' terminates at S'. No path from S' can reach any node of A, so no cycle through both S' and nodes of A can exist. By H3, P' ∉ C', so S' has no self-loop. Therefore G(A') is acyclic. ✓
+
+*Contract completeness.* For existing Sᵢ: their inputs are unchanged and their producers are unchanged (no skill was removed). For S': the hypothesis guarantees every t ∈ C' has a producer in A' or t ∈ Cₐ. ✓
+
+*Single responsibility.* P' is a singleton (S' passed the linter). Existing skills are unchanged. ✓
+
+*Producer uniqueness.* By H2, P' ≠ P(Sⱼ) for all existing Sⱼ. So S' produces a type that no other skill produces. ✓
+
+*Output coverage.* Pₐ is unchanged (adding a skill does not modify the agent's declared outputs). Pₐ ⊆ {P(S₁),...,P(Sₙ)} ⊆ {P(S₁),...,P(Sₙ), P'} = {P(S) : S ∈ A'}. ✓ □
+
+*Corollary (Stability of Pₐ under substitution).* If A is well-formed and A' = A[S ↦ S'] satisfies the conditions of Proposition 2 (P(S') = P(S)), then Pₐ(A') = Pₐ(A) — the agent's output set is unchanged by compatible substitution.
+
+**Corollary 7.1 (Monotonicity).** Let A be a well-formed agent and S' any skill. Let A' = A ∪ {S'}. Then every dependency satisfied in A remains satisfied in A': for every Sᵢ ∈ A and every t ∈ C(Sᵢ), if t was produced by some Sⱼ ∈ A or t ∈ Cₐ, the same holds in A'.
+
+*Proof.* A ⊆ A', so every skill Sⱼ ∈ A is also in A'. Cₐ is unchanged. Therefore every producer of t in A is still present in A'. □
+
+Note: monotonicity is *unconditional* — it does not require H1, H2, or H3. It guarantees that existing *dependencies* are preserved, not that A' is well-formed. The new skill may introduce cycles (violating acyclicity) or duplicate producers (violating producer uniqueness).
+
+**Proposition 8 (Existence of a valid schedule).** If A is well-formed, there exists at least one total ordering of the skills that respects all data flow constraints — i.e., every skill is scheduled after all of its predecessors in G(A).
+
+*Proof.* G(A) is a DAG (acyclicity). Every finite DAG admits at least one topological ordering (Kahn's algorithm or DFS-based topological sort). A topological ordering is a valid schedule: if (Sᵢ, Sⱼ) ∈ E(A), then Sᵢ appears before Sⱼ, so Sⱼ's input from Sᵢ is available when Sⱼ executes. □
+
+**Proposition 9 (Cross-target structural isomorphism).** Let T = {t₁, t₂, ...} be the set of build targets (e.g., Claude Code, GitHub Copilot). For each target t, the build function Bₜ maps a well-formed agent specification A to a set of generated artifacts. The structural content of the artifacts is invariant across targets: for any two targets t₁, t₂ and any well-formed specification A, the generated artifacts Bₜ₁(A) and Bₜ₂(A) encode the same data flow graph, the same I/O contracts, and the same skill ordering.
+
+**Definition (Structural extraction).** For any set of generated artifacts Art, the *structural extraction function* φ(Art) = (N, E, C_ext, P_ext) extracts:
+- N = the set of skill names appearing in the artifacts
+- E = {(sᵢ, sⱼ) : sⱼ's artifact references a type produced by sᵢ} — the data flow edges
+- C_ext = the set of types declared as external inputs
+- P_ext = the set of types declared as agent outputs
+
+φ is well-defined because every target generator embeds skill names, consumes/produces declarations, and execution order in a parseable format (Markdown sections with structured headers). The extraction is syntactic, not semantic — it reads declared types, not runtime behavior.
+
+Formally: ∀ t₁, t₂ ∈ T, ∀ A ∈ F_linter: φ(Bₜ₁(A)) = φ(Bₜ₂(A))
+
+*Proof.* Each target generator Bₜ is a template function:
+
+```
+Bₜ(A) = { templateₜ(Sᵢ) : Sᵢ ∈ A } ∪ { agent_templateₜ(A) }
+```
+
+The template varies the *presentation* (file paths, Markdown structure, framework-specific syntax) but interpolates the same *structural data*: skill name, C(Sᵢ), P(Sᵢ), tools, guardrails, and the DAG-derived execution order. No template introduces, removes, or reorders skills. No template modifies the consumes/produces declarations.
+
+Therefore φ extracts the same (N, E, C_ext, P_ext) regardless of target: φ ∘ Bₜ₁ = φ ∘ Bₜ₂. □
+
+*Epistemic status.* This proof is an argument by inspection of the template implementations, not a deduction from axioms. To make it fully formal, one would need to axiomatize the class of "structural-preserving templates" and prove that all implemented generators belong to this class. In practice, the property is verifiable by testing: generate for both targets and compare φ-extractions.
+
+*Consequence.* Cross-target isomorphism justifies the portability claim (section 3): migrating from one framework to another is a change of presentation, not a change of behavior. It also means that well-formedness invariants verified on the specification carry over to all generated artifacts — the linter validates once, and the guarantee holds for every target.
+
+*Limitations.* The isomorphism is *structural*, not *behavioral*. Two targets may interpret the same structural content differently at runtime. For example, Claude Code may enforce `filesystem: read-only` via hooks while GitHub Copilot may ignore it. The structural content is preserved; its enforcement depends on the target framework.
+
+**Build determinism** (implementation contract). The build function is empirically deterministic: same specification → same artifacts across executions. This is an implementation property, not a formal theorem — it depends on the absence of non-deterministic sources (timestamps, RNG, unsorted map iteration) in the generator code. The implementation guards against non-determinism by sorting all map iterations and using a fixed topological sort algorithm with lexicographic tie-breaking on skill names.
+
+**Proposition 10 (Reachability).** In a well-formed agent A, every skill Sᵢ is reachable from the virtual source ⊤ₐ in G(A), and the virtual sink ⊥ₐ is reachable from every skill Sᵢ.
+
+*Proof.*
+
+*Forward reachability (⊤ₐ ⇝ Sᵢ).* Let Sᵢ ∈ A be arbitrary. If C(Sᵢ) ∩ Cₐ ≠ ∅, then an edge (⊤ₐ, Sᵢ) exists and Sᵢ is directly reachable. Otherwise, every t ∈ C(Sᵢ) is produced by some Sⱼ ∈ A (contract completeness), giving an edge (Sⱼ, Sᵢ). Apply the same argument to Sⱼ. This backward walk terminates because G(A) is acyclic — the walk visits strictly earlier nodes in any topological order. It must reach a skill Sₖ with C(Sₖ) ∩ Cₐ ≠ ∅ or C(Sₖ) = ∅ (a source skill, reachable from ⊤ₐ by convention). ✓
+
+*Backward reachability (Sᵢ ⇝ ⊥ₐ).* By the no-dead-skills invariant, every skill Sᵢ satisfies: (a) P(Sᵢ) ∈ Pₐ, giving an edge (Sᵢ, ⊥ₐ) directly; or (b) ∃ Sⱼ with P(Sᵢ) ∈ C(Sⱼ), giving an edge (Sᵢ, Sⱼ). In case (b), apply the same argument to Sⱼ. This forward walk terminates by acyclicity and must reach a skill Sₘ with P(Sₘ) ∈ Pₐ. Therefore Sᵢ → ... → Sₘ → ⊥ₐ. ✓ □
+
+*Consequence.* Reachability means G(A) is connected in the strong sense: every skill lies on at least one directed path from ⊤ₐ to ⊥ₐ. There are no isolated subgraphs and no dangling branches — the structural analogue of "no dead code."
+
+**Corollary 3.1 (Layer decomposition).** Let A be a well-formed agent. Define the *layer* of a skill Sᵢ as:
+
+```
+layer(Sᵢ) = length of the longest directed path from ⊤ₐ to Sᵢ in G(A)
+```
+
+The skills of A admit a unique partition into layers L₀, L₁, ..., Lₖ where Lⱼ = {Sᵢ : layer(Sᵢ) = j}. Two skills in the same layer are pairwise independent (no directed path between them).
+
+*Proof.* The partition exists and is unique because `layer` is a well-defined function — Proposition 10 guarantees every skill is reachable from ⊤ₐ, so the longest-path distance is finite; acyclicity bounds it by n.
+
+Suppose for contradiction that Sₐ, Sᵦ ∈ Lⱼ and there is a directed path Sₐ → ... → Sᵦ of length ≥ 1. Let π be a longest path from ⊤ₐ to Sₐ (of length j). Then π extended by Sₐ → ... → Sᵦ is a path from ⊤ₐ to Sᵦ of length ≥ j + 1 > j, contradicting layer(Sᵦ) = j.
+
+The decomposition is computable in O(n + |E|) time by topological traversal. □
+
+*Relationship to P3.* Proposition 3 states that independent skills can be scheduled concurrently. Corollary 3.1 strengthens this: the maximal independent groups form a canonical layered structure. The `parallel` and `parallel-then-merge` orchestration strategies correspond directly to this layer decomposition — each layer is a parallel batch, and layers execute sequentially.
+
+**Corollary 3.2 (Dilworth width and maximum parallelism).** The *width* of G(A) — the size of the largest antichain — equals max₀≤j≤k |Lⱼ|. By Dilworth's theorem, this also equals the minimum number of chains (sequential paths) needed to cover all skills.
+
+*Proof.* Each layer Lⱼ is an antichain (Corollary 3.1). For any antichain Q, if it contained skills from different layers Lᵢ and Lⱼ with i < j, the presence of a path between them would contradict independence. Therefore every antichain is contained within a single layer, and the largest antichain is the largest layer: width = max |Lⱼ|. □
+
+*Consequence.* The width is the **maximum degree of parallelism** — the maximum number of skills that can execute simultaneously. An agent with width 1 is inherently sequential; an agent with width n has n skills that can run in a single parallel batch at the widest point.
+
+**Proposition 11 (Skill fusion).** Let A be a well-formed agent containing skills S₁ and S₂ such that:
+- (F1) P(S₁) ∈ C(S₂) — S₂ consumes S₁'s output
+- (F2) P(S₁) ∉ C(Sⱼ) for all Sⱼ ∈ A with Sⱼ ≠ S₂ — no other skill consumes S₁'s output
+- (F3) P(S₁) ∉ Pₐ — S₁'s output is not an agent-level output
+
+Then the *fused skill* S₁₂ = (C(S₁) ∪ (C(S₂) \ {P(S₁)}), P(S₂), F₁₂) can replace S₁ and S₂ in A, yielding A' = (A \ {S₁, S₂}) ∪ {S₁₂}, and A' is well-formed.
+
+*Proof.* We verify each well-formedness invariant.
+
+*Acyclicity.* G(A') is obtained from G(A) by contracting the edge (S₁, S₂). By F2 and F3, S₁ had no outgoing edges except (S₁, S₂). Edge contraction in a DAG preserves acyclicity: any cycle in the contracted graph would imply a cycle in the original. ✓
+
+*Contract completeness.* For S₁₂: every t ∈ C(S₁₂) = C(S₁) ∪ (C(S₂) \ {P(S₁)}) was consumed by S₁ or S₂ in A and had a producer there. That producer remains in A'. For other skills Sⱼ: if Sⱼ consumed P(S₂), S₁₂ still produces it. No skill consumed P(S₁) except S₂ (by F2). ✓
+
+*Single responsibility.* S₁₂ produces P(S₂), a singleton. ✓
+
+*Producer uniqueness.* S₁₂ produces P(S₂), the same type S₂ produced. P(S₁) is now internal — no longer a produced type in A'. ✓
+
+*Output coverage.* P(S₁) ∉ Pₐ (by F3), so removing S₁ as a producer doesn't affect coverage. S₁₂ still produces P(S₂). ✓
+
+*No dead skills.* S₁₂ produces P(S₂). Since S₂ was not dead in A, either P(S₂) ∈ Pₐ or some skill consumed P(S₂). The same holds for S₁₂. ✓
+
+*No dead inputs.* C(S₁₂) ⊇ C(S₁), so external inputs consumed by S₁ are preserved. C(S₂) \ {P(S₁)} ⊆ C(S₁₂), so external inputs consumed by S₂ are preserved. ✓ □
+
+*Consequence.* Fusion is the converse of Single Responsibility decomposition: if an intermediate type is consumed by exactly one downstream skill and is not an agent output, the two skills can be merged. This is the structural analogue of *inlining* a private function called from exactly one site.
+
+*Limitation.* Fusion is structural — it merges I/O contracts but says nothing about merging behavioral facets. Combining two prompts may introduce responsibility overload or conflicting guardrails. Fusion preserves *well-formedness* but may degrade *design quality*. The `score` command can detect this regression.
+
+**Proposition dependency table.** The table below summarizes which well-formedness invariants each proposition depends on:
+
+| Proposition | Depends on |
+|-------------|-----------|
+| **P1** (Decidability) | Definitions only |
+| **P2** (Compatible substitution) | Acyclicity, contract completeness, SRP, producer uniqueness |
+| **P3** (Parallelizability) | Acyclicity, contract completeness |
+| **P4** (Resolution completeness) | Contract completeness, producer uniqueness |
+| **P5** (Output immutability) | Execution axiom (write-once) |
+| **P6** (Acyclic resolution) | Acyclicity |
+| **P7** (Structural additivity) | Acyclicity, contract completeness, SRP, producer uniqueness, output coverage (under H1–H3) |
+| **P8** (Valid schedule existence) | Acyclicity |
+| **P9** (Cross-target isomorphism) | Definitions only |
+| **P10** (Reachability) | Acyclicity, contract completeness, no dead skills |
+| **Cor. 3.1** (Layer decomposition) | Acyclicity, contract completeness, no dead skills (via P10) |
+| **Cor. 3.2** (Dilworth width) | Acyclicity, contract completeness, no dead skills (via Cor. 3.1) |
+| **P11** (Skill fusion) | Acyclicity, contract completeness, SRP, producer uniqueness, output coverage, no dead skills (under F1–F3) |
+
+Acyclicity is the most-used invariant — it appears in every proposition except P1, P4, P5, and P9. Contract completeness is the second most-used, appearing whenever a proof traces data flow backward through the graph.
 
 ### 4.5 Linter Soundness
 
-The linter is *sound* with respect to structural properties: when it reports no diagnostics, certain classes of defects are guaranteed absent.
+The linter is *sound* with respect to structural properties: when it reports no diagnostics, certain classes of defects are guaranteed absent. This claim is straightforward — it follows directly from the linter's construction — but stating it explicitly clarifies the boundary between what is verified and what is not.
 
-**Theorem (Structural Soundness).** If `forgent lint` and `forgent doctor` report no diagnostics for an agent A = (S₁, ..., Sₙ, Cₐ, Pₐ, σ), then:
+**Structural soundness (by construction).** If the linter and diagnostic checker report no diagnostics for an agent A = (S₁, ..., Sₙ, Cₐ, Pₐ, σ), then all five well-formedness invariants of section 4.2 hold:
 
 1. **I/O completeness.** For every skill Sᵢ ∈ A, for every type t ∈ C(Sᵢ), either there exists Sⱼ ∈ A such that P(Sⱼ) = t, or t ∈ Cₐ. Every skill's inputs are satisfied.
 
@@ -462,7 +665,11 @@ The linter is *sound* with respect to structural properties: when it reports no 
 
 3. **Single responsibility.** For every skill Sᵢ ∈ A, Sᵢ produces exactly one type. No skill is a merged responsibility.
 
-The proof follows from construction: the linter explicitly checks each property and reports a diagnostic for any violation. If no diagnostic is reported, no violation exists.
+4. **Producer uniqueness.** For every type t produced in A, at most one skill produces it. Data flow resolution is unambiguous.
+
+5. **Output coverage.** For every type t ∈ Pₐ, there exists Sᵢ ∈ A such that P(Sᵢ) = t. Every declared agent output is produced by some skill.
+
+This holds because the linter explicitly checks each property and reports a diagnostic for any violation. The claim is analogous to stating that a type checker that verifies property P guarantees P when it succeeds — true by construction, but useful for delineating the guarantee boundary.
 
 **What soundness does not guarantee.** The following properties are explicitly outside the scope of structural soundness:
 
@@ -478,23 +685,251 @@ The proof follows from construction: the linter explicitly checks each property 
 
 The relationship between soundness and completeness mirrors that of traditional type systems: soundness is a hard guarantee (no false negatives for checked properties), while completeness is an engineering trade-off (some defects are not checked).
 
+### 4.6 Data Flow Protocol
+
+The composition algebra (section 4.4) specifies *what data flows where* — which skills produce and consume which types. This section specifies *how the data travels* — the concrete mechanism by which a skill's output reaches its consumers.
+
+**The problem.** In current practice, data flow between skills is implicit: the LLM's context window carries everything. When `tdd-runner` produces `test_results` and `review-commenter` consumes it, the mechanism is that both run within the same conversation and the LLM retains prior output. This has three deficiencies:
+
+1. **No isolation.** All skills share one context window. A skill can access data it does not declare in `consumes`, violating the explicit dependency model.
+2. **No efficiency.** The full output of every skill persists in the context, even for consumers that need only a subset. For large outputs (coverage reports, full test logs), this wastes context budget.
+3. **No cross-boundary flow.** Data cannot flow between agents or between invocations without ad-hoc file sharing.
+
+**Definition (Skill URI).** A *skill URI* is a reference to a skill's output:
+
+```
+skill://<skill_name>/<type_name>[?invocation=<id>]
+```
+
+A second URI scheme handles external inputs (types in Cₐ):
+
+```
+input://<type_name>
+```
+
+Examples:
+- `skill://tdd-runner/test_results` — the output of `tdd-runner` from the current invocation
+- `skill://tdd-runner/test_results?invocation=abc123` — a specific historical invocation
+- `skill://ci-reviewer/review_comments` — an agent-level output (for cross-agent flow)
+- `input://git_diff` — an external input provided to the agent
+
+When a skill declares `consumes: [test_results]`, the runtime resolves this to `skill://tdd-runner/test_results` — the skill within the same agent whose `produces` matches the consumed type. Resolution is deterministic because contract completeness (section 4.2) guarantees a producer exists, and producer uniqueness (section 4.2) guarantees it is the only one.
+
+**Resolution strategies.** A *resolver* R maps a skill URI to the actual data. Three strategies are defined:
+
+| Resolver | Mechanism | Trade-off |
+|----------|-----------|-----------|
+| **Context** | Data is present in the LLM's active context window | Zero-latency but no isolation. Default for conversational agents. |
+| **File** | Output is written to `<base>/<skill_name>/<type_name>.md` and the URI resolves to a file read | Isolation and persistence, but requires filesystem access. Suited for CI pipelines. |
+| **API** | Output is fetched via MCP tool call or HTTP endpoint | Full isolation and cross-agent support, but adds network latency. Suited for distributed systems. |
+
+The build step selects the resolver based on the target framework. For Claude Code (conversational agent), the default is `context`. For CI environments, `file` is preferred. For multi-agent deployments (section 6.4), `api` enables cross-boundary resolution.
+
+**YAML extension.** A `data_flow` field in the agent specification declares the protocol:
+
+```yaml
+agent: ci-reviewer
+data_flow:
+  resolver: file
+  base_path: .forgent/outputs/
+  format: markdown
+```
+
+Skills can also declare output hints:
+
+```yaml
+skill: coverage-reporter
+produces: [coverage_report]
+output:
+  size_hint: large       # signals the resolver to prefer file over context
+  retention: invocation  # discard after invocation ends
+```
+
+**Formal properties.**
+
+**Proposition 4 (Resolution completeness and determinism).** If agent A is well-formed, then every skill URI generated by the runtime is resolvable, and the resolution is deterministic (each URI maps to exactly one producer).
+
+*Proof.* A consumer Sⱼ with t ∈ C(Sⱼ) generates a URI. Two cases:
+- If t is produced internally: the URI is `skill://Sᵢ/t` where P(Sᵢ) = t. Contract completeness guarantees such Sᵢ exists. Producer uniqueness guarantees it is the only one. Resolution is deterministic.
+- If t ∈ Cₐ: the URI is `input://t`, which resolves to the agent's external input.
+
+The resolver R maps each URI to actual data (via context, file, or API). Proposition 4 guarantees *structural* resolvability — the URI designates a valid, unambiguous producer. *Effective* resolvability (the data is accessible at runtime) depends on the resolver implementation, which is outside the formal model. □
+
+Note: Proposition 4 combines contract completeness and producer uniqueness applied to the URI scheme. Its value is not a new theorem but the explicit guarantee that the URI abstraction layer preserves the structural properties of section 4.2.
+
+**Execution model (axiom).** Each URI `skill://S/t` receives at most one write during an invocation.
+
+This is the *minimal* axiom required for Proposition 5. It is weaker than requiring topological execution or single execution per skill — it permits lazy evaluation, retry strategies, and caching, as long as the resolver guarantees write-once semantics per URI. Under a strict topological execution model, this axiom is derivable: acyclicity ensures each skill is visited once, and producer uniqueness ensures no other skill writes to the same URI. The axiom is stated explicitly to support resolver implementations that may deviate from strict topological execution.
+
+**Proposition 5 (Immutability).** Under the execution model axiom, a skill's output is immutable within a single invocation: once `skill://S/t` is written, its value does not change.
+
+*Proof.* The axiom guarantees at most one write per URI. Therefore, once `skill://S/t` is written, no subsequent write occurs — the value is stable for the remainder of the invocation. □
+
+*Consequence.* Immutability guarantees that parallel consumers of the same URI receive consistent data — no race conditions, no dirty reads.
+
+**Proposition 6 (Acyclic resolution).** URI resolution cannot produce cycles: no skill URI's resolution transitively depends on the consumer's own output.
+
+*Proof.* Resolving `skill://Sᵢ/t` for consumer Sⱼ traces the reverse of edge (Sᵢ, Sⱼ) in G(A). Sᵢ may in turn resolve URIs from its own producers, tracing further upstream along reverse edges. Since G(A) is acyclic, its reverse is also acyclic. The resolution chain is finite and cycle-free. □
+
+Note: Proposition 6 is a direct consequence of the acyclicity invariant (section 4.2) applied to the reverse graph. Its value is making explicit that the URI resolution mechanism inherits the DAG's structural guarantee.
+
+### 4.7 Petri Net Correspondence
+
+The data flow graph G(A) admits a natural interpretation as a Petri net. This correspondence is not deep — it follows mechanically from the definitions — but it connects the Skill Behavior Model to a mature body of theory and tooling for concurrent systems.
+
+**Definition (Petri net image).** Given an agent A = (S₁, ..., Sₙ, Cₐ, Pₐ, σ), define the Petri net N(A) = (P, Tr, F⁻, F⁺, M₀) as follows:
+
+| Skill Model | Petri Net |
+|---|---|
+| Type t ∈ T | Place pₜ |
+| Skill Sᵢ | Transition trᵢ |
+| t ∈ C(Sᵢ) | Input arc (pₜ, trᵢ) ∈ F⁻ |
+| P(Sᵢ) = t | Output arc (trᵢ, pₜ) ∈ F⁺ |
+| t ∈ Cₐ | M₀(pₜ) = 1 |
+| t ∉ Cₐ | M₀(pₜ) = 0 |
+
+All arc weights are 1. The virtual source ⊤ₐ and sink ⊥ₐ are not represented explicitly — the initial marking and the identification of output places (those corresponding to Pₐ) serve their roles.
+
+**Property transfer.** The well-formedness invariants impose strong structural constraints on N(A):
+
+- **Producer uniqueness** guarantees each place has at most one incoming transition. Combined with SRP (each transition produces one output), the net is a *marked graph* — a restrictive and well-understood subclass.
+
+- **Acyclicity** of G(A) makes N(A) an *acyclic* net. This rules out feedback and iteration, and makes reachability, liveness, and boundedness decidable in polynomial time.
+
+- **Write-once semantics (P5)** — each place receives at most one token — makes N(A) *1-safe* (1-bounded). Since the net is also acyclic, this follows automatically.
+
+- **Contract completeness** ensures every transition is *eventually enabled*: all input places receive tokens.
+
+- **A valid schedule (P8)** corresponds to a *firing sequence* that fires every transition exactly once.
+
+In short, N(A) is an acyclic, 1-safe marked graph in which every transition fires exactly once. This is a nearly trivial class of Petri net — and that is the point. The well-formedness invariants constrain the model tightly enough that the corresponding net is always well-behaved.
+
+**Connection to linear logic.** The consume-and-produce discipline mirrors the resource semantics of linear logic. Types are linear propositions; a skill with C(Sᵢ) = {t₁, ..., tₖ} and P(Sᵢ) = t corresponds to the sequent t₁ ⊗ ... ⊗ tₖ ⊢ t, where ⊗ is the multiplicative conjunction (tensor). Composing skills whose output and input share a type is the cut rule. The write-once invariant is the no-contraction property: resources cannot be duplicated. This connection suggests the model could be given a type-theoretic foundation in which well-formedness is enforced by the type system itself.
+
+**Connection to Kahn Process Networks.** If we relax the single-invocation assumption and allow skills to execute repeatedly over streams, N(A) becomes a Kahn Process Network (KPN): deterministic sequential processes over unbounded FIFO channels. The KPN determinism property — the network's I/O function is independent of scheduling — follows from the same structural constraints (no shared state, single producer per channel). This suggests an extension path toward streaming and reactive agent architectures.
+
+**Practical implications.** Mature Petri net tools — invariant computation, reachability graphs, structural reduction — can be applied directly to N(A). For well-formed agents the analysis is trivially fast, but the tools become useful at the *diagnostic* stage: when an agent fails a well-formedness check, computing its S-invariants can localize defects (uncovered places, dead transitions) more precisely than the syntactic checks of section 4.5 alone.
+
+### 4.8 Execution Purity
+
+A skill specification declares not only *what* a skill computes but *what it needs* to compute it. This section formalizes the principle that a skill should execute in an environment containing exactly its declared requirements — no more, no less.
+
+**Definition (Execution environment).** For a skill S = (C, P, F) within agent A, the *execution environment* of S is:
+
+```
+Env(S) = (D, Π, G)
+```
+
+where:
+
+- D = {resolved(t) : t ∈ C(S)} — the data visible to S, obtained by resolving each consumed type through the data flow protocol (section 4.6)
+- Π = F.security — the permission set (filesystem access, network access, secrets)
+- G = F.guardrails — the constraint set (timeout, limits, behavioral constraints)
+
+An execution is *pure* if S can access exactly D, exercises at most Π, and is bounded by G.
+
+**Proposition 12 (Isolation).** Let S ∈ A be a skill whose consumed types are resolved via a non-shared resolver (file or api). Then the data accessible to S during execution is exactly D = {resolved(t) : t ∈ C(S)}. For any type t' ∉ C(S), the resolved value resolved(t') is inaccessible to S.
+
+*Proof.* Under the file resolver, each type t is materialized to a distinct path and S receives only the paths corresponding to C(S). Under the api resolver, S receives a scoped endpoint exposing only its declared inputs. In neither case does S obtain a reference to data outside C(S). □
+
+*Caveat.* Proposition 12 fails under the *context* resolver. Because all context-resolved types share the LLM's context window, a skill can attend to data produced for a sibling skill. This is a deliberate trade-off: the context resolver optimizes for simplicity and low latency at the cost of isolation. Systems requiring strict purity must use file or api resolution.
+
+**Proposition 13 (Environment containment).** For every skill S in a well-formed agent A: Π(S) ⊆ Π(A). A skill cannot declare permissions exceeding those of its containing agent.
+
+*Proof.* Π(A) is the union of all permissions the agent is authorized to exercise. A skill with Π(S) ⊄ Π(A) would require the runtime to grant capabilities the agent itself does not possess. The linter rejects such specifications as ill-formed. □
+
+**Proposition 14 (Parallel independence).** If S₁ ⊗ S₂ (parallel execution), then Env(S₁) and Env(S₂) share no mutable state. Their write targets are disjoint.
+
+*Proof.* By producer uniqueness, P(S₁) ≠ P(S₂), so each skill writes to a distinct output type. By the write-once axiom, each output URI receives at most one write. Their input sets D₁ and D₂ may overlap, but overlapping inputs are read-only references, not mutable state. □
+
+**Observation (Environment determinism).** For a well-formed agent A and skill S ∈ A, Env(S) is fully determined by the specification and the resolved input values. Two executions of S with identical inputs receive identical environments. The LLM's output may vary, but the environment is fixed.
+
+**Observation (Non-escalation).** The guardrails set G is monotonically restrictive: adding a constraint to G can only narrow the set of permitted behaviors, never expand it. If G' ⊃ G, then the set of executions satisfying G' is a subset of those satisfying G.
+
+**Observation (Static verifiability).** The linter can verify coherence of Env(S) before execution: every type in C(S) has a producer in G(A), and Π(S) ⊆ Π(A). No runtime information is required.
+
+#### 4.8.1 Worktree Isolation Model
+
+The pure execution environment Env(S) describes *what* a skill should see. When skills have side effects on the filesystem — modifying source files, not just producing typed data — a concrete isolation mechanism is needed. Git worktrees provide one.
+
+**Definition (Worktree execution).** For a skill Sᵢ executing within agent A:
+
+```
+Exec(Sᵢ) :
+  1. Wᵢ ← git worktree create (ephemeral branch from HEAD)
+  2. Sᵢ executes in Wᵢ with Env(Sᵢ) = (D, Π, G)
+  3. P(Sᵢ) ← extract output from Wᵢ (structured data or diff)
+  4. Merge Wᵢ → main working tree
+  5. git worktree remove Wᵢ
+```
+
+Each skill operates in its own filesystem copy. The worktree is ephemeral — created before execution, destroyed after merge. Rollback is trivial: `git worktree remove` discards all changes.
+
+**Definition (Write set).** The *write set* of a skill S, denoted W(S) ⊆ Files, is the set of filesystem paths that S may modify during execution. This extends the security facet:
+
+```yaml
+security:
+  filesystem: read-write
+  write_set: ["src/**/*.go", "tests/**/*.go"]
+```
+
+**Merge strategies.** When multiple worktrees must be reconciled, three strategies form a safety spectrum:
+
+| Strategy | Precondition | Guarantee | Mechanism |
+|----------|-------------|-----------|-----------|
+| **Disjoint write sets** | W(S₁) ∩ W(S₂) = ∅ | Conflict-free, commutative | Independent patches, any merge order |
+| **Three-way merge** | None required | Best-effort | Git three-way merge; non-overlapping hunks merge automatically, overlapping hunks fail |
+| **Sequential fallback** | None required | Always safe | Skills execute in topological order; each sees predecessor's results |
+
+**Proposition 15 (Conflict-free parallel merge).** If S₁ ⊗ S₂ and W(S₁) ∩ W(S₂) = ∅, then merging their worktrees W₁ and W₂ into the main working tree is conflict-free and commutative: merge(W₁, W₂) = merge(W₂, W₁).
+
+*Proof.* Both worktrees branch from the same HEAD. Each modifies a disjoint subset of files. A three-way merge between HEAD, W₁, and W₂ applies non-overlapping hunks — since the modified file sets are disjoint, every hunk is non-overlapping. The merge result is independent of the order in which W₁ and W₂ are merged. □
+
+**Automatic degradation.** The scheduler can use write sets to choose the orchestration strategy automatically:
+
+```
+If W(S₁) ∩ W(S₂) = ∅  →  parallel execution (merge guaranteed)
+If W(S₁) ∩ W(S₂) ≠ ∅  →  sequential fallback (always safe)
+```
+
+This connects to the existing `negotiation` facet: `file_conflicts: yield` indicates a skill that accepts sequential demotion when write sets overlap. The write set makes the negotiation *static* — the scheduler resolves conflicts before execution, not during.
+
+**Container-based isolation.** Worktrees isolate the filesystem but not the network or process space. For full isolation, the execution environment can be a container:
+
+```yaml
+security:
+  filesystem: read-write
+  write_set: ["src/**/*.go"]
+  sandbox: container          # ← L3 enforcement
+```
+
+The container receives: (1) a mounted volume with only the files in W(S) ∪ {resolved files for C(S)}, (2) network access per Π(S), (3) resource limits per G (CPU, memory, timeout). This maps directly to the L3 enforcement layer of section 6.3. The LLM CLI (Claude Code, Copilot CLI, etc.) runs inside the container with exactly Env(S) — nothing more.
+
+**Enforcement reality.** The table below maps purity properties to enforcement mechanisms:
+
+| Layer | Isolation (P12) | Containment (P13) | Independence (P14) | Write set |
+|-------|------------------|--------------------|---------------------|-----------|
+| L1 — Generated prompt | Aspirational | Statically checked | Structural (by spec) | Declared only |
+| L2 — Framework hooks | Partial | Partial | Structural | Hook-enforced |
+| L3 — Worktree/Container | **Enforced** | **Enforced** | **Enforced** | **Enforced** |
+| L4 — Guardrails runtime | Enforced + G | Enforced + G | Enforced + G | Enforced + G |
+
+At L1, purity is specification discipline: the generated prompt instructs the LLM to respect boundaries, but nothing prevents violation. At L3 (worktrees or containers), the runtime actively constrains the execution environment to match Env(S), closing the gap between declared and actual purity.
+
 ---
 
 ## 5. Design Rationale
 
-The Skill Behavior Model applies established software design principles to agent engineering.
+The model's design choices map to established software engineering principles. This section names those connections; the mechanisms themselves are defined in sections 2–4.
 
-**Single Responsibility Principle.** Each skill produces exactly one output. This is enforced as a linter rule rather than a schema constraint — a skill with `produces: [lint_results, type_errors]` will parse but will be flagged as a violation. The rule forces decomposition: one `pr-reviewer` producing two outputs becomes two skills — `review-commenter` and `risk-scorer` — each testable and reusable independently.
-
-**Explicit dependency injection.** A skill has no ambient access to shared state — its only inputs are what it explicitly declares in its `consumes` contract [5]. Data flow between skills is inferred from their `consumes`/`produces` interfaces and validated by the linter. No global state, no shared context outside the declared contract. The data flow graph is fully explicit and statically analyzable.
-
-**Composition over Inheritance.** Agents are flat lists of skills — no "base agents", no inheritance, no override mechanisms. Behavior is assembled, not specialized. This eliminates the fragile base class problem: changing a skill affects only agents that explicitly include it.
-
-**Tell, Don't Ask.** Skills declare what they produce. The framework reads the declarations and routes data [6]. No skill queries another skill's state — skills are decoupled from each other and only know their own contract.
-
-**LLM Attention Optimization.** Generated output orders sections to exploit primacy and recency biases [7][8]. Guardrails go first (primacy), security goes last (recency). This is a generation concern — the YAML format is unordered, the generated artifacts are deliberately structured.
-
-**Framework Independence.** Tool names are abstract behavioral capabilities. The mapping to concrete APIs happens at generation time. Skill authors never write framework-specific code; framework migrations are zero-cost at the specification level.
+| Principle | Application in the model |
+|-----------|-------------------------|
+| **Single Responsibility** [4] | One output per skill (`\|P(S)\| = 1`). The linter enforces this as a rule, not a schema constraint. |
+| **Explicit dependency injection** [5] | Skills have no ambient access — only declared `consumes`. Data flow is inferred from contracts and validated statically. |
+| **Composition over inheritance** | Agents are flat skill lists. No "base agent" pattern, no override mechanism. Changing a skill affects only agents that include it. |
+| **Tell, Don't Ask** [6] | Skills declare outputs. The framework routes data. No skill queries another's state. |
+| **Attention optimization** [7][8] | Generated output orders sections for LLM primacy/recency biases: guardrails first, security last. |
+| **Framework independence** | Tool names are abstract capabilities. Mapping to concrete APIs happens at generation time. |
 
 ---
 
@@ -535,14 +970,14 @@ testing:
       - "No false positives on style-only changes"
 ```
 
-The command `forgent test [path]` would run all three levels and report pass/fail per skill. The `tolerance` field controls how golden tests compare outputs: `exact` requires identical strings, `fuzzy` allows minor formatting differences, and `semantic` uses an LLM to judge semantic equivalence.
+A `test` command would run all three levels and report pass/fail per skill. The `tolerance` field controls how golden tests compare outputs: `exact` requires identical strings, `fuzzy` allows minor formatting differences, and `semantic` uses an LLM to judge semantic equivalence.
 
 Two established metrics from the evaluation literature apply directly:
 
 - **pass@k** [22] — the probability that at least one of k invocations produces a correct output. Measures capability.
 - **pass^k** — the probability that all k invocations produce correct output. Measures consistency. A skill with high pass@k but low pass^k is capable but unreliable.
 
-SkillsBench [23] — a benchmark evaluating skill efficacy across 84 tasks and 11 domains — provides external validation for several intuitions underlying the Skill Behavior Model. Its key findings:
+SkillsBench [23] — a benchmark evaluating skill efficacy across 84 tasks and 11 domains — provides external evidence relevant to the Skill Behavior Model's design choices. **Important caveat:** SkillsBench defines "skills" as atomic LLM capabilities (tool use, planning, retrieval), not as declarative YAML behavioral units. The findings below are analogies, not direct validations — they support the *intuition* that structured decomposition improves agent performance, but they test a different notion of "skill" than the one defined in this paper. Key findings:
 
 1. **2–3 skills is optimal.** Agents with 2–3 skills outperformed those with 4+ skills (+18.6pp vs +5.9pp gain). This aligns with the model's emphasis on atomic, single-responsibility skills composed into small pipelines.
 
@@ -552,9 +987,9 @@ SkillsBench [23] — a benchmark evaluating skill efficacy across 84 tasks and 1
 
 ### 6.2 Skill Ecosystem and Marketplace
 
-Skills are designed to be reusable (section 7.1), but the reference tooling provides no mechanism for sharing them beyond copy-paste. A skill ecosystem requires three capabilities: distribution, versioning, and trust.
+Skills are designed to be reusable (section 7.1), but sharing them beyond copy-paste requires additional infrastructure. A skill ecosystem requires three capabilities: distribution, versioning, and trust.
 
-**Distribution.** A skill registry — centralized (like npm) or federated (like Go modules resolving from Git) — would allow `forgent install user/review-commenter@1.2` to fetch a skill and its transitive dependencies. The `forgent import` pipeline already resolves skills from remote sources (Vercel skill resolver); a registry generalizes this pattern.
+**Distribution.** A skill registry — centralized (like npm) or federated (like Go modules resolving from Git) — would allow commands like `install user/review-commenter@1.2` to fetch a skill and its transitive dependencies. An import pipeline that resolves skills from remote sources provides the pattern; a registry generalizes it.
 
 **Semantic versioning.** The I/O contract (`consumes`/`produces`) *is* the skill's public API. A breaking change is any change that modifies the contract:
 
@@ -564,7 +999,7 @@ Skills are designed to be reusable (section 7.1), but the reference tooling prov
 
 This maps to the Liskov Substitution Principle [4]: a new version of a skill is substitutable for the old if `consumes(v2) ⊆ consumes(v1)` (contravariance of inputs) and `produces(v2) = produces(v1)` (invariance of output). Semantic version numbers can be derived mechanically from the I/O diff between versions — no human judgment required.
 
-**Trust and curation.** Published skills carry quality signals: `forgent score` rating, passing `forgent test` results, author verification, and usage statistics. The scoring algorithm (section 7.3) already evaluates structural quality; extending it to include test coverage and reuse frequency is straightforward.
+**Trust and curation.** Published skills carry quality signals: structural quality scores, passing behavioral tests, author verification, and usage statistics. The scoring algorithm (section 7.3) evaluates structural quality; extending it to include test coverage and reuse frequency is straightforward.
 
 The analogy is npm for agent behaviors — but with a critical difference. JavaScript packages have complex dependency trees that create supply chain risk. Skill dependencies are shallow: a skill declares what it consumes, not which other skill provides it. The agent resolves the data flow, not the skill. This means skill "dependency trees" are at most one level deep, eliminating the cascading version conflict problem that plagues package ecosystems.
 
@@ -579,7 +1014,7 @@ The security facet (`filesystem: read-only`, `network: none`) and guardrails (`t
 A skill declaring `security: filesystem: read-only` would generate:
 
 ```jsonc
-// .claude/settings.json (generated by forgent build)
+// .claude/settings.json (generated by the build step)
 {
   "hooks": {
     "pre_tool_call": [{
@@ -627,7 +1062,7 @@ The Skill Behavior Model defines behavior within a single agent (section 7.4). C
 - **Priority arbitration** — when two agents attempt conflicting actions, the higher-priority agent proceeds
 - **Delegation** — an agent can defer a sub-task to another agent by emitting a `delegate:<agent_name>` output
 
-**A2A bridge.** The Agent2Agent protocol [11] defines "Agent Cards" — JSON documents describing an agent's capabilities, authentication, and endpoints. An agent's I/O contract could generate an A2A Agent Card, allowing Forgent agents to participate in A2A discovery and coordination networks. The mapping is straightforward: `produces` → Agent Card capabilities, `consumes` → required input context, `security` → trust and access metadata.
+**A2A bridge.** The Agent2Agent protocol [11] defines "Agent Cards" — JSON documents describing an agent's capabilities, authentication, and endpoints. An agent's I/O contract could generate an A2A Agent Card, allowing agents defined in this model to participate in A2A discovery and coordination networks. The mapping is straightforward: `produces` → Agent Card capabilities, `consumes` → required input context, `security` → trust and access metadata.
 
 These directions extend the model's compositional philosophy from intra-agent to inter-agent: the same principles — explicit contracts, static validation, composition over inheritance — apply at both scales.
 
@@ -675,7 +1110,7 @@ The Skill Behavior Model has the following known limitations and scope boundarie
 
 ### 7.5 Empirical Evaluation
 
-*This section reports preliminary measurements comparing a composed agent (built from Forgent skill specifications) against its monolithic equivalent. The results are from a single agent type (CI review) on a small task set. They illustrate the model's properties, not its generalizability.*
+*This section reports preliminary measurements comparing a composed agent (built from skill specifications) against its monolithic equivalent. The results are from a single agent type (CI review) on a small task set. They illustrate the model's properties, not its generalizability.*
 
 **Setup.** The `ci-reviewer` agent (6 skills: `ts-linter`, `type-checker`, `tdd-runner`, `coverage-reporter`, `review-commenter`, `risk-scorer`) was compared against a monolithic prompt performing the same tasks. Both were generated for the Claude Code target and evaluated on the same set of code review tasks.
 
@@ -783,7 +1218,7 @@ These specifications answer different questions about agent systems:
 
 **ADL** [13] (Agent Description Language) is a declarative DSL for chatbot agents with typed slots and dialogue flows. It shares the goal of replacing free-form prompts with structured specifications, but targets conversational agents rather than coding agents. The Skill Behavior Model focuses on tool-using skills with I/O contracts rather than dialogue management.
 
-**SkillsBench** [23] is a community-driven benchmark evaluating skill efficacy across 84 tasks and 11 domains. It tests whether structured skills improve agent performance compared to vanilla (skill-less) invocations. Its findings — that 2–3 skills are optimal, that self-generated skills provide negligible benefit, and that smaller models with skills can outperform larger models without — provide empirical support for the Skill Behavior Model's design choices. The benchmark evaluates *skill utility*; the Skill Behavior Model defines *skill structure*. The two are complementary: SkillsBench measures whether skills help, the Skill Behavior Model specifies how to write them.
+**SkillsBench** [23] benchmarks skill efficacy across 84 tasks and 11 domains. Its "skills" are atomic LLM capabilities (tool use, planning, retrieval) — a different notion than the declarative behavioral units defined in this paper. Despite this distinction, SkillsBench's structural findings — that 2–3 skills compose optimally, that self-generated skills underperform designed ones, and that structure compensates for model size — provide indirect support for the Skill Behavior Model's design intuitions. The relationship is analogical, not validating.
 
 **Communication protocols** (MCP, A2A, ACP) [10][11] define how agents discover each other, negotiate, and exchange messages. The Skill Behavior Model defines what each agent does internally. They operate at different layers and are composable: skills define behavior, protocols define communication.
 
@@ -793,11 +1228,11 @@ These specifications answer different questions about agent systems:
 
 The Skill Behavior Model brings to agent engineering what interfaces and design principles brought to software engineering: structured decomposition, explicit contracts, and static validation. Each skill is a single-responsibility unit with a declared I/O contract. Agents are flat compositions of skills. The format is framework-agnostic, LLM-agnostic, and statically validatable.
 
-Section 4 formalizes these properties: skills compose as morphisms in a category, the build step is a composition-preserving functor, and the linter provides structural soundness — well-linted agents are free from missing dependencies, circular references, and responsibility overload.
+Section 4 formalizes these properties through fifteen results. The core nine establish structural well-formedness: decidability (P1), compatible substitution (P2), parallelizability with layer decomposition and Dilworth width (P3, Corollaries 3.1–3.2), resolution completeness (P4), output immutability (P5), cycle-free resolution (P6), structural additivity (P7), valid schedule existence (P8), and cross-target structural isomorphism (P9). Two additional propositions strengthen the graph structure: full reachability from source to sink (P10) and well-formedness-preserving skill fusion (P11). Three propositions formalize execution purity: data isolation under non-shared resolvers (P12), permission containment (P13), and parallel independence of mutable state (P14). A final proposition guarantees conflict-free parallel merge under disjoint write sets (P15). The model admits a Petri net correspondence (section 4.7) connecting it to linear logic and Kahn Process Networks. A worktree-based isolation model (section 4.8.1) provides concrete L3 enforcement with a three-level merge strategy spectrum.
 
 Section 6 maps the model's natural extensions: behavioral testing (schema, golden, LLM-as-judge), a skill ecosystem with contract-derived semantic versioning, runtime enforcement through a four-layer ladder (prompt → hooks → sandbox → guardrails), and multi-agent coordination via MCP/A2A bridges. Each direction builds on the model's core principle — explicit, machine-readable contracts — rather than introducing new abstractions.
 
-Early empirical evidence (section 7.5) suggests that composed agents perform comparably to monolithic equivalents with 20–30% token overhead. SkillsBench [23] independently validates the model's intuitions: structured skills improve agent performance, 2–3 skills compose optimally, and structure compensates for model capability.
+Early empirical evidence (section 7.5) suggests that composed agents perform comparably to monolithic equivalents with 20–30% token overhead. SkillsBench [23] — testing a different notion of "skill" (LLM capabilities, not declarative YAML units) — provides indirect support for the model's core intuition: structured decomposition improves agent performance, and structure compensates for model capability.
 
 The format is deliberately minimal. It does not prescribe an implementation language, a runtime, or a specific LLM. It defines a behavioral contract — what an agent skill does, what it needs, what it produces, and what constraints it operates under. Implementations generate framework-native artifacts from this specification.
 
