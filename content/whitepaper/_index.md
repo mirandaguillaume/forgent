@@ -498,6 +498,141 @@ The Skill Behavior Model applies established software design principles to agent
 
 ---
 
+## 6. Frontiers
+
+*The Skill Behavior Model is a foundation. This section describes four directions that extend it beyond static specification into testing, sharing, enforcement, and multi-agent coordination. Each direction is designed concretely — with proposed formats and mechanisms — but none is implemented in the reference tooling. They represent the model's natural evolution, not speculative features.*
+
+### 6.1 Behavioral Testing
+
+Static validation (section 4.5) guarantees structural soundness but not behavioral correctness. A skill that passes all lint rules may still produce useless output. Behavioral testing closes this gap.
+
+Three levels of behavioral testing are proposed, ordered by increasing sophistication:
+
+| Level | Mechanism | What it verifies |
+|-------|-----------|------------------|
+| **Schema testing** | Assertions on output structure (JSON Schema, regex, format checks) | The skill produces output in the correct format |
+| **Golden testing** | Fixed input → output compared to an approved reference, with configurable tolerance | Behavioral stability across versions and model changes |
+| **LLM-as-judge** | A second LLM evaluates output quality against criteria declared in the skill | Semantic quality: relevance, exhaustiveness, actionability |
+
+These levels mirror the three grader types recommended by Anthropic's agent evaluation guide [21]: code-based graders (schema testing), model-based graders (LLM-as-judge), and human graders (golden test authoring and approval).
+
+A proposed YAML extension declares tests inline with the skill:
+
+```yaml
+skill: review-commenter
+# ... existing facets ...
+
+testing:
+  schema: review-comments.schema.json
+  golden:
+    - input: fixtures/simple-diff.txt
+      expected: fixtures/simple-review.golden.md
+      tolerance: semantic  # exact | fuzzy | semantic
+  judge:
+    criteria:
+      - "Comments are actionable, not vague"
+      - "Comments reference specific lines in the diff"
+      - "No false positives on style-only changes"
+```
+
+The command `forgent test [path]` would run all three levels and report pass/fail per skill. The `tolerance` field controls how golden tests compare outputs: `exact` requires identical strings, `fuzzy` allows minor formatting differences, and `semantic` uses an LLM to judge semantic equivalence.
+
+Two established metrics from the evaluation literature apply directly:
+
+- **pass@k** [22] — the probability that at least one of k invocations produces a correct output. Measures capability.
+- **pass^k** — the probability that all k invocations produce correct output. Measures consistency. A skill with high pass@k but low pass^k is capable but unreliable.
+
+SkillsBench [23] — a benchmark evaluating skill efficacy across 84 tasks and 11 domains — provides external validation for several intuitions underlying the Skill Behavior Model. Its key findings:
+
+1. **2–3 skills is optimal.** Agents with 2–3 skills outperformed those with 4+ skills (+18.6pp vs +5.9pp gain). This aligns with the model's emphasis on atomic, single-responsibility skills composed into small pipelines.
+
+2. **Self-generated skills provide negligible benefit** (−1.3pp average). Skills must be designed, not auto-generated. This validates the investment in deliberate skill authoring that the format requires.
+
+3. **Smaller model + skills can exceed larger model without skills.** Claude Haiku with skills (27.7%) outperformed Opus without skills (22.0%). Structure compensates for raw model capability — the central thesis of the Skill Behavior Model.
+
+### 6.2 Skill Ecosystem and Marketplace
+
+Skills are designed to be reusable (section 7.1), but the reference tooling provides no mechanism for sharing them beyond copy-paste. A skill ecosystem requires three capabilities: distribution, versioning, and trust.
+
+**Distribution.** A skill registry — centralized (like npm) or federated (like Go modules resolving from Git) — would allow `forgent install user/review-commenter@1.2` to fetch a skill and its transitive dependencies. The `forgent import` pipeline already resolves skills from remote sources (Vercel skill resolver); a registry generalizes this pattern.
+
+**Semantic versioning.** The I/O contract (`consumes`/`produces`) *is* the skill's public API. A breaking change is any change that modifies the contract:
+
+- Adding a new entry to `consumes` is a breaking change (callers must provide more data)
+- Removing an entry from `consumes` is backward-compatible (callers can provide data the skill ignores)
+- Changing `produces` is always breaking (consumers depend on the exact type name)
+
+This maps to the Liskov Substitution Principle [4]: a new version of a skill is substitutable for the old if `consumes(v2) ⊆ consumes(v1)` (contravariance of inputs) and `produces(v2) = produces(v1)` (invariance of output). Semantic version numbers can be derived mechanically from the I/O diff between versions — no human judgment required.
+
+**Trust and curation.** Published skills carry quality signals: `forgent score` rating, passing `forgent test` results, author verification, and usage statistics. The scoring algorithm (section 7.3) already evaluates structural quality; extending it to include test coverage and reuse frequency is straightforward.
+
+The analogy is npm for agent behaviors — but with a critical difference. JavaScript packages have complex dependency trees that create supply chain risk. Skill dependencies are shallow: a skill declares what it consumes, not which other skill provides it. The agent resolves the data flow, not the skill. This means skill "dependency trees" are at most one level deep, eliminating the cascading version conflict problem that plagues package ecosystems.
+
+### 6.3 Runtime Enforcement
+
+The security facet (`filesystem: read-only`, `network: none`) and guardrails (`timeout: 5min`, `max_comments: 15`) are currently declarations — they inform the generated prompt but are not enforced. Enforcement requires bridging the gap between specification and execution across four layers:
+
+**Layer 1 — Prompt generation (implemented).** The generator includes security and guardrail declarations as explicit instructions in the generated prompt: "You MUST NOT write files", "You MUST NOT make network requests." This relies on the LLM's instruction-following capability — effective in most cases but vulnerable to prompt injection or ambiguity.
+
+**Layer 2 — Framework hooks (specifiable).** Modern coding agent frameworks provide hook systems that intercept tool calls before execution. Claude Code's `pre_tool_call` hooks [1], for example, can block specific tools based on a matcher. The build step can generate hooks from the security facet:
+
+A skill declaring `security: filesystem: read-only` would generate:
+
+```jsonc
+// .claude/settings.json (generated by forgent build)
+{
+  "hooks": {
+    "pre_tool_call": [{
+      "matcher": { "tool_name": "Write" },
+      "command": "echo 'BLOCK: review-commenter has filesystem: read-only' && exit 1"
+    }, {
+      "matcher": { "tool_name": "Edit" },
+      "command": "echo 'BLOCK: review-commenter has filesystem: read-only' && exit 1"
+    }]
+  }
+}
+```
+
+A skill declaring `security: network: none` would generate hooks blocking `WebFetch` and `WebSearch`. This provides deterministic enforcement at the framework level — no LLM compliance required.
+
+**Layer 3 — OS-level sandboxing (future).** The most robust enforcement maps security declarations to OS-level constraints: `filesystem: read-only` → read-only mount, `network: none` → network namespace isolation, `secrets: []` → filtered environment variables. Container profiles, WASM sandboxes, or seccomp filters could be generated from the security facet. This is the ideal end state but requires a runtime layer that does not yet exist.
+
+**Layer 4 — Guardrails enforcement (specifiable).** Beyond security, guardrails like `timeout` and `max_comments` can be enforced through post-execution validation:
+
+```yaml
+guardrails:
+  - timeout: 5min
+  - max_comments: 15
+  - no_approve_without_tests
+```
+
+Generates:
+- A timeout watchdog that terminates the agent process after 5 minutes
+- A post-execution hook that counts review comments in the output and fails if the count exceeds 15
+- A post-execution hook that verifies `test_results` are present before allowing an approval decision
+
+The enforcement ladder — prompt → hooks → sandbox → guardrails runtime — represents increasing investment for increasing guarantees. Layer 1 is free. Layer 2 requires generating framework-specific hook configurations. Layer 3 requires a dedicated runtime. Layer 4 requires output validation logic. Each layer is independently useful; together, they transform declarations into constraints.
+
+### 6.4 Multi-Agent Coordination
+
+The Skill Behavior Model defines behavior within a single agent (section 7.4). Communication between agents — discovery, negotiation, delegation — is the domain of protocols like MCP [10] and Agent2Agent [11]. But the model's I/O contracts provide a natural bridge.
+
+**Agents as MCP tools.** An agent's I/O contract (`consumes`/`produces`) maps directly to an MCP tool definition: `consumes` becomes the tool's input schema, `produces` becomes its output schema. The build step could generate an MCP tool registration for each agent, allowing other agents to discover and invoke it through the standard MCP protocol.
+
+**Agent-to-agent data flow.** A new type convention — `agent_output:<agent_name>` — would allow one agent to consume another agent's output. For example, a `security-auditor` agent might declare `consumes: [agent_output:ci-reviewer]`, wiring the ci-reviewer's `review_comments` and `risk_score` as inputs to the security audit. The linter would validate this cross-agent wiring the same way it validates intra-agent wiring.
+
+**Extended negotiation.** The existing `negotiation` facet (`file_conflicts: yield`, `priority: 3`) handles simple conflict resolution between skills within an agent. Extending it to inter-agent coordination would support:
+
+- **Resource claiming** — an agent declares exclusive access to specific files or directories during execution
+- **Priority arbitration** — when two agents attempt conflicting actions, the higher-priority agent proceeds
+- **Delegation** — an agent can defer a sub-task to another agent by emitting a `delegate:<agent_name>` output
+
+**A2A bridge.** The Agent2Agent protocol [11] defines "Agent Cards" — JSON documents describing an agent's capabilities, authentication, and endpoints. An agent's I/O contract could generate an A2A Agent Card, allowing Forgent agents to participate in A2A discovery and coordination networks. The mapping is straightforward: `produces` → Agent Card capabilities, `consumes` → required input context, `security` → trust and access metadata.
+
+These directions extend the model's compositional philosophy from intra-agent to inter-agent: the same principles — explicit contracts, static validation, composition over inheritance — apply at both scales.
+
+---
+
 ## 7. Experience
 
 *The Skill Behavior Model is early-stage. The observations below come from the reference implementation and its test suite, not from large-scale production adoption. They illustrate the model's properties, not its maturity.*
