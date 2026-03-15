@@ -100,6 +100,26 @@ negotiation:
 | CrewAI | — | Planned |
 | LangGraph | — | Planned |
 
+## Roadmap
+
+| Feature | Status |
+|---------|--------|
+| Skill YAML format + validation | Done |
+| `forgent lint` / `doctor` / `score` | Done |
+| `forgent build` — Claude Code + Copilot targets | Done |
+| `forgent build --watch` — file watcher | Done |
+| SRP lint rules (single produces, name matches output) | Done |
+| Codebase scanner + skill enricher | Done |
+| `forgent import` — LLM-powered agent decomposition | Done |
+| LLM providers — Anthropic + OpenRouter | Done |
+| Vercel skill resolver (`vercel:skill-name`) | Done |
+| Validation-driven retry loop (linter feedback → LLM) | Done |
+| Whitepaper with case study | Done |
+| CrewAI / LangGraph build targets | Planned |
+| `forgent import` — batch directory processing | Planned |
+| Approval gate facet (human-in-the-loop) | Planned |
+| `forgent test` — behavioral testing for skills | Planned |
+
 ```bash
 forgent build --target claude           # default
 forgent build --target copilot
