@@ -7,6 +7,7 @@ context:
 strategy:
   tools: [bash, read_file]
   approach: static-analysis
+  effort: light
   steps:
     - run TypeScript compiler in noEmit mode
     - collect type errors with file locations

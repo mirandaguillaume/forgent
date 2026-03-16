@@ -7,9 +7,11 @@ context:
 strategy:
   tools: [read_file, grep, search]
   approach: diff-first
+  effort: medium
   steps:
     - read the git diff
-    - cross-reference with test results and lint results
+    - cross-reference with test results
+    - cross-reference with lint results
     - identify risky changes
     - write actionable review comments
 guardrails:
