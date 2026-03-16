@@ -7,6 +7,7 @@ context:
 strategy:
   tools: [bash, read_file, grep]
   approach: test-first
+  effort: medium
   steps:
     - detect test framework from package.json
     - run test suite
