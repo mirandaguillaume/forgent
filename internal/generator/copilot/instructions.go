@@ -35,7 +35,7 @@ func GenerateCopilotInstructions(skills []model.SkillBehavior, agents []model.Ag
 		for _, agent := range agents {
 			desc := agent.Description
 			if desc == "" {
-				desc = string(agent.Orchestration) + " agent with " + fmt.Sprintf("%d", len(agent.Skills)) + " skills"
+				desc = string(agent.Orchestration) + " agent with " + fmt.Sprintf("%d", len(agent.AllSkills())) + " skills"
 			}
 			lines = append(lines, "- **"+generator.ToTitle(agent.Agent)+"**: "+desc)
 		}
