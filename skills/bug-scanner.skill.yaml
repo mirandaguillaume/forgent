@@ -1,0 +1,41 @@
+skill: bug-scanner
+version: "1.0.0"
+context:
+  consumes: [pr_diff]
+  produces: [review_issues]
+  memory: short-term
+strategy:
+  tools: [read_file]
+  approach: diff-first
+  effort: medium
+  steps:
+    - read the PR diff only, no expanded context
+    - scan for obvious bugs like null derefs, off-by-one, logic errors
+    - ignore likely false positives
+    - return issues with severity location
+guardrails:
+  - timeout: 5min
+  - no_nitpicks
+  - no_style_issues
+observability:
+  trace_level: standard
+  metrics: [tokens, issue_count]
+security:
+  filesystem: read-only
+  network: none
+  secrets: []
+negotiation:
+  file_conflicts: yield
+  priority: 2
+when_to_use:
+  triggers:
+    - always during code review
+  especially:
+    - when reviewing complex logic changes
+anti_patterns:
+  - excuse: "Flagging linter/typechecker issues"
+    reality: "These are caught by CI; duplicating them adds noise"
+  - excuse: "Flagging intentional functionality changes"
+    reality: "Changes related to the PR purpose are likely intentional"
+  - excuse: "Reading beyond the diff"
+    reality: "Shallow scan focuses on changed lines only"

@@ -15,9 +15,9 @@ func TestIsomorphism_CIReviewer(t *testing.T) {
 	assert.True(t, result.SkillNamesMatch, "skill names should match across targets")
 	assert.True(t, result.IOContractsMatch, "I/O contracts should match")
 	assert.Equal(t, 1.0, result.StructureScore, "structure should be identical")
-	// Should find all 6 skills
-	assert.Len(t, result.ClaudeSkills, 6)
-	assert.Len(t, result.CopilotSkills, 6)
+	// Should find all 16 skills
+	assert.Len(t, result.ClaudeSkills, 16)
+	assert.Len(t, result.CopilotSkills, 16)
 	t.Logf("Claude skills: %v", result.ClaudeSkills)
 	t.Logf("Copilot skills: %v", result.CopilotSkills)
 }
@@ -322,7 +322,8 @@ func TestExtractSignatures_ParsesConsumesAndProduces(t *testing.T) {
 	tmpDir := t.TempDir()
 	skillDir := filepath.Join(tmpDir, "skills", "my-skill")
 	require.NoError(t, os.MkdirAll(skillDir, 0755))
-	content := "# My Skill\n\nConsumes: foo, bar\nProduces: baz\n"
+	// Frontmatter description format from BuildSkillDescription
+	content := "---\nname: my-skill\ndescription: analytical-based skill consuming foo, bar to produce baz\n---\n"
 	require.NoError(t, os.WriteFile(filepath.Join(skillDir, "SKILL.md"), []byte(content), 0644))
 
 	sigs, err := extractSignatures(tmpDir)
@@ -344,7 +345,7 @@ func TestExtractSignatures_SkipsNonSKILLmd(t *testing.T) {
 	tmpDir := t.TempDir()
 	skillDir := filepath.Join(tmpDir, "skills", "my-skill")
 	require.NoError(t, os.MkdirAll(skillDir, 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(skillDir, "README.md"), []byte("Consumes: x\nProduces: y\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(skillDir, "README.md"), []byte("---\nname: my-skill\ndescription: skill consuming x to produce y\n---\n"), 0644))
 
 	sigs, err := extractSignatures(tmpDir)
 	require.NoError(t, err)
