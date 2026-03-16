@@ -22,7 +22,7 @@ func ResolveAgentTools(skills []model.SkillBehavior) []string {
 }
 
 // GenerateAgentMd generates a Claude Code agent.md from an AgentComposition.
-func GenerateAgentMd(agent model.AgentComposition, resolvedSkills []model.SkillBehavior, outputDir string, contracts map[string]string, contractsDir string) string {
+func GenerateAgentMd(agent model.AgentComposition, resolvedSkills []model.SkillBehavior, outputDir string) string {
 	var lines []string
 
 	// Frontmatter — orchestrator only needs Task tool
@@ -37,56 +37,105 @@ func GenerateAgentMd(agent model.AgentComposition, resolvedSkills []model.SkillB
 	lines = append(lines, "---")
 	lines = append(lines, "")
 
-	// Body
-	lines = append(lines, fmt.Sprintf("You are %s. An orchestrator that coordinates %d specialized subagents.", generator.ToTitle(agent.Agent), len(agent.Skills)))
-	lines = append(lines, "")
+	if len(agent.Stages) > 0 {
+		// Staged pipeline
+		totalSkills := len(agent.AllSkills())
+		lines = append(lines, fmt.Sprintf("You are %s. An orchestrator that coordinates %d specialized subagents across %d stages.",
+			generator.ToTitle(agent.Agent), totalSkills, len(agent.Stages)))
+		lines = append(lines, "")
+		lines = append(lines, "## Execution")
+		lines = append(lines, fmt.Sprintf("Execute %d stages sequentially. Each stage completes before the next begins.", len(agent.Stages)))
+		lines = append(lines, "")
 
-	// Orchestration
-	lines = append(lines, "## Execution")
-	n := len(agent.Skills)
-	switch agent.Orchestration {
-	case model.OrchestrationSequential:
-		lines = append(lines, fmt.Sprintf(
-			"Execute %d skills sequentially as independent subagents. Each skill runs in isolation with its own context. Pass the output of each skill as input to the next.", n))
-	case model.OrchestrationParallel:
-		lines = append(lines, fmt.Sprintf(
-			"Launch %d skills as parallel subagents. Each skill runs independently. Collect all results.", n))
-	case model.OrchestrationParallelThenMerge:
-		lines = append(lines, fmt.Sprintf(
-			"Launch %d skills as parallel subagents, then merge their outputs.", n))
-	case model.OrchestrationAdaptive:
-		lines = append(lines, fmt.Sprintf(
-			"Dispatch %d skills as subagents, choosing execution order dynamically based on intermediate results.", n))
-	}
-	lines = append(lines, "")
+		stepNum := 1
+		for _, stage := range agent.Stages {
+			lines = append(lines, fmt.Sprintf("### Stage: %s (%s)", stage.Name, stage.Strategy))
+			lines = append(lines, "")
+			if stage.Strategy == model.OrchestrationParallel {
+				lines = append(lines, "Launch these subagents in parallel:")
+				lines = append(lines, "")
+			}
+			for _, skillName := range stage.Skills {
+				skillPath := fmt.Sprintf("%s/skills/%s/SKILL.md", outputDir, skillName)
+				lines = append(lines, fmt.Sprintf("#### Step %d: %s", stepNum, generator.ToTitle(skillName)))
 
-	// Skill steps
-	for i, skillName := range agent.Skills {
-		skillPath := fmt.Sprintf("%s/skills/%s/SKILL.md", outputDir, skillName)
-		lines = append(lines, fmt.Sprintf("### Step %d: %s", i+1, generator.ToTitle(skillName)))
+				effort := model.EffortMedium
+				for _, s := range resolvedSkills {
+					if s.Skill == skillName {
+						if s.Strategy.Effort != "" {
+							effort = s.Strategy.Effort
+						}
+						lines = append(lines, "Launch a subagent:")
+						lines = append(lines, fmt.Sprintf("- Skill: `%s`", skillPath))
+						lines = append(lines, fmt.Sprintf("- Model: %s", EffortToModel(effort)))
 
-		effort := model.EffortMedium
-		for _, s := range resolvedSkills {
-			if s.Skill == skillName {
-				if s.Strategy.Effort != "" {
-					effort = s.Strategy.Effort
+						consumes := formatIOPointers("In", s.Context.Consumes)
+						produces := formatIOPointers("Out", s.Context.Produces)
+						if consumes != "" {
+							lines = append(lines, "- "+consumes)
+						}
+						if produces != "" {
+							lines = append(lines, "- "+produces)
+						}
+						break
+					}
 				}
-				lines = append(lines, "Launch a subagent:")
-				lines = append(lines, fmt.Sprintf("- Skill: `%s`", skillPath))
-				lines = append(lines, fmt.Sprintf("- Model: %s", EffortToModel(effort)))
-
-				consumes := formatIOPointers("In", s.Context.Consumes, contracts, contractsDir)
-				produces := formatIOPointers("Out", s.Context.Produces, contracts, contractsDir)
-				if consumes != "" {
-					lines = append(lines, "- "+consumes)
-				}
-				if produces != "" {
-					lines = append(lines, "- "+produces)
-				}
-				break
+				lines = append(lines, "")
+				stepNum++
 			}
 		}
+	} else {
+		// Flat pipeline
+		lines = append(lines, fmt.Sprintf("You are %s. An orchestrator that coordinates %d specialized subagents.", generator.ToTitle(agent.Agent), len(agent.Skills)))
 		lines = append(lines, "")
+
+		// Orchestration
+		lines = append(lines, "## Execution")
+		n := len(agent.Skills)
+		switch agent.Orchestration {
+		case model.OrchestrationSequential:
+			lines = append(lines, fmt.Sprintf(
+				"Execute %d skills sequentially as independent subagents. Each skill runs in isolation with its own context. Pass the output of each skill as input to the next.", n))
+		case model.OrchestrationParallel:
+			lines = append(lines, fmt.Sprintf(
+				"Launch %d skills as parallel subagents. Each skill runs independently. Collect all results.", n))
+		case model.OrchestrationParallelThenMerge:
+			lines = append(lines, fmt.Sprintf(
+				"Launch %d skills as parallel subagents, then merge their outputs.", n))
+		case model.OrchestrationAdaptive:
+			lines = append(lines, fmt.Sprintf(
+				"Dispatch %d skills as subagents, choosing execution order dynamically based on intermediate results.", n))
+		}
+		lines = append(lines, "")
+
+		// Skill steps
+		for i, skillName := range agent.Skills {
+			skillPath := fmt.Sprintf("%s/skills/%s/SKILL.md", outputDir, skillName)
+			lines = append(lines, fmt.Sprintf("### Step %d: %s", i+1, generator.ToTitle(skillName)))
+
+			effort := model.EffortMedium
+			for _, s := range resolvedSkills {
+				if s.Skill == skillName {
+					if s.Strategy.Effort != "" {
+						effort = s.Strategy.Effort
+					}
+					lines = append(lines, "Launch a subagent:")
+					lines = append(lines, fmt.Sprintf("- Skill: `%s`", skillPath))
+					lines = append(lines, fmt.Sprintf("- Model: %s", EffortToModel(effort)))
+
+					consumes := formatIOPointers("In", s.Context.Consumes)
+					produces := formatIOPointers("Out", s.Context.Produces)
+					if consumes != "" {
+						lines = append(lines, "- "+consumes)
+					}
+					if produces != "" {
+						lines = append(lines, "- "+produces)
+					}
+					break
+				}
+			}
+			lines = append(lines, "")
+		}
 	}
 
 	// Output
@@ -112,20 +161,11 @@ func GenerateAgentMd(agent model.AgentComposition, resolvedSkills []model.SkillB
 }
 
 // formatIOPointers formats I/O labels with contract pointers when available.
-func formatIOPointers(label string, names []string, contracts map[string]string, contractsDir string) string {
+func formatIOPointers(label string, names []string) string {
 	if len(names) == 0 {
 		return ""
 	}
-	var items []string
-	for _, n := range names {
-		if contractsDir != "" && contracts[n] != "" {
-			ref := contractsDir + "/" + n + ".template.md"
-			items = append(items, "`"+ref+"`")
-		} else {
-			items = append(items, n)
-		}
-	}
-	return label + ": " + strings.Join(items, ", ")
+	return label + ": " + strings.Join(names, ", ")
 }
 
 // GenerateCompactAgentMd generates a single-file agent with all skills inlined.
