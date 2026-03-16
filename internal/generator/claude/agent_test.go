@@ -58,45 +58,45 @@ func testResolvedSkills() []model.SkillBehavior {
 }
 
 func TestGenerateAgentMd_Frontmatter(t *testing.T) {
-	md := claude.GenerateAgentMd(testAgent(), testResolvedSkills(), ".claude", nil, "")
+	md := claude.GenerateAgentMd(testAgent(), testResolvedSkills(), ".claude")
 	assert.Contains(t, md, "---\nname: code-reviewer\n")
 	assert.Contains(t, md, "description: Reviews code for quality and security issues")
 }
 
 func TestGenerateAgentMd_SequentialOrchestration(t *testing.T) {
-	md := claude.GenerateAgentMd(testAgent(), testResolvedSkills(), ".claude", nil, "")
+	md := claude.GenerateAgentMd(testAgent(), testResolvedSkills(), ".claude")
 	assert.Contains(t, md, "sequentially as independent subagents")
 }
 
 func TestGenerateAgentMd_ParallelOrchestration(t *testing.T) {
 	agent := testAgent()
 	agent.Orchestration = model.OrchestrationParallel
-	md := claude.GenerateAgentMd(agent, testResolvedSkills(), ".claude", nil, "")
+	md := claude.GenerateAgentMd(agent, testResolvedSkills(), ".claude")
 	assert.Contains(t, md, "parallel subagents")
 }
 
 func TestGenerateAgentMd_AdaptiveOrchestration(t *testing.T) {
 	agent := testAgent()
 	agent.Orchestration = model.OrchestrationAdaptive
-	md := claude.GenerateAgentMd(agent, testResolvedSkills(), ".claude", nil, "")
+	md := claude.GenerateAgentMd(agent, testResolvedSkills(), ".claude")
 	assert.Contains(t, md, "subagents, choosing execution order")
 }
 
 func TestGenerateAgentMd_SkillReferences(t *testing.T) {
-	md := claude.GenerateAgentMd(testAgent(), testResolvedSkills(), ".claude", nil, "")
+	md := claude.GenerateAgentMd(testAgent(), testResolvedSkills(), ".claude")
 	assert.Contains(t, md, "### Step 1: Code Review")
 	assert.Contains(t, md, "### Step 2: Security Scan")
 }
 
 func TestGenerateAgentMd_SkillContextInfo(t *testing.T) {
-	md := claude.GenerateAgentMd(testAgent(), testResolvedSkills(), ".claude", nil, "")
+	md := claude.GenerateAgentMd(testAgent(), testResolvedSkills(), ".claude")
 	assert.Contains(t, md, "- In: source-code")
 	assert.Contains(t, md, "- Out: review-report")
 	assert.Contains(t, md, "- Out: security-report")
 }
 
 func TestGenerateAgentMd_OutputSection(t *testing.T) {
-	md := claude.GenerateAgentMd(testAgent(), testResolvedSkills(), ".claude", nil, "")
+	md := claude.GenerateAgentMd(testAgent(), testResolvedSkills(), ".claude")
 	assert.Contains(t, md, "## Output")
 	assert.Contains(t, md, "review-report")
 	assert.Contains(t, md, "security-report")
@@ -105,38 +105,38 @@ func TestGenerateAgentMd_OutputSection(t *testing.T) {
 func TestGenerateAgentMd_NoDescription(t *testing.T) {
 	agent := testAgent()
 	agent.Description = ""
-	md := claude.GenerateAgentMd(agent, testResolvedSkills(), ".claude", nil, "")
+	md := claude.GenerateAgentMd(agent, testResolvedSkills(), ".claude")
 	assert.NotContains(t, md, "description:")
 }
 
 func TestGenerateAgentMd_NoSkills(t *testing.T) {
 	agent := testAgent()
-	md := claude.GenerateAgentMd(agent, nil, ".claude", nil, "")
+	md := claude.GenerateAgentMd(agent, nil, ".claude")
 	assert.NotContains(t, md, "tools:")
 	assert.NotContains(t, md, "## Output")
 }
 
 func TestGenerateAgentMd_OrchestratorToolIsTask(t *testing.T) {
-	md := claude.GenerateAgentMd(testAgent(), testResolvedSkills(), ".claude", nil, "")
+	md := claude.GenerateAgentMd(testAgent(), testResolvedSkills(), ".claude")
 	assert.Contains(t, md, "tools: Task")
 	assert.NotContains(t, md, "Bash")
 	assert.NotContains(t, md, "Grep")
 }
 
 func TestGenerateAgentMd_SubagentModel(t *testing.T) {
-	md := claude.GenerateAgentMd(testAgent(), testResolvedSkills(), ".claude", nil, "")
+	md := claude.GenerateAgentMd(testAgent(), testResolvedSkills(), ".claude")
 	assert.Contains(t, md, "Model: sonnet")
 	assert.Contains(t, md, "Model: haiku")
 }
 
 func TestGenerateAgentMd_SubagentSkillPath(t *testing.T) {
-	md := claude.GenerateAgentMd(testAgent(), testResolvedSkills(), ".claude", nil, "")
+	md := claude.GenerateAgentMd(testAgent(), testResolvedSkills(), ".claude")
 	assert.Contains(t, md, "Skill: `.claude/skills/code-review/SKILL.md`")
 	assert.Contains(t, md, "Skill: `.claude/skills/security-scan/SKILL.md`")
 }
 
 func TestGenerateAgentMd_LaunchSubagent(t *testing.T) {
-	md := claude.GenerateAgentMd(testAgent(), testResolvedSkills(), ".claude", nil, "")
+	md := claude.GenerateAgentMd(testAgent(), testResolvedSkills(), ".claude")
 	assert.Contains(t, md, "Launch a subagent")
 }
 
@@ -173,7 +173,7 @@ func TestGenerateCompactAgentMd_InlinedSkills(t *testing.T) {
 }
 
 func TestGenerateCompactAgentMd_FewerWords(t *testing.T) {
-	standard := claude.GenerateAgentMd(testAgent(), testResolvedSkills(), ".claude", nil, "")
+	standard := claude.GenerateAgentMd(testAgent(), testResolvedSkills(), ".claude")
 	compact := claude.GenerateCompactAgentMd(testAgent(), testResolvedSkills())
 	stdWords := len(strings.Fields(standard))
 	cmpWords := len(strings.Fields(compact))
@@ -197,4 +197,99 @@ func TestGenerateCompactAgentMd_NoSkills(t *testing.T) {
 	md := claude.GenerateCompactAgentMd(agent, nil)
 	assert.NotContains(t, md, "tools:")
 	assert.NotContains(t, md, "## Output")
+}
+
+// --- Staged agent tests ---
+
+func testStagedAgent() model.AgentComposition {
+	return model.AgentComposition{
+		Agent:       "code-reviewer",
+		Description: "Multi-stage code review pipeline",
+		Consumes:    []string{"pr_url", "file_tree"},
+		Produces:    []string{"review_comment"},
+		Stages: []model.Stage{
+			{Name: "preflight", Strategy: model.OrchestrationSequential, Skills: []string{"eligibility-checker", "summarizer"}},
+			{Name: "analysis", Strategy: model.OrchestrationParallel, Skills: []string{"bug-scanner", "history-reviewer"}},
+			{Name: "publish", Strategy: model.OrchestrationSequential, Skills: []string{"commenter"}},
+		},
+	}
+}
+
+func testStagedResolvedSkills() []model.SkillBehavior {
+	return []model.SkillBehavior{
+		{
+			Skill:    "eligibility-checker",
+			Context:  model.ContextFacet{Consumes: []string{"pr_url"}, Produces: []string{"eligibility_status"}, Memory: model.MemoryShortTerm},
+			Strategy: model.StrategyFacet{Approach: "gate-check", Tools: []string{"bash"}, Effort: model.EffortLight},
+			Security: model.SecurityFacet{Filesystem: model.AccessNone, Network: model.NetworkAllowlist},
+		},
+		{
+			Skill:    "summarizer",
+			Context:  model.ContextFacet{Consumes: []string{"pr_url"}, Produces: []string{"pr_summary"}, Memory: model.MemoryShortTerm},
+			Strategy: model.StrategyFacet{Approach: "diff-first", Tools: []string{"bash"}, Effort: model.EffortLight},
+			Security: model.SecurityFacet{Filesystem: model.AccessNone, Network: model.NetworkAllowlist},
+		},
+		{
+			Skill:    "bug-scanner",
+			Context:  model.ContextFacet{Consumes: []string{"pr_diff"}, Produces: []string{"review_issues"}, Memory: model.MemoryShortTerm},
+			Strategy: model.StrategyFacet{Approach: "diff-first", Tools: []string{"read_file"}, Effort: model.EffortMedium},
+			Security: model.SecurityFacet{Filesystem: model.AccessReadOnly, Network: model.NetworkNone},
+		},
+		{
+			Skill:    "history-reviewer",
+			Context:  model.ContextFacet{Consumes: []string{"pr_diff", "git_blame"}, Produces: []string{"review_issues"}, Memory: model.MemoryShortTerm},
+			Strategy: model.StrategyFacet{Approach: "history-first", Tools: []string{"bash", "read_file"}, Effort: model.EffortMedium},
+			Security: model.SecurityFacet{Filesystem: model.AccessReadOnly, Network: model.NetworkNone},
+		},
+		{
+			Skill:    "commenter",
+			Context:  model.ContextFacet{Consumes: []string{"scored_issues", "pr_url"}, Produces: []string{"review_comment"}, Memory: model.MemoryShortTerm},
+			Strategy: model.StrategyFacet{Approach: "output-format", Tools: []string{"bash"}, Effort: model.EffortLight},
+			Security: model.SecurityFacet{Filesystem: model.AccessNone, Network: model.NetworkAllowlist},
+		},
+	}
+}
+
+func TestGenerateAgentMd_Staged_HasStageHeaders(t *testing.T) {
+	md := claude.GenerateAgentMd(testStagedAgent(), testStagedResolvedSkills(), ".claude")
+	assert.Contains(t, md, "### Stage: preflight (sequential)")
+	assert.Contains(t, md, "### Stage: analysis (parallel)")
+	assert.Contains(t, md, "### Stage: publish (sequential)")
+}
+
+func TestGenerateAgentMd_Staged_HasStepNumbers(t *testing.T) {
+	md := claude.GenerateAgentMd(testStagedAgent(), testStagedResolvedSkills(), ".claude")
+	assert.Contains(t, md, "#### Step 1: Eligibility Checker")
+	assert.Contains(t, md, "#### Step 2: Summarizer")
+	assert.Contains(t, md, "#### Step 3: Bug Scanner")
+	assert.Contains(t, md, "#### Step 5: Commenter")
+}
+
+func TestGenerateAgentMd_Staged_ParallelNote(t *testing.T) {
+	md := claude.GenerateAgentMd(testStagedAgent(), testStagedResolvedSkills(), ".claude")
+	assert.Contains(t, md, "Launch these subagents in parallel")
+}
+
+func TestGenerateAgentMd_Staged_Frontmatter(t *testing.T) {
+	md := claude.GenerateAgentMd(testStagedAgent(), testStagedResolvedSkills(), ".claude")
+	assert.Contains(t, md, "name: code-reviewer")
+	assert.Contains(t, md, "tools: Task")
+}
+
+func TestGenerateAgentMd_Staged_OutputSection(t *testing.T) {
+	md := claude.GenerateAgentMd(testStagedAgent(), testStagedResolvedSkills(), ".claude")
+	assert.Contains(t, md, "## Output")
+	assert.Contains(t, md, "review_comment")
+}
+
+func TestGenerateAgentMd_Staged_SkillPaths(t *testing.T) {
+	md := claude.GenerateAgentMd(testStagedAgent(), testStagedResolvedSkills(), ".claude")
+	assert.Contains(t, md, "Skill: `.claude/skills/eligibility-checker/SKILL.md`")
+	assert.Contains(t, md, "Skill: `.claude/skills/commenter/SKILL.md`")
+}
+
+func TestGenerateAgentMd_Staged_SubagentModel(t *testing.T) {
+	md := claude.GenerateAgentMd(testStagedAgent(), testStagedResolvedSkills(), ".claude")
+	assert.Contains(t, md, "Model: haiku")  // light effort skills
+	assert.Contains(t, md, "Model: sonnet") // medium effort skills
 }
