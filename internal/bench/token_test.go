@@ -13,8 +13,8 @@ func TestTokenOverhead_CIReviewer(t *testing.T) {
 	assert.Greater(t, result.OverheadPct, 0.0, "overhead should be positive")
 	assert.Less(t, result.OverheadPct, 300.0, "overhead should be < 300% (sanity bound)")
 	assert.Greater(t, result.ComposedFiles, 0, "should generate at least one file")
-	// ci-reviewer has 6 skills + 1 agent = 7 files
-	assert.Equal(t, 7, result.ComposedFiles, "ci-reviewer should generate 7 files")
+	// 16 skills + 1 agent = 17 files
+	assert.Equal(t, 17, result.ComposedFiles, "should generate 17 files")
 	assert.Greater(t, result.MonolithicWords, 0, "monolithic should have content")
 	t.Logf("Composed: %d words (%d files), Monolithic: %d words, Overhead: %.1f%%",
 		result.ComposedWords, result.ComposedFiles, result.MonolithicWords, result.OverheadPct)
@@ -75,8 +75,8 @@ func TestTokenOverhead_FileTraversal(t *testing.T) {
 	// Verify that the number of composed files matches expected count.
 	result, err := RunTokenOverhead("../../skills", "../../agents", "claude")
 	require.NoError(t, err)
-	// claude target: 6 skills + 1 agent = 7 files
-	assert.Equal(t, 7, result.ComposedFiles)
+	// claude target: 16 skills + 1 agent = 17 files
+	assert.Equal(t, 17, result.ComposedFiles)
 }
 
 func TestTokenOverhead_CopilotFileCount(t *testing.T) {
