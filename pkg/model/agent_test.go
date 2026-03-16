@@ -90,6 +90,26 @@ orchestration: sequential
 	assert.Empty(t, ac.Stages)
 }
 
+func TestAgentComposition_AllSkills_Flat(t *testing.T) {
+	ac := model.AgentComposition{Skills: []string{"a", "b"}}
+	assert.Equal(t, []string{"a", "b"}, ac.AllSkills())
+}
+
+func TestAgentComposition_AllSkills_Staged(t *testing.T) {
+	ac := model.AgentComposition{
+		Stages: []model.Stage{
+			{Name: "s1", Skills: []string{"a", "b"}},
+			{Name: "s2", Skills: []string{"c"}},
+		},
+	}
+	assert.Equal(t, []string{"a", "b", "c"}, ac.AllSkills())
+}
+
+func TestAgentComposition_AllSkills_Empty(t *testing.T) {
+	ac := model.AgentComposition{}
+	assert.Empty(t, ac.AllSkills())
+}
+
 func TestOrchestrationStrategyConstants(t *testing.T) {
 	assert.Equal(t, model.OrchestrationStrategy("sequential"), model.OrchestrationSequential)
 	assert.Equal(t, model.OrchestrationStrategy("parallel"), model.OrchestrationParallel)

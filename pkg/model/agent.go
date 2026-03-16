@@ -27,3 +27,15 @@ type AgentComposition struct {
 	Produces      []string              `yaml:"produces,omitempty"`
 	Stages        []Stage               `yaml:"stages,omitempty"`
 }
+
+// AllSkills returns all skill names, whether from flat Skills or from Stages.
+func (a AgentComposition) AllSkills() []string {
+	if len(a.Stages) > 0 {
+		var all []string
+		for _, stage := range a.Stages {
+			all = append(all, stage.Skills...)
+		}
+		return all
+	}
+	return a.Skills
+}
