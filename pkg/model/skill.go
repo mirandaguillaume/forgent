@@ -62,6 +62,15 @@ const (
 	NegotiationMerge    NegotiationStrategy = "merge"
 )
 
+// EffortLevel indicates the computational effort a skill requires.
+type EffortLevel string
+
+const (
+	EffortLight  EffortLevel = "light"
+	EffortMedium EffortLevel = "medium"
+	EffortHeavy  EffortLevel = "heavy"
+)
+
 // ContextFacet defines what data a skill consumes and produces.
 type ContextFacet struct {
 	Consumes []string   `yaml:"consumes"`
@@ -71,9 +80,10 @@ type ContextFacet struct {
 
 // StrategyFacet defines the tools and approach a skill uses.
 type StrategyFacet struct {
-	Tools    []string `yaml:"tools"`
-	Approach string   `yaml:"approach"`
-	Steps    []string `yaml:"steps,omitempty"`
+	Tools    []string    `yaml:"tools"`
+	Approach string      `yaml:"approach"`
+	Steps    []string    `yaml:"steps,omitempty"`
+	Effort   EffortLevel `yaml:"effort,omitempty"`
 }
 
 // GuardrailRule can be either a plain string or a map[string]interface{}.
