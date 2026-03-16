@@ -45,6 +45,51 @@ orchestration: sequential
 	assert.Empty(t, ac.Description)
 }
 
+func TestAgentCompositionWithStages_YAMLParsing(t *testing.T) {
+	input := `agent: code-reviewer
+description: Multi-stage review pipeline
+consumes: [pr_url, file_tree]
+produces: [review_comment]
+stages:
+  - name: preflight
+    strategy: sequential
+    skills: [eligibility-checker, summarizer]
+  - name: analysis
+    strategy: parallel
+    skills: [bug-scanner, history-reviewer]
+  - name: publish
+    strategy: sequential
+    skills: [commenter]
+`
+	var ac model.AgentComposition
+	err := yaml.Unmarshal([]byte(input), &ac)
+	require.NoError(t, err)
+
+	assert.Equal(t, "code-reviewer", ac.Agent)
+	assert.Empty(t, ac.Skills)
+	assert.Empty(t, ac.Orchestration)
+	require.Len(t, ac.Stages, 3)
+	assert.Equal(t, "preflight", ac.Stages[0].Name)
+	assert.Equal(t, model.OrchestrationSequential, ac.Stages[0].Strategy)
+	assert.Equal(t, []string{"eligibility-checker", "summarizer"}, ac.Stages[0].Skills)
+	assert.Equal(t, "analysis", ac.Stages[1].Name)
+	assert.Equal(t, model.OrchestrationParallel, ac.Stages[1].Strategy)
+	assert.Equal(t, "publish", ac.Stages[2].Name)
+}
+
+func TestAgentCompositionLegacyFlat_StillWorks(t *testing.T) {
+	input := `agent: simple-bot
+skills: [lint, test]
+orchestration: sequential
+`
+	var ac model.AgentComposition
+	err := yaml.Unmarshal([]byte(input), &ac)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"lint", "test"}, ac.Skills)
+	assert.Empty(t, ac.Stages)
+}
+
 func TestOrchestrationStrategyConstants(t *testing.T) {
 	assert.Equal(t, model.OrchestrationStrategy("sequential"), model.OrchestrationSequential)
 	assert.Equal(t, model.OrchestrationStrategy("parallel"), model.OrchestrationParallel)
