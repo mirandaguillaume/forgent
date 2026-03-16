@@ -10,12 +10,20 @@ const (
 	OrchestrationAdaptive         OrchestrationStrategy = "adaptive"
 )
 
+// Stage represents a named group of skills with an orchestration strategy.
+type Stage struct {
+	Name     string                `yaml:"name"`
+	Strategy OrchestrationStrategy `yaml:"strategy"`
+	Skills   []string              `yaml:"skills"`
+}
+
 // AgentComposition defines an agent as a composition of skills.
 type AgentComposition struct {
 	Agent         string                `yaml:"agent"`
-	Skills        []string              `yaml:"skills"`
-	Orchestration OrchestrationStrategy `yaml:"orchestration"`
+	Skills        []string              `yaml:"skills,omitempty"`
+	Orchestration OrchestrationStrategy `yaml:"orchestration,omitempty"`
 	Description   string                `yaml:"description,omitempty"`
 	Consumes      []string              `yaml:"consumes,omitempty"`
 	Produces      []string              `yaml:"produces,omitempty"`
+	Stages        []Stage               `yaml:"stages,omitempty"`
 }
