@@ -109,19 +109,51 @@ func ValidateAgent(a AgentComposition) []string {
 	if a.Agent == "" {
 		errs = append(errs, "agent name is required")
 	}
-	if len(a.Skills) == 0 {
+
+	hasSkills := len(a.Skills) > 0
+	hasStages := len(a.Stages) > 0
+
+	if hasSkills && hasStages {
+		errs = append(errs, "skills and stages are mutually exclusive")
+	}
+
+	if !hasSkills && !hasStages {
 		errs = append(errs, "at least one skill is required")
 	}
 
-	// Validate enum: orchestration strategy
-	switch a.Orchestration {
-	case OrchestrationSequential, OrchestrationParallel, OrchestrationParallelThenMerge, OrchestrationAdaptive:
-		// valid
-	default:
-		errs = append(errs, fmt.Sprintf(
-			"invalid orchestration strategy %q: must be one of sequential, parallel, parallel-then-merge, adaptive",
-			a.Orchestration,
-		))
+	if hasSkills {
+		switch a.Orchestration {
+		case OrchestrationSequential, OrchestrationParallel,
+			OrchestrationParallelThenMerge, OrchestrationAdaptive:
+		default:
+			errs = append(errs, fmt.Sprintf(
+				"invalid orchestration strategy %q: must be one of sequential, parallel, parallel-then-merge, adaptive",
+				a.Orchestration,
+			))
+		}
+	}
+
+	if hasStages {
+		seen := make(map[string]bool)
+		for i, stage := range a.Stages {
+			if stage.Name == "" {
+				errs = append(errs, fmt.Sprintf("stage at index %d has no name", i))
+			} else if seen[stage.Name] {
+				errs = append(errs, fmt.Sprintf("duplicate stage name %q", stage.Name))
+			}
+			seen[stage.Name] = true
+
+			if len(stage.Skills) == 0 {
+				errs = append(errs, fmt.Sprintf("stage %q must have at least one skill", stage.Name))
+			}
+
+			switch stage.Strategy {
+			case OrchestrationSequential, OrchestrationParallel,
+				OrchestrationParallelThenMerge, OrchestrationAdaptive:
+			default:
+				errs = append(errs, fmt.Sprintf("stage %q has invalid strategy %q", stage.Name, stage.Strategy))
+			}
+		}
 	}
 
 	return errs

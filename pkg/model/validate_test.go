@@ -175,3 +175,70 @@ func TestValidateAgentMultipleErrors(t *testing.T) {
 	errs := model.ValidateAgent(a)
 	assert.True(t, len(errs) >= 2, "expected multiple errors, got %d", len(errs))
 }
+
+// --- Staged agent validation ---
+
+func TestValidateAgent_StagedValid(t *testing.T) {
+	agent := model.AgentComposition{
+		Agent: "review-bot",
+		Stages: []model.Stage{
+			{Name: "prep", Strategy: model.OrchestrationSequential, Skills: []string{"a"}},
+			{Name: "run", Strategy: model.OrchestrationParallel, Skills: []string{"b", "c"}},
+		},
+	}
+	errs := model.ValidateAgent(agent)
+	assert.Empty(t, errs)
+}
+
+func TestValidateAgent_StagedAndSkills_MutuallyExclusive(t *testing.T) {
+	agent := model.AgentComposition{
+		Agent:  "bad-bot",
+		Skills: []string{"a"},
+		Stages: []model.Stage{{Name: "s", Strategy: model.OrchestrationSequential, Skills: []string{"b"}}},
+	}
+	errs := model.ValidateAgent(agent)
+	assert.Contains(t, errs, "skills and stages are mutually exclusive")
+}
+
+func TestValidateAgent_StagedEmptySkills(t *testing.T) {
+	agent := model.AgentComposition{
+		Agent: "bad-bot",
+		Stages: []model.Stage{{Name: "s", Strategy: model.OrchestrationSequential, Skills: nil}},
+	}
+	errs := model.ValidateAgent(agent)
+	assert.Contains(t, errs, "stage \"s\" must have at least one skill")
+}
+
+func TestValidateAgent_StagedDuplicateNames(t *testing.T) {
+	agent := model.AgentComposition{
+		Agent: "bad-bot",
+		Stages: []model.Stage{
+			{Name: "s", Strategy: model.OrchestrationSequential, Skills: []string{"a"}},
+			{Name: "s", Strategy: model.OrchestrationParallel, Skills: []string{"b"}},
+		},
+	}
+	errs := model.ValidateAgent(agent)
+	assert.Contains(t, errs, "duplicate stage name \"s\"")
+}
+
+func TestValidateAgent_StagedInvalidStrategy(t *testing.T) {
+	agent := model.AgentComposition{
+		Agent: "bad-bot",
+		Stages: []model.Stage{
+			{Name: "s", Strategy: "banana", Skills: []string{"a"}},
+		},
+	}
+	errs := model.ValidateAgent(agent)
+	assert.Contains(t, errs, "stage \"s\" has invalid strategy \"banana\"")
+}
+
+func TestValidateAgent_StagedMissingName(t *testing.T) {
+	agent := model.AgentComposition{
+		Agent: "bad-bot",
+		Stages: []model.Stage{
+			{Strategy: model.OrchestrationSequential, Skills: []string{"a"}},
+		},
+	}
+	errs := model.ValidateAgent(agent)
+	assert.Contains(t, errs, "stage at index 0 has no name")
+}
