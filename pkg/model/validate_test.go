@@ -153,6 +153,23 @@ func TestValidateAgentInvalidOrchestration(t *testing.T) {
 	assert.Contains(t, errs[0], "invalid orchestration strategy")
 }
 
+func TestValidateSkillInvalidEffort(t *testing.T) {
+	s := validSkill()
+	s.Strategy.Effort = "extreme"
+	errs := model.ValidateSkill(s)
+	assert.NotEmpty(t, errs)
+	assert.Contains(t, errs[0], "invalid effort level")
+}
+
+func TestValidateSkillValidEffort(t *testing.T) {
+	for _, effort := range []model.EffortLevel{model.EffortLight, model.EffortMedium, model.EffortHeavy, ""} {
+		s := validSkill()
+		s.Strategy.Effort = effort
+		errs := model.ValidateSkill(s)
+		assert.Empty(t, errs, "effort %q should be valid", effort)
+	}
+}
+
 func TestValidateAgentMultipleErrors(t *testing.T) {
 	a := model.AgentComposition{}
 	errs := model.ValidateAgent(a)
