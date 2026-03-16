@@ -174,3 +174,84 @@ func TestGenerateCompactCopilotAgentMd_OutputSection(t *testing.T) {
 	assert.Contains(t, md, "review-report")
 	assert.Contains(t, md, "security-report")
 }
+
+// --- Staged agent tests ---
+
+func testStagedAgent() model.AgentComposition {
+	return model.AgentComposition{
+		Agent:       "code-reviewer",
+		Description: "Multi-stage code review pipeline",
+		Consumes:    []string{"pr_url", "file_tree"},
+		Produces:    []string{"review_comment"},
+		Stages: []model.Stage{
+			{Name: "preflight", Strategy: model.OrchestrationSequential, Skills: []string{"eligibility-checker", "summarizer"}},
+			{Name: "analysis", Strategy: model.OrchestrationParallel, Skills: []string{"bug-scanner", "history-reviewer"}},
+			{Name: "publish", Strategy: model.OrchestrationSequential, Skills: []string{"commenter"}},
+		},
+	}
+}
+
+func testStagedResolvedSkills() []model.SkillBehavior {
+	return []model.SkillBehavior{
+		{
+			Skill:    "eligibility-checker",
+			Context:  model.ContextFacet{Consumes: []string{"pr_url"}, Produces: []string{"eligibility_status"}, Memory: model.MemoryShortTerm},
+			Strategy: model.StrategyFacet{Approach: "gate-check", Tools: []string{"bash"}, Effort: model.EffortLight},
+			Security: model.SecurityFacet{Filesystem: model.AccessNone, Network: model.NetworkAllowlist},
+		},
+		{
+			Skill:    "summarizer",
+			Context:  model.ContextFacet{Consumes: []string{"pr_url"}, Produces: []string{"pr_summary"}, Memory: model.MemoryShortTerm},
+			Strategy: model.StrategyFacet{Approach: "diff-first", Tools: []string{"bash"}, Effort: model.EffortLight},
+			Security: model.SecurityFacet{Filesystem: model.AccessNone, Network: model.NetworkAllowlist},
+		},
+		{
+			Skill:    "bug-scanner",
+			Context:  model.ContextFacet{Consumes: []string{"pr_diff"}, Produces: []string{"review_issues"}, Memory: model.MemoryShortTerm},
+			Strategy: model.StrategyFacet{Approach: "diff-first", Tools: []string{"read_file"}, Effort: model.EffortMedium},
+			Security: model.SecurityFacet{Filesystem: model.AccessReadOnly, Network: model.NetworkNone},
+		},
+		{
+			Skill:    "history-reviewer",
+			Context:  model.ContextFacet{Consumes: []string{"pr_diff", "git_blame"}, Produces: []string{"review_issues"}, Memory: model.MemoryShortTerm},
+			Strategy: model.StrategyFacet{Approach: "history-first", Tools: []string{"bash", "read_file"}, Effort: model.EffortMedium},
+			Security: model.SecurityFacet{Filesystem: model.AccessReadOnly, Network: model.NetworkNone},
+		},
+		{
+			Skill:    "commenter",
+			Context:  model.ContextFacet{Consumes: []string{"scored_issues", "pr_url"}, Produces: []string{"review_comment"}, Memory: model.MemoryShortTerm},
+			Strategy: model.StrategyFacet{Approach: "output-format", Tools: []string{"bash"}, Effort: model.EffortLight},
+			Security: model.SecurityFacet{Filesystem: model.AccessNone, Network: model.NetworkAllowlist},
+		},
+	}
+}
+
+func TestGenerateCopilotAgentMd_Staged_HasStageHeaders(t *testing.T) {
+	md := copilot.GenerateCopilotAgentMd(testStagedAgent(), testStagedResolvedSkills(), ".github")
+	assert.Contains(t, md, "### Stage: preflight (sequential)")
+	assert.Contains(t, md, "### Stage: analysis (parallel)")
+	assert.Contains(t, md, "### Stage: publish (sequential)")
+}
+
+func TestGenerateCopilotAgentMd_Staged_SkillPaths(t *testing.T) {
+	md := copilot.GenerateCopilotAgentMd(testStagedAgent(), testStagedResolvedSkills(), ".github")
+	assert.Contains(t, md, "Skill: `.github/skills/eligibility-checker/SKILL.md`")
+	assert.Contains(t, md, "Skill: `.github/skills/commenter/SKILL.md`")
+}
+
+func TestGenerateCopilotAgentMd_Staged_ParallelNote(t *testing.T) {
+	md := copilot.GenerateCopilotAgentMd(testStagedAgent(), testStagedResolvedSkills(), ".github")
+	assert.Contains(t, md, "Launch these subagents in parallel")
+}
+
+func TestGenerateCopilotAgentMd_Staged_StepNumbers(t *testing.T) {
+	md := copilot.GenerateCopilotAgentMd(testStagedAgent(), testStagedResolvedSkills(), ".github")
+	assert.Contains(t, md, "#### Step 1: Eligibility Checker")
+	assert.Contains(t, md, "#### Step 5: Commenter")
+}
+
+func TestGenerateCopilotAgentMd_Staged_Frontmatter(t *testing.T) {
+	md := copilot.GenerateCopilotAgentMd(testStagedAgent(), testStagedResolvedSkills(), ".github")
+	assert.Contains(t, md, "name: code-reviewer")
+	assert.Contains(t, md, `tools: ["task"]`)
+}
