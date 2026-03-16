@@ -9,6 +9,7 @@ context:
 strategy:
   tools: []
   approach: sequential
+  effort: medium
   steps: []
 
 guardrails: []
