@@ -7,6 +7,7 @@ context:
 strategy:
   tools: [read_file, grep]
   approach: diff-first
+  effort: medium
   steps:
     - analyze git diff scope and complexity
     - cross-reference with test coverage

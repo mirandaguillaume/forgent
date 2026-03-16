@@ -7,6 +7,7 @@ context:
 strategy:
   tools: [bash, read_file, search]
   approach: static-analysis
+  effort: light
   steps:
     - check for common anti-patterns
     - produce structured lint report
