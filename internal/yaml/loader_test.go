@@ -110,3 +110,36 @@ orchestration: sequential
 	assert.Contains(t, err.Error(), "validation failed")
 	assert.Contains(t, err.Error(), "at least one skill is required")
 }
+
+const validStagedAgentYAML = `
+agent: pipeline-bot
+description: A staged pipeline
+stages:
+  - name: check
+    strategy: sequential
+    skills: [lint]
+  - name: analyze
+    strategy: parallel
+    skills: [scan, review]
+`
+
+func TestParseAgentYAML_Staged_Valid(t *testing.T) {
+	agent, err := yamlloader.ParseAgentYAML(validStagedAgentYAML)
+	require.NoError(t, err)
+	assert.Equal(t, "pipeline-bot", agent.Agent)
+	require.Len(t, agent.Stages, 2)
+	assert.Equal(t, "check", agent.Stages[0].Name)
+}
+
+func TestParseAgentYAML_Staged_ValidationError(t *testing.T) {
+	input := `
+agent: bad-bot
+stages:
+  - name: ""
+    strategy: sequential
+    skills: [lint]
+`
+	_, err := yamlloader.ParseAgentYAML(input)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "stage at index 0 has no name")
+}
