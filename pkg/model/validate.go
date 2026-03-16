@@ -85,6 +85,19 @@ func ValidateSkill(s SkillBehavior) []string {
 		))
 	}
 
+	// Validate enum: effort level (optional — empty defaults to medium)
+	if s.Strategy.Effort != "" {
+		switch s.Strategy.Effort {
+		case EffortLight, EffortMedium, EffortHeavy:
+			// valid
+		default:
+			errs = append(errs, fmt.Sprintf(
+				"invalid effort level %q: must be one of light, medium, heavy",
+				s.Strategy.Effort,
+			))
+		}
+	}
+
 	return errs
 }
 
