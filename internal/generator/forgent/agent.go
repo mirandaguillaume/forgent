@@ -3,6 +3,7 @@ package forgent
 import (
 	"fmt"
 	"go/format"
+	"os"
 	"strings"
 
 	"github.com/mirandaguillaume/forgent/pkg/model"
@@ -130,7 +131,8 @@ func GenerateAgentGo(agent model.AgentComposition, skills []model.SkillBehavior)
 
 	formatted, err := format.Source([]byte(b.String()))
 	if err != nil {
-		return b.String() // fallback: return unformatted
+		fmt.Fprintf(os.Stderr, "warning: generated code failed gofmt: %v\n", err)
+		return b.String()
 	}
 	return string(formatted)
 }
