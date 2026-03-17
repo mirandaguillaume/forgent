@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/mirandaguillaume/forgent/internal/generator"
 	"github.com/mirandaguillaume/forgent/pkg/model"
 )
 
@@ -29,25 +30,25 @@ func BuildPromptTemplate(skill model.SkillBehavior) string {
 	if len(skill.Guardrails) > 0 {
 		b.WriteString("## Guardrails\n")
 		for _, g := range skill.Guardrails {
-			if s, ok := g.StringValue(); ok {
-				b.WriteString("- " + s + "\n")
-			}
-			if m, ok := g.MapValue(); ok {
-				for k, v := range m {
-					fmt.Fprintf(&b, "- %s: %v\n", k, v)
-				}
+			line := generator.FormatGuardrail(g)
+			if line != "" {
+				b.WriteString(line + "\n")
 			}
 		}
 		b.WriteString("\n")
 	}
 
-	b.WriteString("## Input\n")
-	for _, c := range skill.Context.Consumes {
-		fmt.Fprintf(&b, "%s:\n{{ .%s }}\n\n", c, c)
+	if len(skill.Context.Consumes) > 0 {
+		b.WriteString("## Input\n")
+		for _, c := range skill.Context.Consumes {
+			fmt.Fprintf(&b, "%s:\n{{ .%s }}\n\n", c, c)
+		}
 	}
 
-	b.WriteString("## Output\n")
-	b.WriteString("Produce: " + strings.Join(skill.Context.Produces, ", ") + "\n")
+	if len(skill.Context.Produces) > 0 {
+		b.WriteString("## Output\n")
+		b.WriteString("Produce: " + strings.Join(skill.Context.Produces, ", ") + "\n")
+	}
 
 	return b.String()
 }

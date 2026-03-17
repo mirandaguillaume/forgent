@@ -57,3 +57,46 @@ func TestBuildPromptTemplate_ContainsApproach(t *testing.T) {
 	prompt := BuildPromptTemplate(skill)
 	assert.Contains(t, prompt, "static-analysis")
 }
+
+func TestBuildPromptTemplate_EmptyOptionalFields(t *testing.T) {
+	skill := model.SkillBehavior{
+		Skill: "minimal-skill",
+		Context: model.ContextFacet{
+			Consumes: []string{"source_code"},
+			Produces: []string{"report"},
+		},
+	}
+	prompt := BuildPromptTemplate(skill)
+	// Input header must be present (Consumes is non-empty)
+	assert.Contains(t, prompt, "## Input")
+	// Output header must be present (Produces is non-empty)
+	assert.Contains(t, prompt, "## Output")
+	// No dangling Produce: line with empty value
+	assert.NotContains(t, prompt, "Produce: \n")
+	// No empty ## Input header without content
+	assert.NotContains(t, prompt, "## Input\n## ")
+}
+
+func TestBuildPromptTemplate_EmptyConsumes(t *testing.T) {
+	skill := model.SkillBehavior{
+		Skill: "no-consumes-skill",
+		Context: model.ContextFacet{
+			Consumes: []string{},
+			Produces: []string{"report"},
+		},
+	}
+	prompt := BuildPromptTemplate(skill)
+	assert.NotContains(t, prompt, "## Input")
+}
+
+func TestBuildPromptTemplate_EmptyProduces(t *testing.T) {
+	skill := model.SkillBehavior{
+		Skill: "no-produces-skill",
+		Context: model.ContextFacet{
+			Consumes: []string{"source_code"},
+			Produces: []string{},
+		},
+	}
+	prompt := BuildPromptTemplate(skill)
+	assert.NotContains(t, prompt, "## Output")
+}
