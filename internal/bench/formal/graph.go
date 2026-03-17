@@ -3,6 +3,7 @@
 package formal
 
 import (
+	"github.com/mirandaguillaume/forgent/pkg/dag"
 	"github.com/mirandaguillaume/forgent/pkg/model"
 )
 
@@ -18,6 +19,7 @@ type Graph struct {
 	Nodes  []string
 	Adj    map[string][]string // outgoing edges
 	RevAdj map[string][]string // incoming edges (reverse)
+	DAG    *dag.DAG            // execution-capable graph (nodes have no Run — analysis only)
 }
 
 // BuildGraph constructs G(A) from an agent composition and its resolved skills.
@@ -73,6 +75,21 @@ func BuildGraph(agent model.AgentComposition, skills []model.SkillBehavior) *Gra
 				g.addEdge(s.Skill, Bottom)
 			}
 		}
+	}
+
+	// Build pkg/dag for execution-capable use (Run is nil — analysis only)
+	dagNodes := make([]*dag.Node, 0, len(skills))
+	for _, s := range skills {
+		s := s // capture loop variable
+		dagNodes = append(dagNodes, &dag.Node{
+			ID:       s.Skill,
+			Consumes: s.Context.Consumes,
+			Produces: s.Context.Produces,
+			// Run is nil — analysis only, not executable
+		})
+	}
+	if d, err := dag.New(dagNodes...); err == nil {
+		g.DAG = d
 	}
 
 	return g

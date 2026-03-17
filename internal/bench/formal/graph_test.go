@@ -250,3 +250,34 @@ func TestLayers_NoTrailingEmpty(t *testing.T) {
 		assert.NotEmpty(t, l, "no layer should be empty")
 	}
 }
+
+func TestBuildGraph_DelegatesLayers(t *testing.T) {
+	// After refactor, formal.Graph.Layers() must produce the same results as before.
+	skills := []model.SkillBehavior{
+		makeSkill("a", nil, []string{"x"}),
+		makeSkill("b", []string{"x"}, []string{"y"}),
+		makeSkill("c", []string{"y"}, []string{"z"}),
+	}
+	agent := makeAgent("chain", []string{"a", "b", "c"}, nil, []string{"z"})
+	g := BuildGraph(agent, skills)
+	layers := g.Layers()
+
+	// 3 layers: a, b, c
+	require.Equal(t, 3, len(layers))
+	assert.Contains(t, layers[0], "a")
+	assert.Contains(t, layers[1], "b")
+	assert.Contains(t, layers[2], "c")
+}
+
+func TestBuildGraph_DAGField_NotNil(t *testing.T) {
+	skills := []model.SkillBehavior{
+		makeSkill("a", nil, []string{"x"}),
+		makeSkill("b", []string{"x"}, []string{"y"}),
+	}
+	agent := makeAgent("pair", []string{"a", "b"}, nil, []string{"y"})
+	g := BuildGraph(agent, skills)
+
+	assert.NotNil(t, g.DAG, "DAG field must be populated by BuildGraph")
+	// DAG nodes must match skill nodes (no virtual ⊤/⊥ in pkg/dag)
+	assert.Len(t, g.DAG.Nodes(), 2)
+}
