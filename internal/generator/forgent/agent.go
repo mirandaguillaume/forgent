@@ -158,7 +158,7 @@ func joinQuoted(items []string) string {
 func makeSkillRunnerCode() string {
 	return `// llmProvider abstracts an LLM backend for text completion.
 type llmProvider interface {
-	Complete(prompt string) (string, error)
+	Complete(ctx context.Context, prompt string) (string, error)
 }
 
 // anthropicProvider calls the Anthropic Messages API.
@@ -193,7 +193,8 @@ type anthropicContent struct {
 	Text string ` + "`" + `json:"text"` + "`" + `
 }
 
-func (p *anthropicProvider) Complete(prompt string) (string, error) {
+// NOTE: ctx is forwarded to the HTTP request for cancellation support
+func (p *anthropicProvider) Complete(ctx context.Context, prompt string) (string, error) {
 	reqBody := anthropicRequest{
 		Model:     "claude-sonnet-4-20250514",
 		MaxTokens: 8192,
@@ -203,7 +204,7 @@ func (p *anthropicProvider) Complete(prompt string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("marshal request: %w", err)
 	}
-	req, err := http.NewRequest("POST", "https://api.anthropic.com/v1/messages", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://api.anthropic.com/v1/messages", bytes.NewReader(body))
 	if err != nil {
 		return "", fmt.Errorf("create request: %w", err)
 	}
@@ -245,7 +246,7 @@ func makeSkillRunner(
 		for k, v := range inputs {
 			prompt = strings.ReplaceAll(prompt, "{{ ."+k+" }}", fmt.Sprintf("%v", v))
 		}
-		response, err := provider.Complete(prompt)
+		response, err := provider.Complete(ctx, prompt)
 		if err != nil {
 			return nil, err
 		}
