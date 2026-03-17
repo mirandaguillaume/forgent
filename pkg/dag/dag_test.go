@@ -45,7 +45,7 @@ func TestNew_DuplicateID(t *testing.T) {
 		node("a", nil, []string{"x"}),
 		node("a", []string{"x"}, []string{"y"}),
 	)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestAddRemoveEdge(t *testing.T) {
@@ -61,4 +61,28 @@ func TestAddRemoveEdge(t *testing.T) {
 
 	require.NoError(t, g.RemoveEdge("a", "b"))
 	assert.Empty(t, g.Downstream("a"))
+}
+
+func TestRemoveEdge_UnknownNode(t *testing.T) {
+	g, _ := dag.New(node("a", nil, []string{"x"}))
+	assert.Error(t, g.RemoveEdge("a", "nonexistent"))
+	assert.Error(t, g.RemoveEdge("nonexistent", "a"))
+}
+
+func TestNew_DuplicateProducer(t *testing.T) {
+	_, err := dag.New(
+		node("a", nil, []string{"x"}),
+		node("b", nil, []string{"x"}), // also produces x
+	)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "x")
+}
+
+func TestAddEdge_PreventsCycle(t *testing.T) {
+	a := node("a", nil, []string{"x"})
+	b := node("b", []string{"x"}, []string{"y"})
+	g, _ := dag.New(a, b) // a→b auto-wired
+	err := g.AddEdge("b", "a") // would create cycle b→a
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "cycle")
 }
