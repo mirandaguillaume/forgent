@@ -38,11 +38,13 @@ func GenerateAgentGo(agent model.AgentComposition, skills []model.SkillBehavior)
 	b.WriteString("\t\"bytes\"\n")
 	b.WriteString("\t\"context\"\n")
 	b.WriteString("\t\"encoding/json\"\n")
+	b.WriteString("\t\"flag\"\n")
 	b.WriteString("\t\"fmt\"\n")
 	b.WriteString("\t\"io\"\n")
 	b.WriteString("\t\"net/http\"\n")
 	b.WriteString("\t\"os\"\n")
 	b.WriteString("\t\"os/exec\"\n")
+	b.WriteString("\t\"path/filepath\"\n")
 	b.WriteString("\t\"strings\"\n")
 	b.WriteString("\t\"time\"\n\n")
 	b.WriteString("\t\"github.com/mirandaguillaume/forgent/pkg/dag\"\n")
@@ -50,6 +52,12 @@ func GenerateAgentGo(agent model.AgentComposition, skills []model.SkillBehavior)
 
 	// main function
 	b.WriteString("func main() {\n")
+	// Flags
+	b.WriteString("\tvar inputFlags multiFlag\n")
+	b.WriteString("\toutputDir := flag.String(\"output\", \"\", \"directory to write output files (one per produced type)\")\n")
+	b.WriteString("\tflag.Var(&inputFlags, \"input\", \"key=value or key=@file.txt (repeatable)\")\n")
+	b.WriteString("\tflag.Parse()\n\n")
+	// Provider
 	b.WriteString("\tvar provider llmProvider\n")
 	b.WriteString("\tif key := os.Getenv(\"OPENROUTER_API_KEY\"); key != \"\" {\n")
 	b.WriteString("\t\tmodel := os.Getenv(\"OPENROUTER_MODEL\")\n")
@@ -115,17 +123,37 @@ func GenerateAgentGo(agent model.AgentComposition, skills []model.SkillBehavior)
 	b.WriteString("\t\tos.Exit(1)\n")
 	b.WriteString("\t}\n\n")
 
-	// Discover inputs
-	fmt.Fprintf(&b, "\tinputs := discoverInputs([]string{%s})\n\n",
-		joinQuoted(externalInputs))
+	// Discover inputs then apply --input flag overrides
+	fmt.Fprintf(&b, "\tinputs := discoverInputs([]string{%s})\n", joinQuoted(externalInputs))
+	b.WriteString("\tfor _, kv := range inputFlags {\n")
+	b.WriteString("\t\tk, v := parseInputFlag(kv)\n")
+	b.WriteString("\t\tif k != \"\" {\n")
+	b.WriteString("\t\t\tinputs[k] = v\n")
+	b.WriteString("\t\t}\n")
+	b.WriteString("\t}\n\n")
 
 	b.WriteString("\tresults, err := d.Execute(context.Background(), dag.WithInputs(inputs))\n")
 	b.WriteString("\tif err != nil {\n")
 	b.WriteString("\t\tfmt.Fprintf(os.Stderr, \"Execution error: %v\\n\", err)\n")
 	b.WriteString("\t\tos.Exit(1)\n")
 	b.WriteString("\t}\n\n")
+	// Output to files or stdout
 	b.WriteString("\tfor k, v := range results {\n")
-	b.WriteString("\t\tfmt.Printf(\"=== %s ===\\n%v\\n\\n\", k, v)\n")
+	b.WriteString("\t\tcontent := fmt.Sprintf(\"%v\", v)\n")
+	b.WriteString("\t\tif *outputDir != \"\" {\n")
+	b.WriteString("\t\t\tif err := os.MkdirAll(*outputDir, 0755); err != nil {\n")
+	b.WriteString("\t\t\t\tfmt.Fprintf(os.Stderr, \"mkdir %s: %v\\n\", *outputDir, err)\n")
+	b.WriteString("\t\t\t\tcontinue\n")
+	b.WriteString("\t\t\t}\n")
+	b.WriteString("\t\t\tpath := filepath.Join(*outputDir, k+\".md\")\n")
+	b.WriteString("\t\t\tif err := os.WriteFile(path, []byte(content), 0644); err != nil {\n")
+	b.WriteString("\t\t\t\tfmt.Fprintf(os.Stderr, \"write %s: %v\\n\", path, err)\n")
+	b.WriteString("\t\t\t} else {\n")
+	b.WriteString("\t\t\t\tfmt.Printf(\"wrote %s\\n\", path)\n")
+	b.WriteString("\t\t\t}\n")
+	b.WriteString("\t\t} else {\n")
+	b.WriteString("\t\t\tfmt.Printf(\"=== %s ===\\n%s\\n\\n\", k, content)\n")
+	b.WriteString("\t\t}\n")
 	b.WriteString("\t}\n")
 	b.WriteString("}\n\n")
 
@@ -336,7 +364,34 @@ func makeSkillRunner(
 }
 
 func discoverInputsCode() string {
-	return `func discoverInputs(needed []string) map[string]any {
+	return `// multiFlag allows --input to be specified multiple times.
+type multiFlag []string
+
+func (f *multiFlag) String() string { return strings.Join(*f, ", ") }
+func (f *multiFlag) Set(v string) error {
+	*f = append(*f, v)
+	return nil
+}
+
+// parseInputFlag parses "key=value" or "key=@file.txt" into (key, content).
+func parseInputFlag(kv string) (string, string) {
+	idx := strings.IndexByte(kv, '=')
+	if idx < 0 {
+		return "", ""
+	}
+	k, v := kv[:idx], kv[idx+1:]
+	if strings.HasPrefix(v, "@") {
+		data, err := os.ReadFile(v[1:])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: cannot read input file %s: %v\n", v[1:], err)
+			return k, ""
+		}
+		return k, string(data)
+	}
+	return k, v
+}
+
+func discoverInputs(needed []string) map[string]any {
 	inputs := make(map[string]any)
 	for _, key := range needed {
 		switch key {
