@@ -57,6 +57,9 @@ func New(nodes ...*Node) (*DAG, error) {
 	producer := make(map[string]string, len(nodes))
 	for _, n := range nodes {
 		for _, p := range n.Produces {
+			if existing, conflict := producer[p]; conflict {
+				return nil, fmt.Errorf("dag: type %q produced by both %q and %q", p, existing, n.ID)
+			}
 			producer[p] = n.ID
 		}
 	}
@@ -80,12 +83,22 @@ func (d *DAG) AddEdge(from, to string) error {
 	if _, ok := d.nodes[to]; !ok {
 		return fmt.Errorf("dag: unknown node %q", to)
 	}
+	// Cycle guard: if from is reachable from to, adding from→to would create a cycle
+	if d.reachable(to, from) {
+		return fmt.Errorf("dag: adding edge %q→%q would create a cycle", from, to)
+	}
 	d.addEdge(from, to)
 	return nil
 }
 
 // RemoveEdge removes the edge from → to.
 func (d *DAG) RemoveEdge(from, to string) error {
+	if _, ok := d.nodes[from]; !ok {
+		return fmt.Errorf("dag: unknown node %q", from)
+	}
+	if _, ok := d.nodes[to]; !ok {
+		return fmt.Errorf("dag: unknown node %q", to)
+	}
 	neighbors := d.adj[from]
 	for i, n := range neighbors {
 		if n == to {
@@ -104,10 +117,26 @@ func (d *DAG) RemoveEdge(from, to string) error {
 }
 
 // Downstream returns the node IDs that nodeID points to.
-func (d *DAG) Downstream(nodeID string) []string { return d.adj[nodeID] }
+func (d *DAG) Downstream(nodeID string) []string {
+	src := d.adj[nodeID]
+	if len(src) == 0 {
+		return nil
+	}
+	out := make([]string, len(src))
+	copy(out, src)
+	return out
+}
 
 // Upstream returns the node IDs that point to nodeID.
-func (d *DAG) Upstream(nodeID string) []string { return d.rev[nodeID] }
+func (d *DAG) Upstream(nodeID string) []string {
+	src := d.rev[nodeID]
+	if len(src) == 0 {
+		return nil
+	}
+	out := make([]string, len(src))
+	copy(out, src)
+	return out
+}
 
 // Nodes returns all node IDs.
 func (d *DAG) Nodes() []string {
@@ -129,4 +158,28 @@ func (d *DAG) addEdge(from, to string) {
 	}
 	d.adj[from] = append(d.adj[from], to)
 	d.rev[to] = append(d.rev[to], from)
+}
+
+// reachable returns true if target is reachable from start via BFS.
+func (d *DAG) reachable(start, target string) bool {
+	if start == target {
+		return true
+	}
+	visited := make(map[string]bool)
+	queue := []string{start}
+	visited[start] = true
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		for _, next := range d.adj[cur] {
+			if next == target {
+				return true
+			}
+			if !visited[next] {
+				visited[next] = true
+				queue = append(queue, next)
+			}
+		}
+	}
+	return false
 }
