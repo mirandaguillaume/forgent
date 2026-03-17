@@ -18,6 +18,7 @@ import (
 	// Register generators so spec.Get works.
 	_ "github.com/mirandaguillaume/forgent/internal/generator/claude"
 	_ "github.com/mirandaguillaume/forgent/internal/generator/copilot"
+	_ "github.com/mirandaguillaume/forgent/internal/generator/forgent"
 )
 
 const wordLimit = 500
