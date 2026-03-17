@@ -180,3 +180,62 @@ func TestExecute_ContextCancelled(t *testing.T) {
 	_, err := d.Execute(ctx)
 	assert.Error(t, err)
 }
+
+func TestExecute_Retry_S4_SucceedsOnThirdAttempt(t *testing.T) {
+	attempts := 0
+	flaky := &dag.Node{
+		ID:         "flaky",
+		Produces:   []string{"x"},
+		MaxRetries: 2,
+		Run: func(ctx context.Context, inputs map[string]any) (map[string]any, error) {
+			attempts++
+			if attempts < 3 {
+				return nil, errors.New("transient")
+			}
+			return map[string]any{"x": "ok"}, nil
+		},
+	}
+	d, _ := dag.New(flaky)
+	results, err := d.Execute(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "ok", results["x"])
+	assert.Equal(t, 3, attempts, "should have tried 3 times (1 initial + 2 retries)")
+}
+
+func TestExecute_Retry_S4_ExhaustedReturnsError(t *testing.T) {
+	calls := 0
+	n := &dag.Node{
+		ID:         "n",
+		Produces:   []string{"x"},
+		MaxRetries: 1,
+		Run: func(ctx context.Context, inputs map[string]any) (map[string]any, error) {
+			calls++
+			return nil, errors.New("always fails")
+		},
+	}
+	d, _ := dag.New(n)
+	_, err := d.Execute(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "always fails")
+	assert.Equal(t, 2, calls, "should have tried 2 times (1 initial + 1 retry)")
+}
+
+func TestExecute_Timeout_S5_NodeCancelled(t *testing.T) {
+	slow := &dag.Node{
+		ID:       "slow",
+		Produces: []string{"x"},
+		Timeout:  10 * time.Millisecond,
+		Run: func(ctx context.Context, inputs map[string]any) (map[string]any, error) {
+			select {
+			case <-time.After(1 * time.Second):
+				return map[string]any{"x": "done"}, nil
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		},
+	}
+	d, _ := dag.New(slow)
+	_, err := d.Execute(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "deadline exceeded")
+}
