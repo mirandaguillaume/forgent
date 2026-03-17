@@ -19,7 +19,7 @@ type forgentGenerator struct{}
 
 func (g *forgentGenerator) Target() string          { return "forgent" }
 func (g *forgentGenerator) DefaultOutputDir() string { return ".forgent" }
-func (g *forgentGenerator) ContextDir() string       { return "" }
+func (g *forgentGenerator) ContextDir() string       { return "context" }
 
 // AgentPath returns the relative path for the generated main.go within the output dir.
 func (g *forgentGenerator) AgentPath(name string) string {
@@ -33,7 +33,7 @@ func (g *forgentGenerator) GenerateAgent(agent model.AgentComposition, skills []
 	safe := safeAgentName(agent.Agent)
 	modDir := filepath.Join(outputDir, safe)
 	if err := os.MkdirAll(modDir, 0755); err == nil {
-		modContent := GenerateGoMod(safe)
+		modContent := GenerateGoMod(agent.Agent)
 		_ = os.WriteFile(filepath.Join(modDir, "go.mod"), []byte(modContent), 0644)
 		_ = os.WriteFile(filepath.Join(modDir, "go.sum"), []byte(""), 0644)
 	}
