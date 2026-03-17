@@ -80,7 +80,6 @@ func BuildGraph(agent model.AgentComposition, skills []model.SkillBehavior) *Gra
 	// Build pkg/dag for execution-capable use (Run is nil — analysis only)
 	dagNodes := make([]*dag.Node, 0, len(skills))
 	for _, s := range skills {
-		s := s // capture loop variable
 		dagNodes = append(dagNodes, &dag.Node{
 			ID:       s.Skill,
 			Consumes: s.Context.Consumes,
