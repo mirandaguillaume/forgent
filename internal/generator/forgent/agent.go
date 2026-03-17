@@ -50,12 +50,19 @@ func GenerateAgentGo(agent model.AgentComposition, skills []model.SkillBehavior)
 
 	// main function
 	b.WriteString("func main() {\n")
-	b.WriteString("\tapiKey := os.Getenv(\"ANTHROPIC_API_KEY\")\n")
-	b.WriteString("\tif apiKey == \"\" {\n")
-	b.WriteString("\t\tfmt.Fprintln(os.Stderr, \"ANTHROPIC_API_KEY is required\")\n")
+	b.WriteString("\tvar provider llmProvider\n")
+	b.WriteString("\tif key := os.Getenv(\"OPENROUTER_API_KEY\"); key != \"\" {\n")
+	b.WriteString("\t\tmodel := os.Getenv(\"OPENROUTER_MODEL\")\n")
+	b.WriteString("\t\tif model == \"\" {\n")
+	b.WriteString("\t\t\tmodel = \"anthropic/claude-haiku-4-5-20251001\"\n")
+	b.WriteString("\t\t}\n")
+	b.WriteString("\t\tprovider = newOpenRouterProvider(key, model)\n")
+	b.WriteString("\t} else if key := os.Getenv(\"ANTHROPIC_API_KEY\"); key != \"\" {\n")
+	b.WriteString("\t\tprovider = newAnthropicProvider(key)\n")
+	b.WriteString("\t} else {\n")
+	b.WriteString("\t\tfmt.Fprintln(os.Stderr, \"OPENROUTER_API_KEY or ANTHROPIC_API_KEY is required\")\n")
 	b.WriteString("\t\tos.Exit(1)\n")
-	b.WriteString("\t}\n")
-	b.WriteString("\tprovider := newAnthropicProvider(apiKey)\n\n")
+	b.WriteString("\t}\n\n")
 
 	// Nodes
 	b.WriteString("\tnodes := []*dag.Node{\n")
@@ -191,6 +198,73 @@ type anthropicResponse struct {
 type anthropicContent struct {
 	Type string ` + "`" + `json:"type"` + "`" + `
 	Text string ` + "`" + `json:"text"` + "`" + `
+}
+
+// openRouterProvider calls the OpenRouter API (OpenAI-compatible).
+type openRouterProvider struct {
+	apiKey string
+	model  string
+}
+
+func newOpenRouterProvider(apiKey, model string) *openRouterProvider {
+	return &openRouterProvider{apiKey: apiKey, model: model}
+}
+
+type openRouterRequest struct {
+	Model    string              ` + "`" + `json:"model"` + "`" + `
+	Messages []anthropicMessage  ` + "`" + `json:"messages"` + "`" + `
+}
+
+type openRouterResponse struct {
+	Choices []struct {
+		Message struct {
+			Content string ` + "`" + `json:"content"` + "`" + `
+		} ` + "`" + `json:"message"` + "`" + `
+	} ` + "`" + `json:"choices"` + "`" + `
+	Error *struct {
+		Message string ` + "`" + `json:"message"` + "`" + `
+	} ` + "`" + `json:"error,omitempty"` + "`" + `
+}
+
+// NOTE: ctx is forwarded to the HTTP request for cancellation support
+func (p *openRouterProvider) Complete(ctx context.Context, prompt string) (string, error) {
+	reqBody := openRouterRequest{
+		Model:    p.model,
+		Messages: []anthropicMessage{{Role: "user", Content: prompt}},
+	}
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("marshal request: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://openrouter.ai/api/v1/chat/completions", bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+p.apiKey)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("send request: %w", err)
+	}
+	defer resp.Body.Close()
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("read response: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("API error %d: %s", resp.StatusCode, string(respBody))
+	}
+	var result openRouterResponse
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return "", fmt.Errorf("unmarshal response: %w", err)
+	}
+	if result.Error != nil {
+		return "", fmt.Errorf("API error: %s", result.Error.Message)
+	}
+	if len(result.Choices) == 0 {
+		return "", fmt.Errorf("empty response from API")
+	}
+	return result.Choices[0].Message.Content, nil
 }
 
 // NOTE: ctx is forwarded to the HTTP request for cancellation support
