@@ -65,12 +65,13 @@ func TestIntegration_GeneratedCodeCompiles(t *testing.T) {
 	// go mod tidy
 	tidy := exec.Command("go", "mod", "tidy")
 	tidy.Dir = agentDir
-	tidyOut, _ := tidy.CombinedOutput()
+	tidyOut, tidyErr := tidy.CombinedOutput()
+	require.NoError(t, tidyErr, "go mod tidy must succeed:\n%s", string(tidyOut))
 
 	// go build
 	build := exec.Command("go", "build", ".")
 	build.Dir = agentDir
 	buildOut, buildErr := build.CombinedOutput()
 
-	assert.NoError(t, buildErr, "generated code must compile:\ngo mod tidy: %s\ngo build: %s", string(tidyOut), string(buildOut))
+	assert.NoError(t, buildErr, "generated code must compile:\n%s", string(buildOut))
 }
