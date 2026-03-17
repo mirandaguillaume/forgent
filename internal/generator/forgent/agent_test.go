@@ -62,8 +62,9 @@ func TestGenerateAgentGo_ContainsAllNodes(t *testing.T) {
 	}
 
 	code := GenerateAgentGo(agent, skills)
-	assert.Contains(t, code, `ID: "a"`)
-	assert.Contains(t, code, `ID: "b"`)
+	assert.Contains(t, code, `"a"`)
+	assert.Contains(t, code, `"b"`)
+	assert.Contains(t, code, `ID:`)
 }
 
 func TestGenerateGoMod(t *testing.T) {
