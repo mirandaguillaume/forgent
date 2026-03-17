@@ -1,0 +1,92 @@
+package forgent
+
+import (
+	"testing"
+
+	"github.com/mirandaguillaume/forgent/pkg/model"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestGenerateAgentGo_Compiles(t *testing.T) {
+	agent := model.AgentComposition{
+		Agent:         "ci-reviewer",
+		Skills:        []string{"ts-linter", "review-commenter"},
+		Orchestration: model.OrchestrationSequential,
+		Consumes:      []string{"file_tree", "source_code", "git_diff"},
+		Produces:      []string{"review_comments"},
+	}
+	skills := []model.SkillBehavior{
+		{
+			Skill:   "ts-linter",
+			Version: "1.0.0",
+			Context: model.ContextFacet{
+				Consumes: []string{"file_tree", "source_code"},
+				Produces: []string{"lint_results"},
+			},
+			Strategy: model.StrategyFacet{Approach: "static-analysis"},
+			Security: model.SecurityFacet{Filesystem: model.AccessReadOnly, Network: model.NetworkNone},
+		},
+		{
+			Skill:   "review-commenter",
+			Version: "1.0.0",
+			Context: model.ContextFacet{
+				Consumes: []string{"git_diff", "lint_results"},
+				Produces: []string{"review_comments"},
+			},
+			Strategy: model.StrategyFacet{Approach: "diff-analysis"},
+			Security: model.SecurityFacet{Filesystem: model.AccessReadOnly, Network: model.NetworkNone},
+		},
+	}
+
+	code := GenerateAgentGo(agent, skills)
+
+	// Must contain key structural elements
+	assert.Contains(t, code, "package main")
+	assert.Contains(t, code, `"github.com/mirandaguillaume/forgent/pkg/dag"`)
+	assert.Contains(t, code, "dag.New(")
+	assert.Contains(t, code, "dag.WithInputs(")
+	assert.Contains(t, code, "ts-linter")
+	assert.Contains(t, code, "review-commenter")
+	assert.Contains(t, code, "discoverInputs")
+}
+
+func TestGenerateAgentGo_ContainsAllNodes(t *testing.T) {
+	agent := model.AgentComposition{
+		Agent:  "simple",
+		Skills: []string{"a", "b"},
+	}
+	skills := []model.SkillBehavior{
+		{Skill: "a", Context: model.ContextFacet{Produces: []string{"x"}}},
+		{Skill: "b", Context: model.ContextFacet{Consumes: []string{"x"}, Produces: []string{"y"}}},
+	}
+
+	code := GenerateAgentGo(agent, skills)
+	assert.Contains(t, code, `ID: "a"`)
+	assert.Contains(t, code, `ID: "b"`)
+}
+
+func TestGenerateGoMod(t *testing.T) {
+	mod := GenerateGoMod("ci-reviewer")
+	require.Contains(t, mod, "module ci-reviewer")
+	assert.Contains(t, mod, "github.com/mirandaguillaume/forgent")
+	assert.Contains(t, mod, "replace")
+}
+
+func TestGenerateAgentGo_RetryTimeout(t *testing.T) {
+	agent := model.AgentComposition{
+		Agent:  "retry-test",
+		Skills: []string{"flaky"},
+	}
+	skills := []model.SkillBehavior{
+		{
+			Skill: "flaky",
+			Context: model.ContextFacet{Produces: []string{"x"}},
+			Strategy: model.StrategyFacet{Approach: "test"},
+		},
+	}
+
+	code := GenerateAgentGo(agent, skills)
+	assert.Contains(t, code, "MaxRetries:")
+	assert.Contains(t, code, "Timeout:")
+}
