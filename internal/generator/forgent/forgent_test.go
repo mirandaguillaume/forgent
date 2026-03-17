@@ -27,3 +27,10 @@ func TestForgentTarget_NotSkillGenerator(t *testing.T) {
 	_, ok := gen.(spec.SkillGenerator)
 	assert.False(t, ok, "forgent generator should NOT implement SkillGenerator (skills are inlined)")
 }
+
+func TestForgentTarget_AgentPath(t *testing.T) {
+	gen, _ := spec.Get("forgent")
+	ag := gen.(spec.AgentGenerator)
+	assert.Equal(t, "my_agent/main.go", ag.AgentPath("my-agent"))
+	assert.Equal(t, "ci_reviewer/main.go", ag.AgentPath("ci-reviewer"))
+}
