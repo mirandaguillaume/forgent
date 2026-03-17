@@ -86,3 +86,114 @@ func TestAddEdge_PreventsCycle(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "cycle")
 }
+
+// --- Topology layer tests (T1-T10) ---
+
+func TestLayers_T1_Pipeline(t *testing.T) {
+	d, _ := dag.New(
+		node("a", nil, []string{"x"}),
+		node("b", []string{"x"}, []string{"y"}),
+		node("c", []string{"y"}, []string{"z"}),
+	)
+	layers := d.Layers()
+	require.Len(t, layers, 3)
+	assert.Contains(t, layers[0], "a")
+	assert.Contains(t, layers[1], "b")
+	assert.Contains(t, layers[2], "c")
+}
+
+func TestLayers_T2_FanOut(t *testing.T) {
+	d, _ := dag.New(
+		node("a", nil, []string{"x"}),
+		node("b", []string{"x"}, []string{"p"}),
+		node("c", []string{"x"}, []string{"q"}),
+		node("dd", []string{"x"}, []string{"r"}),
+	)
+	layers := d.Layers()
+	require.Len(t, layers, 2)
+	assert.Len(t, layers[0], 1)
+	assert.Len(t, layers[1], 3)
+}
+
+func TestLayers_T3_FanIn(t *testing.T) {
+	d, _ := dag.New(
+		node("a", nil, []string{"x"}),
+		node("b", nil, []string{"y"}),
+		node("c", nil, []string{"z"}),
+		node("d", []string{"x", "y", "z"}, []string{"out"}),
+	)
+	layers := d.Layers()
+	require.Len(t, layers, 2)
+	assert.Len(t, layers[0], 3)
+	assert.Contains(t, layers[1], "d")
+}
+
+func TestLayers_T4_Diamond(t *testing.T) {
+	d, _ := dag.New(
+		node("a", nil, []string{"x"}),
+		node("b", []string{"x"}, []string{"y"}),
+		node("c", []string{"x"}, []string{"z"}),
+		node("d", []string{"y", "z"}, []string{"out"}),
+	)
+	layers := d.Layers()
+	require.Len(t, layers, 3)
+	assert.Contains(t, layers[0], "a")
+	assert.ElementsMatch(t, []string{"b", "c"}, layers[1])
+	assert.Contains(t, layers[2], "d")
+}
+
+func TestLayers_T6_WideParallel(t *testing.T) {
+	d, _ := dag.New(
+		node("a", nil, []string{"x"}),
+		node("b", nil, []string{"y"}),
+		node("c", nil, []string{"z"}),
+	)
+	layers := d.Layers()
+	require.Len(t, layers, 1)
+	assert.Len(t, layers[0], 3)
+}
+
+func TestLayers_T7_PipelineWithBypass(t *testing.T) {
+	// a produces both "x" and "shortcut"
+	// b consumes "x" → produces "y"
+	// c consumes both "y" (from b) and "shortcut" (from a) → longest path a→b→c = 2 hops
+	d, _ := dag.New(
+		node("a", nil, []string{"x", "shortcut"}),
+		node("b", []string{"x"}, []string{"y"}),
+		node("c", []string{"y", "shortcut"}, []string{"z"}),
+	)
+	layers := d.Layers()
+	require.Len(t, layers, 3)
+	assert.Contains(t, layers[0], "a")
+	assert.Contains(t, layers[1], "b")
+	assert.Contains(t, layers[2], "c")
+}
+
+func TestLayers_T10_Hourglass(t *testing.T) {
+	d, _ := dag.New(
+		node("a", nil, []string{"x"}),
+		node("b", nil, []string{"y"}),
+		node("c", nil, []string{"z"}),
+		node("d", []string{"x", "y", "z"}, []string{"m"}),
+		node("e", []string{"m"}, []string{"p"}),
+		node("f", []string{"m"}, []string{"q"}),
+		node("g", []string{"m"}, []string{"r"}),
+	)
+	layers := d.Layers()
+	require.Len(t, layers, 3)
+	assert.Len(t, layers[0], 3)
+	assert.Contains(t, layers[1], "d")
+	assert.Len(t, layers[2], 3)
+}
+
+func TestLayers_Empty(t *testing.T) {
+	d, _ := dag.New()
+	assert.Empty(t, d.Layers())
+}
+
+func TestLayers_SingleNode(t *testing.T) {
+	d, _ := dag.New(node("only", nil, []string{"out"}))
+	layers := d.Layers()
+	require.Len(t, layers, 1)
+	assert.Equal(t, []string{"only"}, layers[0])
+}
