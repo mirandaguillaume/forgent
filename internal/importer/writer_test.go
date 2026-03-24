@@ -81,6 +81,56 @@ func TestWriteImportResult_WithAgent(t *testing.T) {
 	require.NoError(t, err, "agent file should exist")
 }
 
+func TestWriteImportResult_WithContracts(t *testing.T) {
+	dir := t.TempDir()
+
+	result := ImportResult{
+		Success: true,
+		Skills: []SkillResult{
+			{
+				Skill: model.SkillBehavior{
+					Skill:   "reviewer",
+					Version: "1.0.0",
+					Context: model.ContextFacet{
+						Produces: []string{"review_comments"},
+					},
+				},
+			},
+		},
+		Contracts: map[string]string{
+			"review_comments": "Provide review as structured list.",
+		},
+	}
+
+	paths, err := WriteImportResult(result, dir)
+	require.NoError(t, err)
+	require.Len(t, paths, 2) // 1 skill + 1 contract
+
+	contractPath := filepath.Join(dir, "contracts", "review_comments.md")
+	assert.Contains(t, paths, contractPath)
+
+	data, err := os.ReadFile(contractPath)
+	require.NoError(t, err)
+	assert.Contains(t, string(data), "structured list")
+}
+
+func TestWriteImportResult_ContractConflict(t *testing.T) {
+	dir := t.TempDir()
+
+	contractsDir := filepath.Join(dir, "contracts")
+	require.NoError(t, os.MkdirAll(contractsDir, 0755))
+	require.NoError(t, os.WriteFile(filepath.Join(contractsDir, "existing.md"), []byte("old"), 0644))
+
+	result := ImportResult{
+		Success:   true,
+		Contracts: map[string]string{"existing": "new content"},
+	}
+
+	_, err := WriteImportResult(result, dir)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "already exists")
+}
+
 func TestWriteImportResult_ConflictDetection(t *testing.T) {
 	dir := t.TempDir()
 

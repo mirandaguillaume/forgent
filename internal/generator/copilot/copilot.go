@@ -6,18 +6,20 @@ import (
 )
 
 type copilotGenerator struct {
-	compact bool
+	compact   bool
+	contracts map[string]string
 }
 
 func (g *copilotGenerator) Target() string           { return "copilot" }
 func (g *copilotGenerator) DefaultOutputDir() string { return ".github" }
 
 func (g *copilotGenerator) GenerateSkill(skill model.SkillBehavior) string {
-	return GenerateCopilotSkillMd(skill)
+	return GenerateCopilotSkillMd(skill, g.contracts)
 }
 
 func (g *copilotGenerator) SetOptions(opts spec.GeneratorOptions) {
 	g.compact = opts.Compact
+	g.contracts = opts.Contracts
 }
 
 func (g *copilotGenerator) GenerateAgent(agent model.AgentComposition, skills []model.SkillBehavior, outputDir string) string {

@@ -1,0 +1,29 @@
+skill: performance-bottleneck-detection
+version: 1.0.0
+context:
+  consumes: [source_code]
+  produces: [performance_report]
+  memory: short-term
+strategy:
+  tools: [read_file, grep, search, bash]
+  approach: Performance bottleneck identification through code pattern analysis
+  steps:
+    - Analyze database queries for N+1 problems
+    - Review memory usage patterns
+    - Check caching implementations
+    - Assess async/concurrent patterns
+    - Evaluate resource management
+guardrails:
+  - timeout: 180s
+  - max_query_analysis_time: 60s
+  - performance_threshold_ms: 100
+observability:
+  trace_level: standard
+  metrics: [bottlenecks_found, optimization_potential, analysis_time]
+security:
+  filesystem: read-only
+  network: none
+  secrets: []
+negotiation:
+  file_conflicts: yield
+  priority: 6

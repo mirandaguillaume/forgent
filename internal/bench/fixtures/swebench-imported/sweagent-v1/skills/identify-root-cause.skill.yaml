@@ -1,0 +1,26 @@
+skill: identify-root-cause
+version: 1.0.0
+context:
+  consumes: [code_analysis, issue_description]
+  produces: [root_cause]
+  memory: short-term
+strategy:
+  tools: [read_file, grep]
+  approach: "Identify the root cause of the issue through detailed code examination"
+  steps:
+    - "Examine the analyzed code components for potential issues"
+    - "Trace through the logic to identify the source of the problem"
+    - "Determine the specific cause that needs to be addressed"
+guardrails:
+  - "Timeout after 180 seconds of root cause analysis"
+  - "Focus analysis on the most relevant code sections"
+observability:
+  trace_level: standard
+  metrics: [analysis_depth, cause_identification_time]
+security:
+  filesystem: read-only
+  network: none
+  secrets: []
+negotiation:
+  file_conflicts: yield
+  priority: 110

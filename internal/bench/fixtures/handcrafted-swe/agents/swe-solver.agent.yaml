@@ -1,0 +1,10 @@
+agent: swe-solver
+description: Fix GitHub issues with minimal, targeted code changes
+skills:
+  - repo-navigation
+  - fault-localization
+  - minimal-edit
+  - test-validation
+orchestration: sequential
+consumes: [problem_statement]
+produces: [code_patch, validation_result]

@@ -1,0 +1,10 @@
+agent: code-reviewer
+skills:
+  - security-vulnerability-scan
+  - code-quality-assessment
+  - performance-bottleneck-detection
+  - infrastructure-config-audit
+orchestration: parallel-then-merge
+description: Elite code review expert providing comprehensive analysis across security, quality, performance, and infrastructure
+consumes: [source_code, dependencies, test_files, config_files, infrastructure_code]
+produces: [security_findings, quality_report, performance_report, config_audit_report]

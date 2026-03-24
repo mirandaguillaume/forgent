@@ -45,97 +45,63 @@ func testSkill() model.SkillBehavior {
 }
 
 func TestGenerateSkillMd_Frontmatter(t *testing.T) {
-	md := claude.GenerateSkillMd(testSkill())
+	md := claude.GenerateSkillMd(testSkill(), nil, "")
 	assert.Contains(t, md, "---\nname: code-review\n")
 	assert.Contains(t, md, "description: analytical-based skill")
 }
 
 func TestGenerateSkillMd_Title(t *testing.T) {
-	md := claude.GenerateSkillMd(testSkill())
+	md := claude.GenerateSkillMd(testSkill(), nil, "")
 	assert.Contains(t, md, "# Code Review")
 }
 
-func TestGenerateSkillMd_GuardrailsBeforeContext(t *testing.T) {
-	md := claude.GenerateSkillMd(testSkill())
+func TestGenerateSkillMd_GuardrailsFirst(t *testing.T) {
+	md := claude.GenerateSkillMd(testSkill(), nil, "")
 	guardrailIdx := strings.Index(md, "## Guardrails")
-	contextIdx := strings.Index(md, "## Context")
-	assert.Greater(t, contextIdx, guardrailIdx, "Guardrails should appear before Context")
+	stepsIdx := strings.Index(md, "## Steps")
+	assert.Greater(t, stepsIdx, guardrailIdx, "Guardrails should appear before Steps")
 }
 
-func TestGenerateSkillMd_SecurityLast(t *testing.T) {
-	md := claude.GenerateSkillMd(testSkill())
-	securityIdx := strings.Index(md, "## Security")
-	strategyIdx := strings.Index(md, "## Strategy")
-	assert.Greater(t, securityIdx, strategyIdx, "Security should appear after Strategy")
+func TestGenerateSkillMd_NoContextSection(t *testing.T) {
+	md := claude.GenerateSkillMd(testSkill(), nil, "")
+	assert.NotContains(t, md, "## Context")
+	assert.NotContains(t, md, "Consumes:")
+	assert.NotContains(t, md, "Memory:")
 }
 
-func TestGenerateSkillMd_ContextSection(t *testing.T) {
-	md := claude.GenerateSkillMd(testSkill())
-	assert.Contains(t, md, "Consumes: source-code, diff")
-	assert.Contains(t, md, "Produces: review-report")
-	assert.Contains(t, md, "Memory: conversation")
+func TestGenerateSkillMd_NoSecuritySection(t *testing.T) {
+	md := claude.GenerateSkillMd(testSkill(), nil, "")
+	assert.NotContains(t, md, "## Security")
 }
 
-func TestGenerateSkillMd_StrategySection(t *testing.T) {
-	md := claude.GenerateSkillMd(testSkill())
-	assert.Contains(t, md, "Approach: analytical")
-	assert.Contains(t, md, "Tools: read, grep")
+func TestGenerateSkillMd_NoWhenToUseSection(t *testing.T) {
+	skill := testSkill()
+	skill.WhenToUse = model.WhenToUseFacet{
+		Triggers: []string{"Test failures"},
+	}
+	md := claude.GenerateSkillMd(skill, nil, "")
+	assert.NotContains(t, md, "## When to Use")
+}
+
+func TestGenerateSkillMd_NoStrategyMetadata(t *testing.T) {
+	md := claude.GenerateSkillMd(testSkill(), nil, "")
+	assert.NotContains(t, md, "## Strategy")
+	assert.NotContains(t, md, "Approach:")
+	assert.NotContains(t, md, "Tools:")
 }
 
 func TestGenerateSkillMd_StepsNumbered(t *testing.T) {
-	md := claude.GenerateSkillMd(testSkill())
+	md := claude.GenerateSkillMd(testSkill(), nil, "")
 	assert.Contains(t, md, "1. Read the code")
 	assert.Contains(t, md, "2. Analyze patterns")
 	assert.Contains(t, md, "3. Write report")
 }
 
-func TestGenerateSkillMd_NoDependenciesSection(t *testing.T) {
-	md := claude.GenerateSkillMd(testSkill())
-	assert.NotContains(t, md, "## Dependencies")
-}
-
-func TestGenerateSkillMd_Security(t *testing.T) {
-	md := claude.GenerateSkillMd(testSkill())
-	assert.Contains(t, md, "- Filesystem: read-only")
-	assert.Contains(t, md, "- Network: none")
-	assert.Contains(t, md, "- Secrets: GITHUB_TOKEN")
-	assert.Contains(t, md, "- Sandbox: docker")
-}
-
 func TestGenerateSkillMd_NoGuardrails(t *testing.T) {
 	skill := testSkill()
 	skill.Guardrails = nil
-	md := claude.GenerateSkillMd(skill)
+	md := claude.GenerateSkillMd(skill, nil, "")
 	assert.NotContains(t, md, "## Guardrails")
-}
-
-func TestGenerateSkillMd_WhenToUse(t *testing.T) {
-	skill := testSkill()
-	skill.WhenToUse = model.WhenToUseFacet{
-		Triggers:   []string{"Test failures", "Bug reports"},
-		DontUse:    []string{"Simple typos"},
-		Especially: []string{"Under pressure"},
-	}
-	md := claude.GenerateSkillMd(skill)
-	assert.Contains(t, md, "## When to Use")
-	assert.Contains(t, md, "- Test failures")
-	assert.Contains(t, md, "- Simple typos")
-	assert.Contains(t, md, "- Under pressure")
-}
-
-func TestGenerateSkillMd_WhenToUseEmpty(t *testing.T) {
-	skill := testSkill()
-	md := claude.GenerateSkillMd(skill)
-	assert.NotContains(t, md, "## When to Use")
-}
-
-func TestGenerateSkillMd_WhenToUseBeforeContext(t *testing.T) {
-	skill := testSkill()
-	skill.WhenToUse = model.WhenToUseFacet{Triggers: []string{"always"}}
-	md := claude.GenerateSkillMd(skill)
-	wtuIdx := strings.Index(md, "## When to Use")
-	ctxIdx := strings.Index(md, "## Context")
-	assert.Greater(t, ctxIdx, wtuIdx, "When to Use should appear before Context")
 }
 
 func TestGenerateSkillMd_Examples(t *testing.T) {
@@ -143,7 +109,7 @@ func TestGenerateSkillMd_Examples(t *testing.T) {
 	skill.Examples = []model.CodeExample{
 		{Label: "Good: verify", Code: "go test ./...", Lang: "bash"},
 	}
-	md := claude.GenerateSkillMd(skill)
+	md := claude.GenerateSkillMd(skill, nil, "")
 	assert.Contains(t, md, "## Examples")
 	assert.Contains(t, md, "**Good: verify**")
 	assert.Contains(t, md, "```bash")
@@ -151,8 +117,7 @@ func TestGenerateSkillMd_Examples(t *testing.T) {
 }
 
 func TestGenerateSkillMd_ExamplesEmpty(t *testing.T) {
-	skill := testSkill()
-	md := claude.GenerateSkillMd(skill)
+	md := claude.GenerateSkillMd(testSkill(), nil, "")
 	assert.NotContains(t, md, "## Examples")
 }
 
@@ -161,25 +126,47 @@ func TestGenerateSkillMd_AntiPatterns(t *testing.T) {
 	skill.AntiPatterns = []model.AntiPattern{
 		{Excuse: "Quick fix", Reality: "Do it right"},
 	}
-	md := claude.GenerateSkillMd(skill)
+	md := claude.GenerateSkillMd(skill, nil, "")
 	assert.Contains(t, md, "## Red Flags")
 	assert.Contains(t, md, "| Quick fix | Do it right |")
 }
 
 func TestGenerateSkillMd_AntiPatternsEmpty(t *testing.T) {
-	skill := testSkill()
-	md := claude.GenerateSkillMd(skill)
+	md := claude.GenerateSkillMd(testSkill(), nil, "")
 	assert.NotContains(t, md, "## Red Flags")
 }
 
-func TestGenerateSkillMd_ExamplesBeforeSecurity(t *testing.T) {
+func TestGenerateSkillMd_ContractInlined(t *testing.T) {
+	skill := testSkill()
+	contracts := map[string]string{
+		"review-report": "```\nseverity: {level}\n```",
+	}
+	md := claude.GenerateSkillMd(skill, contracts, "")
+	assert.Contains(t, md, "## Output Format")
+	assert.Contains(t, md, "severity: {level}")
+}
+
+func TestGenerateSkillMd_ContractAsPointer(t *testing.T) {
+	skill := testSkill()
+	contracts := map[string]string{
+		"review-report": "```\nseverity: {level}\n```",
+	}
+	md := claude.GenerateSkillMd(skill, contracts, "/project/contracts")
+	assert.Contains(t, md, "## Output")
+	assert.Contains(t, md, "`/project/contracts/review-report")
+	assert.NotContains(t, md, "severity: {level}")
+}
+
+func TestGenerateSkillMd_SectionOrder(t *testing.T) {
 	skill := testSkill()
 	skill.Examples = []model.CodeExample{{Label: "test", Code: "echo hi"}}
 	skill.AntiPatterns = []model.AntiPattern{{Excuse: "a", Reality: "b"}}
-	md := claude.GenerateSkillMd(skill)
+	md := claude.GenerateSkillMd(skill, nil, "")
+	guardrailIdx := strings.Index(md, "## Guardrails")
+	stepsIdx := strings.Index(md, "## Steps")
 	exIdx := strings.Index(md, "## Examples")
 	apIdx := strings.Index(md, "## Red Flags")
-	secIdx := strings.Index(md, "## Security")
-	assert.Greater(t, apIdx, exIdx, "Red Flags should appear after Examples")
-	assert.Greater(t, secIdx, apIdx, "Security should appear after Red Flags")
+	assert.Greater(t, stepsIdx, guardrailIdx, "Steps after Guardrails")
+	assert.Greater(t, exIdx, stepsIdx, "Examples after Steps")
+	assert.Greater(t, apIdx, exIdx, "Red Flags after Examples")
 }

@@ -40,11 +40,12 @@ type AgentResult struct {
 
 // ImportResult is the output of the import pipeline.
 type ImportResult struct {
-	Success  bool
-	Error    string
-	Skills   []SkillResult
-	Agent    *AgentResult
-	Warnings []string
+	Success   bool
+	Error     string
+	Skills    []SkillResult
+	Agent     *AgentResult
+	Contracts map[string]string // produce name → output format template
+	Warnings  []string
 }
 
 // llmResponse is the JSON structure returned by the LLM.
@@ -55,6 +56,7 @@ type llmResponse struct {
 	Agent *struct {
 		YAML string `json:"yaml"`
 	} `json:"agent"`
+	Contracts map[string]string `json:"contracts"`
 }
 
 // RunImport executes the full import pipeline: resolve sources, extract
@@ -93,7 +95,7 @@ func RunImport(opts ImportOptions) ImportResult {
 	}
 
 	// 6. Parse response
-	skills, agent, rawYAMLs, err := parseLLMResponse(response)
+	skills, agent, rawYAMLs, contracts, err := parseLLMResponse(response)
 	if err != nil {
 		return ImportResult{Error: fmt.Sprintf("parsing LLM response: %v", err)}
 	}
@@ -107,6 +109,7 @@ func RunImport(opts ImportOptions) ImportResult {
 
 	// 7. Validate
 	result := validateImport(skills, agent, rawYAMLs, rawAgentYAML)
+	result.Contracts = contracts
 
 	// 8. Retry if MinScore > 0 and feedback exists
 	if opts.MinScore > 0 {
@@ -115,7 +118,7 @@ func RunImport(opts ImportOptions) ImportResult {
 			retryPrompt := BuildRetryPrompt(prompt, response, feedback)
 			retryResponse, retryErr := opts.Provider.Complete(retryPrompt)
 			if retryErr == nil {
-				retrySkills, retryAgent, retryRawYAMLs, parseErr := parseLLMResponse(retryResponse)
+				retrySkills, retryAgent, retryRawYAMLs, retryContracts, parseErr := parseLLMResponse(retryResponse)
 				if parseErr == nil {
 					var retryRawAgentYAML string
 					if retryAgent != nil && len(retryRawYAMLs) > len(retrySkills) {
@@ -123,6 +126,7 @@ func RunImport(opts ImportOptions) ImportResult {
 						retryRawYAMLs = retryRawYAMLs[:len(retryRawYAMLs)-1]
 					}
 					result = validateImport(retrySkills, retryAgent, retryRawYAMLs, retryRawAgentYAML)
+					result.Contracts = retryContracts
 				}
 			}
 		}
@@ -135,14 +139,14 @@ func RunImport(opts ImportOptions) ImportResult {
 // markdown code fences, unmarshals the JSON, then parses each embedded
 // YAML block into SkillBehavior and optionally AgentComposition.
 // Returns skills, agent, all raw YAML strings (skills first, then agent if
-// present), and any error.
-func parseLLMResponse(response string) ([]model.SkillBehavior, *model.AgentComposition, []string, error) {
+// present), contracts map, and any error.
+func parseLLMResponse(response string) ([]model.SkillBehavior, *model.AgentComposition, []string, map[string]string, error) {
 	// Strip markdown fences.
 	cleaned := stripMarkdownFences(response)
 
 	var resp llmResponse
 	if err := json.Unmarshal([]byte(cleaned), &resp); err != nil {
-		return nil, nil, nil, fmt.Errorf("invalid JSON from LLM: %w", err)
+		return nil, nil, nil, nil, fmt.Errorf("invalid JSON from LLM: %w", err)
 	}
 
 	var skills []model.SkillBehavior
@@ -151,7 +155,7 @@ func parseLLMResponse(response string) ([]model.SkillBehavior, *model.AgentCompo
 	for i, s := range resp.Skills {
 		var skill model.SkillBehavior
 		if err := yaml.Unmarshal([]byte(s.YAML), &skill); err != nil {
-			return nil, nil, nil, fmt.Errorf("parsing skill YAML [%d]: %w", i, err)
+			return nil, nil, nil, nil, fmt.Errorf("parsing skill YAML [%d]: %w", i, err)
 		}
 		skills = append(skills, skill)
 		rawYAMLs = append(rawYAMLs, s.YAML)
@@ -161,13 +165,13 @@ func parseLLMResponse(response string) ([]model.SkillBehavior, *model.AgentCompo
 	if resp.Agent != nil {
 		var a model.AgentComposition
 		if err := yaml.Unmarshal([]byte(resp.Agent.YAML), &a); err != nil {
-			return nil, nil, nil, fmt.Errorf("parsing agent YAML: %w", err)
+			return nil, nil, nil, nil, fmt.Errorf("parsing agent YAML: %w", err)
 		}
 		agent = &a
 		rawYAMLs = append(rawYAMLs, resp.Agent.YAML)
 	}
 
-	return skills, agent, rawYAMLs, nil
+	return skills, agent, rawYAMLs, resp.Contracts, nil
 }
 
 // stripMarkdownFences removes markdown code fences from a string, handling

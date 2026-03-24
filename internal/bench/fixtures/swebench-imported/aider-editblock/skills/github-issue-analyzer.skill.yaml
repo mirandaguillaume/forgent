@@ -1,0 +1,35 @@
+skill: github-issue-analyzer
+version: 1.0.0
+context:
+  consumes:
+    - github_issue
+    - python_codebase
+  produces:
+    - issue_analysis
+  memory: short-term
+strategy:
+  tools:
+    - read_file
+    - grep
+    - search
+  approach: Analyze GitHub issues to understand bugs in Python code
+  steps:
+    - Parse the GitHub issue to identify the bug
+    - Analyze relevant code files to understand current behavior
+    - Determine what changes are needed to fix the issue
+guardrails:
+    - Focus only on understanding the problem, not implementing fixes
+    - Only analyze standard Python code
+    - Maximum 15 minutes per issue analysis
+observability:
+  trace_level: standard
+  metrics:
+    - analysis_time
+    - files_analyzed
+security:
+  filesystem: read-only
+  network: none
+  secrets: []
+negotiation:
+  file_conflicts: yield
+  priority: 5

@@ -1,0 +1,30 @@
+skill: generate-code-patch
+version: 1.0.0
+context:
+  consumes: [bug_analysis, code_context]
+  produces: [unified_diff_patch]
+  memory: short-term
+strategy:
+  tools: [read_file, edit_file, grep]
+  approach: minimal code changes to resolve identified issue
+  steps:
+    - identify exact locations requiring changes
+    - implement minimal fixes preserving functionality
+    - add necessary imports if required
+    - generate unified diff format
+guardrails:
+  - timeout: 600s
+  - minimal_changes_only: true
+  - preserve_existing_functionality: true
+  - no_test_file_modifications: true
+  - proper_python_indentation: required
+observability:
+  trace_level: detailed
+  metrics: [patch_size, files_modified, generation_time]
+security:
+  filesystem: read-only
+  network: none
+  secrets: []
+negotiation:
+  file_conflicts: override
+  priority: 2

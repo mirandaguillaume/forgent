@@ -2,18 +2,17 @@
 
 A CLI for designing, building, and composing AI agents across frameworks.
 
-Agents are compositions of **Skill Behaviors** — reusable behavioral units described by 6 facets:
+Agents are compositions of **Skill Behaviors** — reusable behavioral units described by 5 facets:
 
 | Facet | What it defines |
 |-------|----------------|
 | **Context** | Memory, inputs consumed, outputs produced |
-| **Strategy** | Tools, approach, execution steps |
+| **Strategy** | Tools, approach, execution steps, effort level |
 | **Guardrails** | Rules, limits, constraints |
-| **Dependencies** | Skill composition and data flow |
 | **Observability** | Traces, metrics, structured logging |
 | **Security** | Filesystem, network, secrets, sandboxing |
 
-Skills are defined in YAML, validated against a schema, and compiled to framework-specific formats.
+Skills are pure interfaces (consumes/produces). Agents declare their own I/O contract and orchestration. Skills are defined in YAML, validated against a schema, and compiled to framework-specific formats.
 
 ## Install
 
@@ -32,16 +31,19 @@ Requires Go 1.22+.
 ## Commands
 
 ```bash
-forgent init                      # Initialize a Forgent project
-forgent skill create <name>       # Scaffold a new skill
-forgent lint [path]               # Lint skills for best practices
-forgent doctor [path]             # Full diagnostic (lint + deps + loops)
-forgent score [path]              # Score design quality
-forgent build                     # Build for Claude Code (default)
-forgent build --target copilot    # Build for GitHub Copilot
-forgent build --watch             # Watch and rebuild on changes
-forgent import <source>           # Import agent .md files as Forgent skill specs
-forgent import <source> --yes     # Skip confirmation, write directly
+forgent init                           # Initialize a Forgent project
+forgent skill create <name>            # Scaffold a new skill
+forgent lint [path]                    # Lint skills for best practices
+forgent doctor [path]                  # Full diagnostic (lint + deps + loops)
+forgent score [path]                   # Score design quality
+forgent build --target claude          # Build for Claude Code (default)
+forgent build --target copilot         # Build for GitHub Copilot
+forgent build --target forgent         # Generate standalone Go runtime
+forgent build --compact                # Reduce structural overhead
+forgent build --watch                  # Watch and rebuild on changes
+forgent import <source>               # Import agent .md files as Forgent skill specs
+forgent import <source> --yes          # Skip confirmation, write directly
+forgent bench <repo-path>             # Benchmark agent composition quality
 ```
 
 ## Quick Start
@@ -70,6 +72,7 @@ context:
 strategy:
   tools: [web_search, read_url]
   approach: "Search, filter, summarize"
+  effort: medium
 
 guardrails:
   - "Max 5 search queries per invocation"
@@ -83,10 +86,6 @@ security:
   filesystem: none
   network: full
   secrets: []
-
-negotiation:
-  file_conflicts: yield
-  priority: 0
 ```
 
 ## Build Targets
@@ -97,8 +96,7 @@ negotiation:
 |--------|--------|--------|
 | Claude Code | `.claude/` (SKILL.md + agent.md) | Available |
 | GitHub Copilot | `.github/` (SKILL.md + agent.md + instructions) | Available |
-| CrewAI | — | Planned |
-| LangGraph | — | Planned |
+| Forgent | standalone Go binary (runtime + prompt) | Available |
 
 ## Roadmap
 
@@ -114,18 +112,16 @@ negotiation:
 | LLM providers — Anthropic + OpenRouter | Done |
 | Vercel skill resolver (`vercel:skill-name`) | Done |
 | Validation-driven retry loop (linter feedback → LLM) | Done |
-| Whitepaper with case study | Done |
-| CrewAI / LangGraph build targets | Planned |
+| Multi-agent dispatch with effort levels | Done |
+| Staged agent pipelines (multi-stage orchestration) | Done |
+| `--compact` mode (reduces overhead 117% → 14%) | Done |
+| Executable DAG engine (`pkg/dag`) | Done |
+| `forgent build --target forgent` — Go runtime generator | Done |
+| `forgent bench` — composition quality benchmarks | Done |
+| DAG v2 (race, fallback, map-reduce, HITL) | Planned |
 | `forgent import` — batch directory processing | Planned |
 | Approval gate facet (human-in-the-loop) | Planned |
 | `forgent test` — behavioral testing for skills | Planned |
-
-```bash
-forgent build --target claude           # default
-forgent build --target copilot
-forgent build --target claude -o out/
-forgent build --watch                   # rebuilds on changes
-```
 
 ## Development
 
