@@ -6,18 +6,22 @@ import (
 )
 
 type claudeGenerator struct {
-	compact bool
+	compact      bool
+	contracts    map[string]string
+	contractsDir string
 }
 
 func (g *claudeGenerator) Target() string           { return "claude" }
 func (g *claudeGenerator) DefaultOutputDir() string { return ".claude" }
 
 func (g *claudeGenerator) GenerateSkill(skill model.SkillBehavior) string {
-	return GenerateSkillMd(skill)
+	return GenerateSkillMd(skill, g.contracts, g.contractsDir)
 }
 
 func (g *claudeGenerator) SetOptions(opts spec.GeneratorOptions) {
 	g.compact = opts.Compact
+	g.contracts = opts.Contracts
+	g.contractsDir = opts.ContractsDir
 }
 
 func (g *claudeGenerator) GenerateAgent(agent model.AgentComposition, skills []model.SkillBehavior, outputDir string) string {

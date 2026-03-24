@@ -100,6 +100,15 @@ func FormatPreview(result ImportResult, w io.Writer) {
 		fmt.Fprintln(w)
 	}
 
+	// Contracts section.
+	if len(result.Contracts) > 0 {
+		fmt.Fprintf(w, "Contracts: %d extracted\n", len(result.Contracts))
+		for name := range result.Contracts {
+			fmt.Fprintf(w, "  %s.md\n", name)
+		}
+		fmt.Fprintln(w)
+	}
+
 	// Warnings at the end.
 	if len(result.Warnings) > 0 {
 		fmt.Fprintln(w, "Warnings:")

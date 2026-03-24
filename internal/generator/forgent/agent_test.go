@@ -80,6 +80,32 @@ func TestGenerateGoMod_Sanitization(t *testing.T) {
 	assert.Contains(t, mod, "module my-ci-reviewer")
 }
 
+func TestGenerateAgentGo_ParallelStageMerge(t *testing.T) {
+	agent := model.AgentComposition{
+		Agent: "code-reviewer",
+		Stages: []model.Stage{
+			{Name: "analysis", Strategy: model.OrchestrationParallel, Skills: []string{"bug-scanner", "git-scanner"}},
+			{Name: "scoring", Strategy: model.OrchestrationSequential, Skills: []string{"scorer"}},
+		},
+	}
+	skills := []model.SkillBehavior{
+		{Skill: "bug-scanner", Context: model.ContextFacet{Consumes: []string{"diff"}, Produces: []string{"issues"}}},
+		{Skill: "git-scanner", Context: model.ContextFacet{Consumes: []string{"diff"}, Produces: []string{"issues"}}},
+		{Skill: "scorer", Context: model.ContextFacet{Consumes: []string{"issues"}, Produces: []string{"scored"}}},
+	}
+
+	code := GenerateAgentGo(agent, skills)
+
+	// Parallel skills must have renamed produces to avoid DAG duplicate-producer error.
+	assert.Contains(t, code, "issues__bug_scanner")
+	assert.Contains(t, code, "issues__git_scanner")
+	// A merge node must be emitted to combine them back into "issues".
+	assert.Contains(t, code, `merge__issues`)
+	assert.Contains(t, code, `"issues"`) // merge node produces original type
+	// scorer must still consume the original "issues" type (provided by merge node).
+	assert.Contains(t, code, "scorer")
+}
+
 func TestGenerateAgentGo_RetryTimeout(t *testing.T) {
 	agent := model.AgentComposition{
 		Agent:  "retry-test",

@@ -38,6 +38,29 @@ func TestBuildImportPrompt_NoFrontmatter(t *testing.T) {
 	assert.NotContains(t, prompt, "Source file:")
 }
 
+func TestBuildImportPrompt_ContractExtraction(t *testing.T) {
+	source := Source{Name: "agent.md", Content: "# Agent"}
+	fm := AgentFrontmatter{Name: "test"}
+
+	prompt := BuildImportPrompt(source, fm, "# Agent", nil)
+
+	assert.Contains(t, prompt, "output format templates")
+	assert.Contains(t, prompt, "contracts")
+	assert.Contains(t, prompt, "produce_name")
+}
+
+func TestBuildImportPrompt_SRPGuidance(t *testing.T) {
+	source := Source{Name: "agent.md", Content: "# Agent"}
+	fm := AgentFrontmatter{Name: "test"}
+
+	prompt := BuildImportPrompt(source, fm, "# Agent", nil)
+
+	assert.Contains(t, prompt, "exactly ONE output")
+	assert.Contains(t, prompt, "ONE action")
+	assert.Contains(t, prompt, "Maximum 5 steps")
+	assert.Contains(t, prompt, "REJECT skills")
+}
+
 func TestBuildRetryPrompt(t *testing.T) {
 	feedback := []string{
 		"skill 'review': missing guardrails.timeout",

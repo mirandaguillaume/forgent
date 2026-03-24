@@ -1,0 +1,49 @@
+skill: repo-navigation
+version: "1.0.0"
+
+context:
+  consumes: [problem_statement]
+  produces: [repo_structure]
+  memory: short-term
+
+strategy:
+  tools: [bash, glob, read]
+  approach: sequential
+  steps:
+    - List the top-level directory structure to understand the project layout
+    - Identify the source code directory versus tests, docs, and config
+    - Read setup.py, pyproject.toml, or Cargo.toml to understand the project name and structure
+    - Use the module or package names from the issue to navigate to the right directory
+    - Do not read files that are not relevant to the issue
+
+guardrails:
+  - Spend no more than 3 tool calls on navigation before moving to localization
+  - Do not read README or documentation files unless the issue references them
+  - Do not explore the git history
+  - Focus on source directories, skip CI config, Docker files, and build scripts
+
+when_to_use:
+  triggers:
+    - Starting work on an unfamiliar repository
+    - Issue references module or package names you need to locate
+  dont_use:
+    - You already know the repository structure
+    - The issue specifies exact file paths
+
+anti_patterns:
+  - excuse: "Let me understand the full architecture first"
+    reality: "You need to find one bug, not understand the whole system."
+  - excuse: "I'll read the README for context"
+    reality: "The issue statement is your context. Go straight to the code."
+
+observability:
+  trace_level: minimal
+  metrics: [dirs_explored, nav_tool_calls]
+
+negotiation:
+  file_conflicts: yield
+  priority: 0
+
+security:
+  filesystem: read-only
+  network: none

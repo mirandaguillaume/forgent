@@ -1,0 +1,11 @@
+agent: aider-editblock-bug-fixer
+skills:
+  - github-issue-analyzer
+  - unified-diff-patch-generator
+orchestration: sequential
+description: Analyzes GitHub issues describing Python bugs and generates unified diff patches to fix them
+consumes:
+  - github_issue
+  - python_codebase
+produces:
+  - unified_diff_patch

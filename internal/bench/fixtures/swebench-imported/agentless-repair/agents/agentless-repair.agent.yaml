@@ -1,0 +1,6 @@
+agent: agentless-repair
+skills: [bug-localization, minimal-fix-generation]
+orchestration: sequential
+description: "Software developer agent that fixes bugs reported in GitHub issues by localizing the problem and generating minimal code patches"
+consumes: [github_issue, codebase_files]
+produces: [unified_diff_patch]

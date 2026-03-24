@@ -38,51 +38,55 @@ func GenerateAgentMd(agent model.AgentComposition, resolvedSkills []model.SkillB
 	lines = append(lines, "")
 
 	if len(agent.Stages) > 0 {
-		// Staged pipeline
-		totalSkills := len(agent.AllSkills())
-		lines = append(lines, fmt.Sprintf("You are %s. An orchestrator that coordinates %d specialized subagents across %d stages.",
-			generator.ToTitle(agent.Agent), totalSkills, len(agent.Stages)))
-		lines = append(lines, "")
-		lines = append(lines, "## Execution")
-		lines = append(lines, fmt.Sprintf("Execute %d stages sequentially. Each stage completes before the next begins.", len(agent.Stages)))
+		// Staged pipeline — metadata table + flat steps
+		allSkills := agent.AllSkills()
+		totalSkills := len(allSkills)
+		lines = append(lines, fmt.Sprintf("You are %s. An orchestrator that coordinates %d specialized subagents.",
+			generator.ToTitle(agent.Agent), totalSkills))
 		lines = append(lines, "")
 
-		stepNum := 1
+		// Pipeline table (metadata only)
+		lines = append(lines, "## Pipeline")
+		lines = append(lines, "| Stage | Strategy | Skills |")
+		lines = append(lines, "|-------|----------|--------|")
 		for _, stage := range agent.Stages {
-			lines = append(lines, fmt.Sprintf("### Stage: %s (%s)", stage.Name, stage.Strategy))
-			lines = append(lines, "")
-			if stage.Strategy == model.OrchestrationParallel {
-				lines = append(lines, "Launch these subagents in parallel:")
-				lines = append(lines, "")
-			}
-			for _, skillName := range stage.Skills {
-				skillPath := fmt.Sprintf("%s/skills/%s/SKILL.md", outputDir, skillName)
-				lines = append(lines, fmt.Sprintf("#### Step %d: %s", stepNum, generator.ToTitle(skillName)))
+			lines = append(lines, fmt.Sprintf("| %s | %s | %s |",
+				stage.Name, stage.Strategy, strings.Join(stage.Skills, ", ")))
+		}
+		lines = append(lines, "")
 
-				effort := model.EffortMedium
-				for _, s := range resolvedSkills {
-					if s.Skill == skillName {
-						if s.Strategy.Effort != "" {
-							effort = s.Strategy.Effort
-						}
-						lines = append(lines, "Launch a subagent:")
-						lines = append(lines, fmt.Sprintf("- Skill: `%s`", skillPath))
-						lines = append(lines, fmt.Sprintf("- Model: %s", EffortToModel(effort)))
+		// Flat execution steps
+		lines = append(lines, "## Execution")
+		lines = append(lines, fmt.Sprintf(
+			"Execute %d skills sequentially as independent subagents. Each skill runs in isolation with its own context. Pass the output of each skill as input to the next.", totalSkills))
+		lines = append(lines, "")
 
-						consumes := formatIOPointers("In", s.Context.Consumes)
-						produces := formatIOPointers("Out", s.Context.Produces)
-						if consumes != "" {
-							lines = append(lines, "- "+consumes)
-						}
-						if produces != "" {
-							lines = append(lines, "- "+produces)
-						}
-						break
+		for i, skillName := range allSkills {
+			skillPath := fmt.Sprintf("%s/skills/%s/SKILL.md", outputDir, skillName)
+			lines = append(lines, fmt.Sprintf("### Step %d: %s", i+1, generator.ToTitle(skillName)))
+
+			effort := model.EffortMedium
+			for _, s := range resolvedSkills {
+				if s.Skill == skillName {
+					if s.Strategy.Effort != "" {
+						effort = s.Strategy.Effort
 					}
+					lines = append(lines, "Launch a subagent:")
+					lines = append(lines, fmt.Sprintf("- Skill: `%s`", skillPath))
+					lines = append(lines, fmt.Sprintf("- Model: %s", EffortToModel(effort)))
+
+					consumes := formatIOPointers("In", s.Context.Consumes)
+					produces := formatIOPointers("Out", s.Context.Produces)
+					if consumes != "" {
+						lines = append(lines, "- "+consumes)
+					}
+					if produces != "" {
+						lines = append(lines, "- "+produces)
+					}
+					break
 				}
-				lines = append(lines, "")
-				stepNum++
 			}
+			lines = append(lines, "")
 		}
 	} else {
 		// Flat pipeline

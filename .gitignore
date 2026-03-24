@@ -28,3 +28,16 @@ mutation-report.json
 
 # Claude
 .claude/
+
+# Serena
+.serena/
+
+# Local env
+.envrc
+
+# Bench artifacts
+logs/
+results/
+predictions-*.jsonl
+bench-h2h.json
+internal/bench/testdata/FeatureBench

@@ -1,0 +1,51 @@
+skill: fault-localization
+version: "1.0.0"
+
+context:
+  consumes: [problem_statement, repo_structure]
+  produces: [fault_location]
+  memory: short-term
+
+strategy:
+  tools: [grep, glob, read]
+  approach: sequential
+  steps:
+    - Read the problem statement carefully, noting error messages or stack traces
+    - Search for exact error strings or class/function names using grep
+    - Read the surrounding code context in the matched files
+    - Narrow down to the specific function containing the bug
+    - Confirm the fault location by tracing the triggering code path
+
+guardrails:
+  - Never edit code before completing localization
+  - Search at least 2 different terms before concluding where the bug is
+  - If the issue mentions a test, read the test first to understand expected behavior
+  - Prefer grep over reading entire files
+
+when_to_use:
+  triggers:
+    - Starting work on any bug fix task
+    - Issue contains error messages or stack traces
+  dont_use:
+    - Bug location is already specified in the issue
+  especially:
+    - Large repositories with many files
+    - Vague issue descriptions
+
+anti_patterns:
+  - excuse: "I'll just edit the file that seems most likely"
+    reality: "Guessing leads to wrong files. Search first, always."
+  - excuse: "Reading the whole codebase to understand it"
+    reality: "Targeted search is faster and more accurate than reading everything."
+
+observability:
+  trace_level: minimal
+  metrics: [files_searched, fault_confidence]
+
+negotiation:
+  file_conflicts: yield
+  priority: 0
+
+security:
+  filesystem: read-only
+  network: none

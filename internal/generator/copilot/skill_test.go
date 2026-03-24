@@ -45,57 +45,57 @@ func testSkill() model.SkillBehavior {
 }
 
 func TestGenerateCopilotSkillMd_Frontmatter(t *testing.T) {
-	md := copilot.GenerateCopilotSkillMd(testSkill())
+	md := copilot.GenerateCopilotSkillMd(testSkill(), nil)
 	assert.Contains(t, md, "---\nname: code-review\n")
 	assert.Contains(t, md, "description: analytical-based skill")
 }
 
 func TestGenerateCopilotSkillMd_Title(t *testing.T) {
-	md := copilot.GenerateCopilotSkillMd(testSkill())
+	md := copilot.GenerateCopilotSkillMd(testSkill(), nil)
 	assert.Contains(t, md, "# Code Review")
 }
 
 func TestGenerateCopilotSkillMd_GuardrailsBeforeContext(t *testing.T) {
-	md := copilot.GenerateCopilotSkillMd(testSkill())
+	md := copilot.GenerateCopilotSkillMd(testSkill(), nil)
 	guardrailIdx := strings.Index(md, "## Guardrails")
 	contextIdx := strings.Index(md, "## Context")
 	assert.Greater(t, contextIdx, guardrailIdx, "Guardrails should appear before Context")
 }
 
 func TestGenerateCopilotSkillMd_SecurityLast(t *testing.T) {
-	md := copilot.GenerateCopilotSkillMd(testSkill())
+	md := copilot.GenerateCopilotSkillMd(testSkill(), nil)
 	securityIdx := strings.Index(md, "## Security")
 	strategyIdx := strings.Index(md, "## Strategy")
 	assert.Greater(t, securityIdx, strategyIdx, "Security should appear after Strategy")
 }
 
 func TestGenerateCopilotSkillMd_ContextSection(t *testing.T) {
-	md := copilot.GenerateCopilotSkillMd(testSkill())
+	md := copilot.GenerateCopilotSkillMd(testSkill(), nil)
 	assert.Contains(t, md, "Consumes: source-code, diff")
 	assert.Contains(t, md, "Produces: review-report")
 	assert.Contains(t, md, "Memory: conversation")
 }
 
 func TestGenerateCopilotSkillMd_StrategySection(t *testing.T) {
-	md := copilot.GenerateCopilotSkillMd(testSkill())
+	md := copilot.GenerateCopilotSkillMd(testSkill(), nil)
 	assert.Contains(t, md, "Approach: analytical")
 	assert.Contains(t, md, "Tools: read, grep")
 }
 
 func TestGenerateCopilotSkillMd_StepsNumbered(t *testing.T) {
-	md := copilot.GenerateCopilotSkillMd(testSkill())
+	md := copilot.GenerateCopilotSkillMd(testSkill(), nil)
 	assert.Contains(t, md, "1. Read the code")
 	assert.Contains(t, md, "2. Analyze patterns")
 	assert.Contains(t, md, "3. Write report")
 }
 
 func TestGenerateCopilotSkillMd_NoDependenciesSection(t *testing.T) {
-	md := copilot.GenerateCopilotSkillMd(testSkill())
+	md := copilot.GenerateCopilotSkillMd(testSkill(), nil)
 	assert.NotContains(t, md, "## Dependencies")
 }
 
 func TestGenerateCopilotSkillMd_Security(t *testing.T) {
-	md := copilot.GenerateCopilotSkillMd(testSkill())
+	md := copilot.GenerateCopilotSkillMd(testSkill(), nil)
 	assert.Contains(t, md, "- Filesystem: read-only")
 	assert.Contains(t, md, "- Network: none")
 	assert.Contains(t, md, "- Secrets: GITHUB_TOKEN")
@@ -105,7 +105,7 @@ func TestGenerateCopilotSkillMd_Security(t *testing.T) {
 func TestGenerateCopilotSkillMd_NoGuardrails(t *testing.T) {
 	skill := testSkill()
 	skill.Guardrails = nil
-	md := copilot.GenerateCopilotSkillMd(skill)
+	md := copilot.GenerateCopilotSkillMd(skill, nil)
 	assert.NotContains(t, md, "## Guardrails")
 }
 
@@ -118,7 +118,7 @@ func TestGenerateCopilotSkillMd_DescriptionTruncation(t *testing.T) {
 	}
 	skill.Context.Consumes = longItems
 	skill.Context.Produces = longItems
-	md := copilot.GenerateCopilotSkillMd(skill)
+	md := copilot.GenerateCopilotSkillMd(skill, nil)
 
 	// Extract the description from frontmatter
 	parts := strings.SplitN(md, "---", 3)
@@ -134,7 +134,7 @@ func TestGenerateCopilotSkillMd_DescriptionTruncation(t *testing.T) {
 }
 
 func TestGenerateCopilotSkillMd_ShortDescriptionNotTruncated(t *testing.T) {
-	md := copilot.GenerateCopilotSkillMd(testSkill())
+	md := copilot.GenerateCopilotSkillMd(testSkill(), nil)
 
 	parts := strings.SplitN(md, "---", 3)
 	frontmatter := parts[1]
@@ -153,7 +153,7 @@ func TestGenerateCopilotSkillMd_WhenToUse(t *testing.T) {
 		Triggers: []string{"Test failures"},
 		DontUse:  []string{"Typos"},
 	}
-	md := copilot.GenerateCopilotSkillMd(skill)
+	md := copilot.GenerateCopilotSkillMd(skill, nil)
 	assert.Contains(t, md, "## When to Use")
 	assert.Contains(t, md, "- Test failures")
 	assert.Contains(t, md, "- Typos")
@@ -164,7 +164,7 @@ func TestGenerateCopilotSkillMd_Examples(t *testing.T) {
 	skill.Examples = []model.CodeExample{
 		{Label: "Good: verify", Code: "go test ./...", Lang: "bash"},
 	}
-	md := copilot.GenerateCopilotSkillMd(skill)
+	md := copilot.GenerateCopilotSkillMd(skill, nil)
 	assert.Contains(t, md, "## Examples")
 	assert.Contains(t, md, "```bash")
 }
@@ -174,7 +174,7 @@ func TestGenerateCopilotSkillMd_AntiPatterns(t *testing.T) {
 	skill.AntiPatterns = []model.AntiPattern{
 		{Excuse: "Quick fix", Reality: "Do it right"},
 	}
-	md := copilot.GenerateCopilotSkillMd(skill)
+	md := copilot.GenerateCopilotSkillMd(skill, nil)
 	assert.Contains(t, md, "## Red Flags")
 	assert.Contains(t, md, "| Quick fix | Do it right |")
 }
@@ -183,7 +183,7 @@ func TestGenerateCopilotSkillMd_ExamplesAndAntiPatternsBeforeSecurity(t *testing
 	skill := testSkill()
 	skill.Examples = []model.CodeExample{{Label: "test", Code: "echo"}}
 	skill.AntiPatterns = []model.AntiPattern{{Excuse: "a", Reality: "b"}}
-	md := copilot.GenerateCopilotSkillMd(skill)
+	md := copilot.GenerateCopilotSkillMd(skill, nil)
 	exIdx := strings.Index(md, "## Examples")
 	secIdx := strings.Index(md, "## Security")
 	assert.Greater(t, secIdx, exIdx, "Security should appear after Examples")

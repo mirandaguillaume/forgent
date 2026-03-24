@@ -18,7 +18,8 @@ func buildDescription(skill model.SkillBehavior) string {
 }
 
 // GenerateCopilotSkillMd generates a Copilot SKILL.md from a SkillBehavior.
-func GenerateCopilotSkillMd(skill model.SkillBehavior) string {
+// contracts is an optional map of output format templates keyed by produces name.
+func GenerateCopilotSkillMd(skill model.SkillBehavior, contracts map[string]string) string {
 	var lines []string
 
 	// Frontmatter
@@ -57,6 +58,11 @@ func GenerateCopilotSkillMd(skill model.SkillBehavior) string {
 	}
 	lines = append(lines, "Memory: "+string(skill.Context.Memory))
 	lines = append(lines, "")
+
+	// Output format templates (from contracts/ dir, when relevant)
+	if contractSection := generator.FormatContractSection(skill.Context.Produces, contracts); contractSection != "" {
+		lines = append(lines, contractSection)
+	}
 
 	// Strategy
 	lines = append(lines, "## Strategy")

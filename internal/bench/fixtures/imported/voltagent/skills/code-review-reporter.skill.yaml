@@ -1,0 +1,27 @@
+skill: code-review-reporter
+version: 1.0.0
+context:
+  consumes: ["security-findings", "quality-metrics", "review-context"]
+  produces: ["code-review-report"]
+  memory: conversation
+strategy:
+  tools: ["write_file"]
+  approach: "comprehensive review report generation"
+  steps:
+    - "aggregate all review findings"
+    - "prioritize issues by criticality"
+    - "generate actionable recommendations"
+    - "format comprehensive review report"
+guardrails:
+  - "timeout: 10 minutes for report generation"
+  - "require_findings_input: true"
+observability:
+  trace_level: standard
+  metrics: ["report_sections", "recommendations_count"]
+security:
+  filesystem: read-write
+  network: none
+  secrets: []
+negotiation:
+  file_conflicts: override
+  priority: 70

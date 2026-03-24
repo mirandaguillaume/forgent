@@ -1,0 +1,27 @@
+skill: bug-localization
+version: 1.0.0
+context:
+  consumes: [github_issue, codebase_files]
+  produces: [bug_location_analysis]
+  memory: short-term
+strategy:
+  tools: [read_file, grep, search]
+  approach: "Analyze GitHub issues to localize bugs by identifying affected components"
+  steps:
+    - "Parse the GitHub issue description to identify affected components"
+    - "Search codebase to locate relevant files near affected components"
+    - "Narrow down to the specific code paths involved in the reported behavior"
+guardrails:
+  - "Focus only on identifying the bug location and root cause"
+  - "Do not make any code changes during analysis"
+  - timeout: 300
+observability:
+  trace_level: standard
+  metrics: [files_analyzed, search_queries, analysis_time]
+security:
+  filesystem: read-only
+  network: none
+  secrets: []
+negotiation:
+  file_conflicts: yield
+  priority: 3

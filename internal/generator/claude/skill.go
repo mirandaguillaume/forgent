@@ -9,7 +9,9 @@ import (
 )
 
 // GenerateSkillMd generates a Claude Code SKILL.md from a SkillBehavior.
-func GenerateSkillMd(skill model.SkillBehavior) string {
+// contracts is an optional map of output format templates keyed by produces name.
+// contractsDir, when non-empty, generates file references instead of inlining templates.
+func GenerateSkillMd(skill model.SkillBehavior, contracts map[string]string, contractsDir string) string {
 	var lines []string
 
 	// Frontmatter
@@ -24,6 +26,11 @@ func GenerateSkillMd(skill model.SkillBehavior) string {
 	lines = append(lines, "# "+generator.ToTitle(skill.Skill))
 	lines = append(lines, "")
 
+	// Input — contract references for consumed data
+	if inputSection := generator.FormatContractSectionWithDir(skill.Context.Consumes, contracts, contractsDir); inputSection != "" {
+		lines = append(lines, strings.Replace(inputSection, "## Output", "## Input", 1))
+	}
+
 	// Guardrails FIRST (primacy bias)
 	if len(skill.Guardrails) > 0 {
 		lines = append(lines, "## Guardrails")
@@ -33,57 +40,30 @@ func GenerateSkillMd(skill model.SkillBehavior) string {
 		lines = append(lines, "")
 	}
 
-	// When to Use (after guardrails, before context)
-	if wtu := generator.FormatWhenToUse(skill.WhenToUse); wtu != "" {
-		lines = append(lines, wtu)
-	}
-
-	// Context
-	lines = append(lines, "## Context")
-	if len(skill.Context.Consumes) > 0 {
-		lines = append(lines, "Consumes: "+strings.Join(skill.Context.Consumes, ", "))
-	}
-	if len(skill.Context.Produces) > 0 {
-		lines = append(lines, "Produces: "+strings.Join(skill.Context.Produces, ", "))
-	}
-	lines = append(lines, "Memory: "+string(skill.Context.Memory))
-	lines = append(lines, "")
-
-	// Strategy
-	lines = append(lines, "## Strategy")
-	lines = append(lines, "Approach: "+skill.Strategy.Approach)
-	if len(skill.Strategy.Tools) > 0 {
-		lines = append(lines, "Tools: "+strings.Join(skill.Strategy.Tools, ", "))
-	}
+	// Steps (core behavior)
 	if len(skill.Strategy.Steps) > 0 {
-		lines = append(lines, "")
-		lines = append(lines, "### Steps")
+		lines = append(lines, "## Steps")
 		for i, step := range skill.Strategy.Steps {
 			lines = append(lines, fmt.Sprintf("%d. %s", i+1, step))
 		}
+		lines = append(lines, "")
 	}
-	lines = append(lines, "")
 
-	// Examples (after strategy)
+	// Output — contract references for produced data
+	if contractSection := generator.FormatContractSectionWithDir(skill.Context.Produces, contracts, contractsDir); contractSection != "" {
+		lines = append(lines, contractSection)
+	}
+
+	// Examples (concrete, actionable)
 	if exs := generator.FormatExamples(skill.Examples); exs != "" {
 		lines = append(lines, exs)
 	}
 
-	// Anti-patterns / Red Flags (before security)
+	// Anti-patterns / Red Flags
 	if aps := generator.FormatAntiPatterns(skill.AntiPatterns); aps != "" {
 		lines = append(lines, aps)
 	}
 
-	// Security LAST (recency bias)
-	lines = append(lines, "## Security")
-	lines = append(lines, "- Filesystem: "+string(skill.Security.Filesystem))
-	lines = append(lines, "- Network: "+string(skill.Security.Network))
-	if len(skill.Security.Secrets) > 0 {
-		lines = append(lines, "- Secrets: "+strings.Join(skill.Security.Secrets, ", "))
-	}
-	if skill.Security.Sandbox != "" {
-		lines = append(lines, "- Sandbox: "+string(skill.Security.Sandbox))
-	}
 	lines = append(lines, "")
 
 	return strings.Join(lines, "\n")

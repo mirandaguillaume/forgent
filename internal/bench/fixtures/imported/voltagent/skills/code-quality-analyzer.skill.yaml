@@ -1,0 +1,29 @@
+skill: code-quality-analyzer
+version: 1.0.0
+context:
+  consumes: ["code-changes", "coding-standards"]
+  produces: ["quality-metrics"]
+  memory: short-term
+strategy:
+  tools: ["read_file", "grep", "search", "bash"]
+  approach: "comprehensive code quality assessment"
+  steps:
+    - "evaluate logic correctness"
+    - "analyze naming conventions"
+    - "check code organization"
+    - "measure function complexity"
+    - "validate best practices compliance"
+guardrails:
+  - "timeout: 20 minutes for quality analysis"
+  - "max_cyclomatic_complexity: 10"
+  - "minimum_coverage_threshold: 80%"
+observability:
+  trace_level: standard
+  metrics: ["quality_score", "complexity_violations", "code_smells"]
+security:
+  filesystem: read-only
+  network: none
+  secrets: []
+negotiation:
+  file_conflicts: yield
+  priority: 75

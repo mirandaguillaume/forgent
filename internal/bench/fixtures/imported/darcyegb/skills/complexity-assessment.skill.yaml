@@ -1,0 +1,28 @@
+skill: complexity-assessment
+version: 1.0.0
+context:
+  consumes: ["code_files", "project_requirements"]
+  produces: ["complexity_assessment"]
+  memory: short-term
+strategy:
+  tools: ["read_file", "grep", "search"]
+  approach: "complexity-analysis"
+  steps:
+    - "Scan codebase for complexity indicators"
+    - "Evaluate complexity against actual project requirements"
+    - "Generate complexity score with justification"
+    - "Identify over-engineering patterns in the codebase"
+guardrails:
+  - "Timeout after 8 minutes to prevent excessive analysis"
+  - "Consider project scale (MVP vs enterprise) in assessment"
+  - "Use standardized complexity levels: Low|Medium|High"
+observability:
+  trace_level: standard
+  metrics: ["files_analyzed", "complexity_score", "patterns_detected"]
+security:
+  filesystem: read-only
+  network: none
+  secrets: []
+negotiation:
+  file_conflicts: yield
+  priority: 3
