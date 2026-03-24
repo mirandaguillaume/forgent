@@ -1,0 +1,6 @@
+agent: code-reviewer
+skills: ["security-vulnerability-scanner", "code-quality-analyzer", "code-review-reporter"]
+orchestration: sequential
+description: "Comprehensive code review focusing on security vulnerabilities and quality analysis"
+consumes: ["code-changes", "pull-request", "review-requirements"]
+produces: ["code-review-report"]

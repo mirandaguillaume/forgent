@@ -1,0 +1,29 @@
+skill: code-quality-assessment
+version: 1.0.0
+context:
+  consumes: [source_code, test_files]
+  produces: [quality_report]
+  memory: short-term
+strategy:
+  tools: [read_file, grep, search, bash]
+  approach: Static analysis for code maintainability using complexity metrics
+  steps:
+    - Analyze code complexity metrics
+    - Check coding standards compliance
+    - Detect code smells
+    - Review test coverage
+    - Assess technical debt
+guardrails:
+  - timeout: 240s
+  - max_complexity_threshold: 15
+  - min_test_coverage: 80
+observability:
+  trace_level: standard
+  metrics: [complexity_score, test_coverage, code_smells]
+security:
+  filesystem: read-only
+  network: none
+  secrets: []
+negotiation:
+  file_conflicts: yield
+  priority: 7

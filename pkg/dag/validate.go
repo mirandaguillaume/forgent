@@ -15,14 +15,19 @@ const (
 	TopoHourglass    Topology = "hourglass"
 )
 
-// HasCycle returns true if the graph contains a directed cycle.
+// HasCycle returns true if the forward-edge subgraph contains a directed cycle.
+// Back-edges are excluded — they intentionally create bounded cycles.
 // Uses DFS with three-colour marking: 0=unvisited, 1=in-stack, 2=done.
 func (d *DAG) HasCycle() bool {
 	colour := make(map[string]int, len(d.nodes))
 	var dfs func(id string) bool
 	dfs = func(id string) bool {
 		colour[id] = 1
-		for _, next := range d.adj[id] {
+		for _, e := range d.adj[id] {
+			if e.IsBackEdge() {
+				continue
+			}
+			next := e.To
 			if colour[next] == 1 {
 				return true
 			}
@@ -132,6 +137,89 @@ func (d *DAG) ValidateTopology(declared Topology) error {
 		}
 	}
 
+	return nil
+}
+
+// CycleInfo describes a bounded cycle formed by a back-edge.
+type CycleInfo struct {
+	BackEdge      *Edge    // the back-edge that closes the cycle
+	Path          []string // forward-edge path from BackEdge.To → BackEdge.From
+	MaxIterations int      // bound from the back-edge
+}
+
+// FindCycles returns all bounded cycles in the graph.
+// Each cycle is identified by a back-edge plus the forward path it closes.
+func (d *DAG) FindCycles() []CycleInfo {
+	var cycles []CycleInfo
+	for _, e := range d.edges {
+		if !e.IsBackEdge() {
+			continue
+		}
+		// Find forward path from e.To → e.From using BFS
+		path := d.forwardPath(e.To, e.From)
+		if path != nil {
+			cycles = append(cycles, CycleInfo{
+				BackEdge:      e,
+				Path:          path,
+				MaxIterations: e.MaxIterations,
+			})
+		}
+	}
+	return cycles
+}
+
+// ValidateBoundedCycles checks that:
+//  1. The forward-edge subgraph is acyclic
+//  2. Every back-edge closes a real cycle (forward path exists from To → From)
+func (d *DAG) ValidateBoundedCycles() error {
+	if d.HasCycle() {
+		return fmt.Errorf("dag: forward-edge subgraph contains a cycle")
+	}
+	for _, e := range d.edges {
+		if !e.IsBackEdge() {
+			continue
+		}
+		path := d.forwardPath(e.To, e.From)
+		if path == nil {
+			return fmt.Errorf("dag: back-edge %q→%q does not close a cycle (no forward path from %q to %q)", e.From, e.To, e.To, e.From)
+		}
+	}
+	return nil
+}
+
+// forwardPath returns the forward-edge path from start to target, or nil if unreachable.
+func (d *DAG) forwardPath(start, target string) []string {
+	if start == target {
+		return []string{start}
+	}
+	parent := make(map[string]string)
+	visited := map[string]bool{start: true}
+	queue := []string{start}
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		for _, e := range d.adj[cur] {
+			if e.IsBackEdge() || visited[e.To] {
+				continue
+			}
+			parent[e.To] = cur
+			if e.To == target {
+				// Reconstruct path
+				path := []string{target}
+				for p := target; p != start; {
+					p = parent[p]
+					path = append(path, p)
+				}
+				// Reverse
+				for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
+					path[i], path[j] = path[j], path[i]
+				}
+				return path
+			}
+			visited[e.To] = true
+			queue = append(queue, e.To)
+		}
+	}
 	return nil
 }
 

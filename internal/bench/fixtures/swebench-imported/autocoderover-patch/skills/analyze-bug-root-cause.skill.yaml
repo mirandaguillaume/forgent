@@ -1,0 +1,28 @@
+skill: analyze-bug-root-cause
+version: 1.0.0
+context:
+  consumes: [issue_description, code_context]
+  produces: [bug_analysis]
+  memory: short-term
+strategy:
+  tools: [read_file, grep, search]
+  approach: systematic code analysis to identify root cause
+  steps:
+    - analyze issue description for symptoms
+    - examine provided code context
+    - trace through code flow to identify bug location
+    - determine minimal scope of changes needed
+guardrails:
+  - timeout: 300s
+  - must preserve existing functionality
+  - focus only on bug analysis, not test modifications
+observability:
+  trace_level: standard
+  metrics: [analysis_time, files_examined]
+security:
+  filesystem: read-only
+  network: none
+  secrets: []
+negotiation:
+  file_conflicts: yield
+  priority: 1

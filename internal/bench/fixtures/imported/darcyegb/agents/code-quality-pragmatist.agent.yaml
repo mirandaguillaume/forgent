@@ -1,0 +1,6 @@
+agent: code-quality-pragmatist
+skills: ["complexity-assessment", "code-simplification-recommendations"]
+orchestration: sequential
+description: "Pragmatic code quality reviewer for common frustrations and anti-patterns"
+consumes: ["code_files", "project_requirements"]
+produces: ["quality_review_report"]

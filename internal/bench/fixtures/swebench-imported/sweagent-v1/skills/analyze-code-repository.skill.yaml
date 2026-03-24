@@ -1,0 +1,27 @@
+skill: analyze-code-repository
+version: 1.0.0
+context:
+  consumes: [repository, issue_description]
+  produces: [code_analysis]
+  memory: short-term
+strategy:
+  tools: [read_file, grep, search]
+  approach: "Systematically analyze repository structure to locate code relevant to the issue"
+  steps:
+    - "Locate code files relevant to the problem description"
+    - "Map the repository structure around the affected area"
+    - "Document relevant code components for the issue"
+guardrails:
+  - "Timeout after 300 seconds of file analysis"
+  - "Limit file reads to 100 files per analysis"
+  - "Only analyze files with common programming extensions (.py, .js, .java, etc.)"
+observability:
+  trace_level: standard
+  metrics: [files_analyzed, analysis_duration]
+security:
+  filesystem: read-only
+  network: none
+  secrets: []
+negotiation:
+  file_conflicts: yield
+  priority: 100

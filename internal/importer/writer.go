@@ -47,6 +47,29 @@ func WriteImportResult(result ImportResult, outputDir string) ([]string, error) 
 		written = append(written, path)
 	}
 
+	// Write contracts.
+	for name, content := range result.Contracts {
+		dir := filepath.Join(outputDir, "contracts")
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return written, fmt.Errorf("creating contracts directory: %w", err)
+		}
+
+		path := filepath.Join(dir, name+".md")
+		if _, err := os.Stat(path); err == nil {
+			return written, fmt.Errorf("contract file already exists: %s", path)
+		}
+
+		data := []byte(content)
+		if len(data) == 0 || data[len(data)-1] != '\n' {
+			data = append(data, '\n')
+		}
+
+		if err := os.WriteFile(path, data, 0644); err != nil {
+			return written, fmt.Errorf("writing contract %q: %w", name, err)
+		}
+		written = append(written, path)
+	}
+
 	if result.Agent != nil {
 		name := result.Agent.Agent.Agent
 		if name == "" {

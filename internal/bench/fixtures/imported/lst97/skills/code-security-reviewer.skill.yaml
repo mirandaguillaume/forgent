@@ -1,0 +1,30 @@
+skill: code-security-reviewer
+version: 1.0.0
+context:
+  consumes: ["code-files", "git-diff", "project-context"]
+  produces: ["security-findings"]
+  memory: short-term
+strategy:
+  tools: ["read_file", "grep", "search", "web_fetch", "web_search"]
+  approach: "security-scanning"
+  steps:
+    - "Review code for common injection vulnerabilities"
+    - "Scan for hardcoded secrets"
+    - "Validate input sanitization patterns"
+    - "Check authorization implementations"
+    - "Generate security findings report with severity levels"
+guardrails:
+  - "Maximum review time of 15 minutes per session"
+  - "Focus only on security-related issues"
+  - "Never expose or log sensitive information found in code"
+  - "Categorize findings by CVSS severity levels"
+observability:
+  trace_level: detailed
+  metrics: ["security_issues_found", "vulnerability_severity_distribution", "scan_duration"]
+security:
+  filesystem: read-only
+  network: allowlist
+  secrets: []
+negotiation:
+  file_conflicts: yield
+  priority: 95

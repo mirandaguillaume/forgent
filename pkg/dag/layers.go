@@ -25,14 +25,16 @@ func (d *DAG) Layers() [][]string {
 		return nil
 	}
 
-	// Compute in-degree for all nodes
+	// Compute in-degree for all nodes (forward edges only)
 	inDegree := make(map[string]int, len(d.nodes))
 	for id := range d.nodes {
 		inDegree[id] = 0
 	}
-	for _, downstreams := range d.adj {
-		for _, to := range downstreams {
-			inDegree[to]++
+	for _, edges := range d.adj {
+		for _, e := range edges {
+			if !e.IsBackEdge() {
+				inDegree[e.To]++
+			}
 		}
 	}
 
@@ -51,11 +53,15 @@ func (d *DAG) Layers() [][]string {
 		}
 	}
 
-	// Kahn traversal with longest-path update
+	// Kahn traversal with longest-path update (forward edges only)
 	for len(queue) > 0 {
 		cur := queue[0]
 		queue = queue[1:]
-		for _, next := range d.adj[cur] {
+		for _, e := range d.adj[cur] {
+			if e.IsBackEdge() {
+				continue
+			}
+			next := e.To
 			if dist[cur]+1 > dist[next] {
 				dist[next] = dist[cur] + 1
 			}

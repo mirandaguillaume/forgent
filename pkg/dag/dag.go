@@ -25,21 +25,26 @@ type Node struct {
 	Run        func(ctx context.Context, inputs map[string]any) (map[string]any, error)
 	MaxRetries int
 	Timeout    time.Duration
+	Config     *NodeConfig
 }
 
-// DAG is a directed acyclic graph auto-wired by type-matching edges.
+// DAG is a directed graph auto-wired by type-matching edges.
+// Forward edges (MaxIterations=0) preserve acyclicity; back-edges (MaxIterations>0)
+// allow bounded cycles for iterative patterns.
 type DAG struct {
 	nodes map[string]*Node
-	adj   map[string][]string
-	rev   map[string][]string
+	edges map[EdgeKey]*Edge
+	adj   map[string][]*Edge // outgoing edges (from → edges)
+	rev   map[string][]*Edge // incoming edges (to → edges)
 }
 
 // New creates a DAG and auto-wires edges from Produces/Consumes type matching.
 func New(nodes ...*Node) (*DAG, error) {
 	d := &DAG{
 		nodes: make(map[string]*Node, len(nodes)),
-		adj:   make(map[string][]string, len(nodes)),
-		rev:   make(map[string][]string, len(nodes)),
+		edges: make(map[EdgeKey]*Edge),
+		adj:   make(map[string][]*Edge, len(nodes)),
+		rev:   make(map[string][]*Edge, len(nodes)),
 	}
 
 	for _, n := range nodes {
@@ -99,16 +104,17 @@ func (d *DAG) RemoveEdge(from, to string) error {
 	if _, ok := d.nodes[to]; !ok {
 		return fmt.Errorf("dag: unknown node %q", to)
 	}
-	neighbors := d.adj[from]
-	for i, n := range neighbors {
-		if n == to {
-			d.adj[from] = append(neighbors[:i], neighbors[i+1:]...)
+	delete(d.edges, EdgeKey{From: from, To: to})
+	adj := d.adj[from]
+	for i, e := range adj {
+		if e.To == to {
+			d.adj[from] = append(adj[:i], adj[i+1:]...)
 			break
 		}
 	}
 	rev := d.rev[to]
-	for i, n := range rev {
-		if n == from {
+	for i, e := range rev {
+		if e.From == from {
 			d.rev[to] = append(rev[:i], rev[i+1:]...)
 			break
 		}
@@ -116,25 +122,82 @@ func (d *DAG) RemoveEdge(from, to string) error {
 	return nil
 }
 
-// Downstream returns the node IDs that nodeID points to.
-func (d *DAG) Downstream(nodeID string) []string {
-	src := d.adj[nodeID]
-	if len(src) == 0 {
-		return nil
+// AddBackEdge adds a back-edge that permits a bounded cycle.
+// MaxIterations must be > 0.
+func (d *DAG) AddBackEdge(from, to string, maxIter int) error {
+	if _, ok := d.nodes[from]; !ok {
+		return fmt.Errorf("dag: unknown node %q", from)
 	}
-	out := make([]string, len(src))
-	copy(out, src)
+	if _, ok := d.nodes[to]; !ok {
+		return fmt.Errorf("dag: unknown node %q", to)
+	}
+	if maxIter <= 0 {
+		return fmt.Errorf("dag: back-edge requires MaxIterations > 0, got %d", maxIter)
+	}
+	key := EdgeKey{From: from, To: to}
+	if _, exists := d.edges[key]; exists {
+		return fmt.Errorf("dag: edge %q→%q already exists", from, to)
+	}
+	e := &Edge{From: from, To: to, MaxIterations: maxIter}
+	d.edges[key] = e
+	d.adj[from] = append(d.adj[from], e)
+	d.rev[to] = append(d.rev[to], e)
+	return nil
+}
+
+// Edges returns all edges in the graph.
+func (d *DAG) Edges() []*Edge {
+	out := make([]*Edge, 0, len(d.edges))
+	for _, e := range d.edges {
+		out = append(out, e)
+	}
 	return out
 }
 
-// Upstream returns the node IDs that point to nodeID.
-func (d *DAG) Upstream(nodeID string) []string {
-	src := d.rev[nodeID]
-	if len(src) == 0 {
+// ForwardEdges returns all forward (non-back) outgoing edges from nodeID.
+func (d *DAG) ForwardEdges(nodeID string) []*Edge {
+	var out []*Edge
+	for _, e := range d.adj[nodeID] {
+		if !e.IsBackEdge() {
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// HasBackEdges returns true if the graph contains any back-edges.
+func (d *DAG) HasBackEdges() bool {
+	for _, e := range d.edges {
+		if e.IsBackEdge() {
+			return true
+		}
+	}
+	return false
+}
+
+// Downstream returns the node IDs that nodeID points to (all edge types).
+func (d *DAG) Downstream(nodeID string) []string {
+	edges := d.adj[nodeID]
+	if len(edges) == 0 {
 		return nil
 	}
-	out := make([]string, len(src))
-	copy(out, src)
+	out := make([]string, len(edges))
+	for i, e := range edges {
+		out[i] = e.To
+	}
+	return out
+}
+
+// Upstream returns the node IDs that point to nodeID (all edge types).
+func (d *DAG) Upstream(nodeID string) []string {
+	edges := d.rev[nodeID]
+	if len(edges) == 0 {
+		return nil
+	}
+	out := make([]string, len(edges))
+	for i, e := range edges {
+		out[i] = e.From
+	}
 	return out
 }
 
@@ -151,16 +214,17 @@ func (d *DAG) Nodes() []string {
 func (d *DAG) Node(id string) *Node { return d.nodes[id] }
 
 func (d *DAG) addEdge(from, to string) {
-	for _, n := range d.adj[from] {
-		if n == to {
-			return
-		}
+	key := EdgeKey{From: from, To: to}
+	if _, exists := d.edges[key]; exists {
+		return
 	}
-	d.adj[from] = append(d.adj[from], to)
-	d.rev[to] = append(d.rev[to], from)
+	e := &Edge{From: from, To: to, MaxIterations: 0}
+	d.edges[key] = e
+	d.adj[from] = append(d.adj[from], e)
+	d.rev[to] = append(d.rev[to], e)
 }
 
-// reachable returns true if target is reachable from start via BFS.
+// reachable returns true if target is reachable from start via forward edges (BFS).
 func (d *DAG) reachable(start, target string) bool {
 	if start == target {
 		return true
@@ -171,13 +235,16 @@ func (d *DAG) reachable(start, target string) bool {
 	for len(queue) > 0 {
 		cur := queue[0]
 		queue = queue[1:]
-		for _, next := range d.adj[cur] {
-			if next == target {
+		for _, e := range d.adj[cur] {
+			if e.IsBackEdge() {
+				continue
+			}
+			if e.To == target {
 				return true
 			}
-			if !visited[next] {
-				visited[next] = true
-				queue = append(queue, next)
+			if !visited[e.To] {
+				visited[e.To] = true
+				queue = append(queue, e.To)
 			}
 		}
 	}

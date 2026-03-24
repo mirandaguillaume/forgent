@@ -1,0 +1,49 @@
+skill: minimal-edit
+version: "1.0.0"
+
+context:
+  consumes: [fault_location, problem_statement]
+  produces: [code_patch]
+  memory: short-term
+
+strategy:
+  tools: [edit, read]
+  approach: sequential
+  steps:
+    - Re-read the fault location to understand the exact lines that need changing
+    - Plan the smallest change that fixes the root cause
+    - Make the edit using precise line replacements, not file rewrites
+    - Preserve existing code style, indentation, naming conventions
+    - Do not refactor, rename, or reorganize surrounding code
+
+guardrails:
+  - Touch the fewest files possible, ideally only one
+  - Never add new files unless the fix strictly requires it
+  - Never delete code unrelated to the bug
+  - Do not change import ordering or formatting
+  - If the fix requires more than 20 lines of changes, reconsider the approach
+
+when_to_use:
+  triggers:
+    - After fault has been localized
+    - Ready to write the fix
+  dont_use:
+    - Fault location is not yet confirmed
+
+anti_patterns:
+  - excuse: "While I'm here, let me clean up this code too"
+    reality: "Extra changes cause patch conflicts and test failures."
+  - excuse: "I'll rewrite the function to be cleaner"
+    reality: "Rewriting introduces new bugs. Patch the specific issue."
+
+observability:
+  trace_level: minimal
+  metrics: [lines_changed, files_touched]
+
+negotiation:
+  file_conflicts: yield
+  priority: 0
+
+security:
+  filesystem: read-write
+  network: none

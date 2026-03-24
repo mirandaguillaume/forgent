@@ -42,7 +42,9 @@ type FullGenerator interface {
 
 // GeneratorOptions holds build-time options for generators.
 type GeneratorOptions struct {
-	Compact bool
+	Compact      bool
+	Contracts    map[string]string // name → format template content (from contracts/ dir)
+	ContractsDir string            // absolute path to contracts/ dir (for file references)
 }
 
 // Configurable is an optional interface for generators that accept build-time options.

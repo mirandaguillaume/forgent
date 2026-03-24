@@ -1,22 +1,54 @@
 skill: bug-scanner
-version: "1.0.0"
+version: "2.0.0"
 context:
-  consumes: [pr_diff]
+  consumes: [git_diff, source_code, code_analysis]
   produces: [review_issues]
   memory: short-term
 strategy:
   tools: [read_file]
   approach: diff-first
-  effort: medium
+  effort: heavy
   steps:
-    - read the PR diff only, no expanded context
-    - scan for obvious bugs like null derefs, off-by-one, logic errors
-    - ignore likely false positives
-    - return issues with severity location
+    - parse each changed hunk — note file, line numbers, language
+    - for every removed or added line, apply the forensic checklist below
+    - if source_code is non-empty, look up the full function body around each hunk for context
+    - emit one issue per finding with file, line, severity, and exact quote from the diff
+  forensic_checklist:
+    null_safety:
+      - field access or method call on a value that can be nil/null/None
+      - missing nil/null check before dereferencing a pointer, optional, or interface
+      - function that can return nil/null used directly without guard
+    type_errors:
+      - wrong type passed to a function (e.g. datetime where int expected)
+      - type assertion without ok-check in Go, unchecked cast in Java/Kotlin
+      - math operations on non-numeric types (floor/ceil on datetime, etc.)
+    logic_bugs:
+      - inverted boolean condition (negation swapped, AND/OR wrong)
+      - off-by-one in slice/array index or loop bound
+      - unreachable branch (condition always true/false given prior guards)
+      - missing return or early-exit that changes control flow
+      - wrong variable used (copy-paste error, stale variable from outer scope)
+    concurrency:
+      - shared mutable state accessed without a lock or atomic
+      - double-checked locking without memory barrier
+      - goroutine/thread started before variable is fully initialised
+    resource_handling:
+      - error return ignored (especially from db/io calls)
+      - resource opened but not closed in all code paths
+      - context not propagated to blocking calls
+    security:
+      - SQL/shell/template injection from user-controlled input
+      - auth/permission check bypassed or applied after the guarded operation
+      - secret or credential written to log or returned in response
+    api_contracts:
+      - method called with wrong argument count or order
+      - required interface method not implemented
+      - function documented as non-nil that can now return nil
 guardrails:
   - timeout: 5min
   - no_nitpicks
   - no_style_issues
+  - "skip_if_source_empty: if source_code is empty, analyse the diff alone without fabricating context"
 observability:
   trace_level: standard
   metrics: [tokens, issue_count]
@@ -27,15 +59,3 @@ security:
 negotiation:
   file_conflicts: yield
   priority: 2
-when_to_use:
-  triggers:
-    - always during code review
-  especially:
-    - when reviewing complex logic changes
-anti_patterns:
-  - excuse: "Flagging linter/typechecker issues"
-    reality: "These are caught by CI; duplicating them adds noise"
-  - excuse: "Flagging intentional functionality changes"
-    reality: "Changes related to the PR purpose are likely intentional"
-  - excuse: "Reading beyond the diff"
-    reality: "Shallow scan focuses on changed lines only"

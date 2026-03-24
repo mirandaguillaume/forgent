@@ -9,9 +9,87 @@ import (
 	"github.com/mirandaguillaume/forgent/pkg/model"
 )
 
+// nodeEmission describes a single DAG node to emit — either a skill node or a merge node.
+type nodeEmission struct {
+	skill     *model.SkillBehavior
+	renames   map[string]string // original type → renamed type (parallel duplicates)
+	isMerge   bool
+	mergeType string   // original type name
+	mergeVars []string // renamed variant names to merge
+}
+
+// buildEmissions converts an agent's stage/skill list into an ordered []nodeEmission,
+// inserting merge nodes after parallel stages where multiple skills produce the same type.
+func buildEmissions(agent model.AgentComposition, skillMap map[string]model.SkillBehavior) []nodeEmission {
+	var emissions []nodeEmission
+
+	emitSkill := func(name string, renames map[string]string) {
+		s, ok := skillMap[name]
+		if !ok {
+			return
+		}
+		sc := s
+		emissions = append(emissions, nodeEmission{skill: &sc, renames: renames})
+	}
+
+	if len(agent.Stages) > 0 {
+		for _, stage := range agent.Stages {
+			if stage.Strategy == model.OrchestrationParallel {
+				// Count how many skills in this stage produce each type.
+				typeCount := map[string]int{}
+				for _, name := range stage.Skills {
+					if s, ok := skillMap[name]; ok {
+						for _, p := range s.Context.Produces {
+							typeCount[p]++
+						}
+					}
+				}
+				// Assign per-skill renames for duplicated types.
+				mergeMap := map[string][]string{} // origType → variant names
+				for _, name := range stage.Skills {
+					renames := map[string]string{}
+					if s, ok := skillMap[name]; ok {
+						for _, p := range s.Context.Produces {
+							if typeCount[p] > 1 {
+								safeID := strings.NewReplacer("-", "_", ".", "_").Replace(name)
+								renamed := p + "__" + safeID
+								renames[p] = renamed
+								mergeMap[p] = append(mergeMap[p], renamed)
+							}
+						}
+					}
+					emitSkill(name, renames)
+				}
+				// One merge node per duplicated type.
+				for origType, variants := range mergeMap {
+					emissions = append(emissions, nodeEmission{
+						isMerge:   true,
+						mergeType: origType,
+						mergeVars: variants,
+					})
+				}
+			} else {
+				for _, name := range stage.Skills {
+					emitSkill(name, nil)
+				}
+			}
+		}
+	} else {
+		for _, s := range agent.AllSkills() {
+			emitSkill(s, nil)
+		}
+	}
+	return emissions
+}
+
 // GenerateAgentGo generates a complete Go main.go program for an agent's DAG runtime.
 func GenerateAgentGo(agent model.AgentComposition, skills []model.SkillBehavior) string {
 	var b strings.Builder
+
+	skillMap := map[string]model.SkillBehavior{}
+	for _, s := range skills {
+		skillMap[s.Skill] = s
+	}
 
 	// Collect all consumed types across skills that have no internal producer
 	allProduced := map[string]bool{}
@@ -62,7 +140,7 @@ func GenerateAgentGo(agent model.AgentComposition, skills []model.SkillBehavior)
 	b.WriteString("\tif key := os.Getenv(\"OPENROUTER_API_KEY\"); key != \"\" {\n")
 	b.WriteString("\t\tmodel := os.Getenv(\"OPENROUTER_MODEL\")\n")
 	b.WriteString("\t\tif model == \"\" {\n")
-	b.WriteString("\t\t\tmodel = \"anthropic/claude-haiku-4-5-20251001\"\n")
+	b.WriteString("\t\t\tmodel = \"anthropic/claude-3.5-haiku\"\n")
 	b.WriteString("\t\t}\n")
 	b.WriteString("\t\tprovider = newOpenRouterProvider(key, model)\n")
 	b.WriteString("\t} else if key := os.Getenv(\"ANTHROPIC_API_KEY\"); key != \"\" {\n")
@@ -73,10 +151,49 @@ func GenerateAgentGo(agent model.AgentComposition, skills []model.SkillBehavior)
 	b.WriteString("\t}\n\n")
 
 	// Nodes
+	emissions := buildEmissions(agent, skillMap)
 	b.WriteString("\tnodes := []*dag.Node{\n")
-	for _, s := range skills {
+	for _, e := range emissions {
+		if e.isMerge {
+			// Merge node: concatenates all variant outputs into the original type.
+			mergeID := "merge__" + strings.ReplaceAll(e.mergeType, "-", "_")
+			b.WriteString("\t\t{\n")
+			fmt.Fprintf(&b, "\t\t\tID: %q,\n", mergeID)
+			consumeStrs := make([]string, len(e.mergeVars))
+			for i, v := range e.mergeVars {
+				consumeStrs[i] = fmt.Sprintf("%q", v)
+			}
+			fmt.Fprintf(&b, "\t\t\tConsumes: []string{%s},\n", strings.Join(consumeStrs, ", "))
+			fmt.Fprintf(&b, "\t\t\tProduces: []string{%q},\n", e.mergeType)
+			fmt.Fprintf(&b, "\t\t\tMaxRetries: %d,\n", 0)
+			fmt.Fprintf(&b, "\t\t\tTimeout:    time.Duration(%d),\n", 0)
+			// Inline Run closure that joins all variants.
+			b.WriteString("\t\t\tRun: func(ctx context.Context, inputs map[string]any) (map[string]any, error) {\n")
+			b.WriteString("\t\t\t\tvar parts []string\n")
+			for _, v := range e.mergeVars {
+				fmt.Fprintf(&b, "\t\t\t\tif v, ok := inputs[%q]; ok {\n", v)
+				fmt.Fprintf(&b, "\t\t\t\t\tparts = append(parts, fmt.Sprintf(\"=== %s ===\\n%%v\", v))\n", v)
+				b.WriteString("\t\t\t\t}\n")
+			}
+			fmt.Fprintf(&b, "\t\t\t\treturn map[string]any{%q: strings.Join(parts, \"\\n\\n\")}, nil\n", e.mergeType)
+			b.WriteString("\t\t\t},\n")
+			b.WriteString("\t\t},\n")
+			continue
+		}
+
+		s := *e.skill
 		prompt := BuildPromptTemplate(s)
 		escapedPrompt := strings.ReplaceAll(prompt, "`", "` + \"`\" + `")
+
+		// Apply renames to produces list.
+		produces := make([]string, len(s.Context.Produces))
+		for i, p := range s.Context.Produces {
+			if renamed, ok := e.renames[p]; ok {
+				produces[i] = renamed
+			} else {
+				produces[i] = p
+			}
+		}
 
 		b.WriteString("\t\t{\n")
 		fmt.Fprintf(&b, "\t\t\tID: %q,\n", s.Skill)
@@ -90,10 +207,10 @@ func GenerateAgentGo(agent model.AgentComposition, skills []model.SkillBehavior)
 			fmt.Fprintf(&b, "\t\t\tConsumes: []string{%s},\n", strings.Join(consumeStrs, ", "))
 		}
 
-		// Produces
-		if len(s.Context.Produces) > 0 {
-			produceStrs := make([]string, len(s.Context.Produces))
-			for i, p := range s.Context.Produces {
+		// Produces (potentially renamed)
+		if len(produces) > 0 {
+			produceStrs := make([]string, len(produces))
+			for i, p := range produces {
 				produceStrs[i] = fmt.Sprintf("%q", p)
 			}
 			fmt.Fprintf(&b, "\t\t\tProduces: []string{%s},\n", strings.Join(produceStrs, ", "))
@@ -103,9 +220,9 @@ func GenerateAgentGo(agent model.AgentComposition, skills []model.SkillBehavior)
 		fmt.Fprintf(&b, "\t\t\tMaxRetries: %d,\n", 0)
 		fmt.Fprintf(&b, "\t\t\tTimeout:    time.Duration(%d),\n", 0)
 
-		// Run function
+		// Run function — use renamed produces for output keys.
 		fmt.Fprintf(&b, "\t\t\tRun: makeSkillRunner(provider, `%s`, []string{", escapedPrompt)
-		for i, p := range s.Context.Produces {
+		for i, p := range produces {
 			if i > 0 {
 				b.WriteString(", ")
 			}
@@ -425,6 +542,9 @@ func discoverInputs(needed []string) map[string]any {
 			if out, err := exec.Command("gh", "pr", "view", "--json", "url", "-q", ".url").Output(); err == nil {
 				inputs[key] = strings.TrimSpace(string(out))
 			}
+		case "code_analysis":
+			// code_analysis is computed externally (by CLI or bench) and passed via --input.
+			// If not provided but git_diff is available, leave empty — the caller should provide it.
 		}
 	}
 	return inputs

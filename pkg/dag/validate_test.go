@@ -151,3 +151,49 @@ func TestValidateTopology_MismatchError_ContainsName(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "diamond")
 }
+
+func TestFindCycles_NoCycles(t *testing.T) {
+	d, err := dag.New(
+		&dag.Node{ID: "a", Produces: []string{"x"}},
+		&dag.Node{ID: "b", Consumes: []string{"x"}},
+	)
+	require.NoError(t, err)
+	assert.Empty(t, d.FindCycles())
+}
+
+func TestFindCycles_WithBackEdge(t *testing.T) {
+	d, err := dag.New(
+		&dag.Node{ID: "a", Produces: []string{"x"}},
+		&dag.Node{ID: "b", Consumes: []string{"x"}, Produces: []string{"y"}},
+		&dag.Node{ID: "c", Consumes: []string{"y"}},
+	)
+	require.NoError(t, err)
+	require.NoError(t, d.AddBackEdge("c", "a", 3))
+
+	cycles := d.FindCycles()
+	require.Len(t, cycles, 1)
+	assert.Equal(t, 3, cycles[0].MaxIterations)
+	assert.Equal(t, []string{"a", "b", "c"}, cycles[0].Path)
+}
+
+func TestValidateBoundedCycles_Valid(t *testing.T) {
+	d, _ := dag.New(
+		&dag.Node{ID: "a", Produces: []string{"x"}},
+		&dag.Node{ID: "b", Consumes: []string{"x"}},
+	)
+	require.NoError(t, d.AddBackEdge("b", "a", 5))
+	assert.NoError(t, d.ValidateBoundedCycles())
+}
+
+func TestValidateBoundedCycles_DanglingBackEdge(t *testing.T) {
+	// Back-edge from c→a but no forward path from a→c
+	d, _ := dag.New(
+		&dag.Node{ID: "a"},
+		&dag.Node{ID: "b"},
+		&dag.Node{ID: "c"},
+	)
+	require.NoError(t, d.AddBackEdge("c", "a", 2))
+	err := d.ValidateBoundedCycles()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "does not close a cycle")
+}

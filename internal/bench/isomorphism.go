@@ -25,8 +25,10 @@ type IsomorphismResult struct {
 }
 
 var (
-	consumesRe = regexp.MustCompile(`(?m)^Consumes:\s*(.+)$`)
-	producesRe = regexp.MustCompile(`(?m)^Produces:\s*(.+)$`)
+	// Parse I/O from frontmatter description line produced by BuildSkillDescription:
+	// "description: analytical-based skill consuming source-code, diff to produce review-report"
+	descConsumesRe = regexp.MustCompile(`(?m)^description:.*consuming\s+(.+?)(?:\s+to produce|$)`)
+	descProducesRe = regexp.MustCompile(`(?m)^description:.*to produce\s+(.+)$`)
 )
 
 // RunIsomorphism builds for both claude and copilot targets, then compares
@@ -116,10 +118,10 @@ func extractSignatures(outputDir string) ([]SkillSignature, error) {
 
 		sig := SkillSignature{Name: name}
 
-		if m := consumesRe.FindStringSubmatch(content); len(m) > 1 {
+		if m := descConsumesRe.FindStringSubmatch(content); len(m) > 1 {
 			sig.Consumes = parseCSV(m[1])
 		}
-		if m := producesRe.FindStringSubmatch(content); len(m) > 1 {
+		if m := descProducesRe.FindStringSubmatch(content); len(m) > 1 {
 			sig.Produces = parseCSV(m[1])
 		}
 

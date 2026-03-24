@@ -1,0 +1,49 @@
+skill: test-validation
+version: "1.0.0"
+
+context:
+  consumes: [code_patch]
+  produces: [validation_result]
+  memory: short-term
+
+strategy:
+  tools: [bash, read]
+  approach: sequential
+  steps:
+    - Identify the relevant test file for the code you changed
+    - Run the specific test that relates to the fix, not the entire test suite
+    - If the test passes, verify it was actually testing the fixed behavior
+    - If the test fails, read the failure output carefully and adjust the fix
+    - Never modify test files to make them pass
+
+guardrails:
+  - Never modify test files, test fixtures, or test configuration
+  - Never skip or disable failing tests
+  - Never add new tests unless explicitly asked
+  - If tests fail after your fix, the fix is wrong, not the tests
+  - Run targeted tests, not the full suite
+
+when_to_use:
+  triggers:
+    - After writing a code fix
+    - Need to verify the fix works
+  dont_use:
+    - Before any code changes have been made
+
+anti_patterns:
+  - excuse: "This test is outdated, I'll update it"
+    reality: "Tests define correct behavior. If your fix breaks a test, your fix is wrong."
+  - excuse: "Let me run the full test suite to be thorough"
+    reality: "Full suites are slow and noisy. Run only relevant tests."
+
+observability:
+  trace_level: minimal
+  metrics: [tests_run, tests_passed]
+
+negotiation:
+  file_conflicts: yield
+  priority: 0
+
+security:
+  filesystem: read-write
+  network: none
