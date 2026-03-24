@@ -41,3 +41,4 @@ results/
 predictions-*.jsonl
 bench-h2h.json
 internal/bench/testdata/FeatureBench
+internal/bench/testdata/swebench_live.jsonl
