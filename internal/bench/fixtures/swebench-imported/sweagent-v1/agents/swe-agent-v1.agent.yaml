@@ -1,0 +1,9 @@
+agent: swe-agent-v1
+skills:
+  - analyze-code-repository
+  - identify-root-cause
+  - generate-code-fix
+orchestration: sequential
+description: "Solve programming tasks by analyzing code repositories and generating fixes for GitHub issues"
+consumes: [repository, issue_description]
+produces: [code_patch]

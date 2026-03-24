@@ -1,0 +1,8 @@
+agent: autocode-rover-patch-writer
+skills:
+  - analyze-bug-root-cause
+  - generate-code-patch
+orchestration: sequential
+description: software developer agent that analyzes bugs and creates minimal patches
+consumes: [issue_description, code_context]
+produces: [unified_diff_patch]

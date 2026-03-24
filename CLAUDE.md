@@ -25,9 +25,12 @@ forgent doctor [path]                  # Full diagnostic (lint + dependency + lo
 forgent score [path]                   # Score design quality
 forgent build --target claude          # Generate skills/agents for Claude Code
 forgent build --target copilot         # Generate skills/agents for GitHub Copilot
+forgent build --target forgent         # Generate standalone Go runtime
+forgent build --compact                # Reduce structural overhead
 forgent build --watch                  # Watch and rebuild on changes
 forgent import <source>               # Import agent .md files as Forgent skill specs
 forgent import <source> --yes         # Skip confirmation, write directly
+forgent bench <repo-path>             # Benchmark agent composition quality
 ```
 
 ## Dev Commands
@@ -47,14 +50,23 @@ cmd/
 pkg/
   model/                     # SkillBehavior, AgentComposition, validation
   spec/                      # TargetGenerator interface + registry
+  dag/                       # Executable DAG engine (auto-wiring, layers, router, retry)
+  analysis/                  # Formal property analysis
 internal/
   cmd/                       # CLI command handlers (Cobra)
   analyzer/                  # Dependency checker, loop detector, score, ordering
   linter/                    # Lint rules
   yaml/                      # YAML loader
+  scanner/                   # Codebase scanner
+  enricher/                  # Skill enricher (codebase_index injection)
+  llm/                       # LLM provider interface (Anthropic, OpenRouter)
+  builder/                   # Build orchestration
+  bench/                     # Benchmark framework (token, isomorphism, SWE-bench, H2H)
+  importer/                  # Agent .md → skill spec decomposition pipeline
   generator/
     claude/                  # Claude Code generator (skill, agent, toolmap)
     copilot/                 # GitHub Copilot generator (skill, agent, instructions, toolmap)
+    forgent/                 # Go runtime generator (standalone binary)
 templates/                   # Skill/agent YAML templates
 ```
 
@@ -66,3 +78,4 @@ Generators implement `pkg/spec.TargetGenerator` and register via `init()`.
 |--------|-----------|-------|
 | claude | `.claude/` | `skills/<name>/SKILL.md`, `agents/<name>.md` |
 | copilot | `.github/` | `skills/<name>/SKILL.md`, `agents/<name>.agent.md`, `copilot-instructions.md` |
+| forgent | user-specified | standalone Go binary (main.go + go.mod) |

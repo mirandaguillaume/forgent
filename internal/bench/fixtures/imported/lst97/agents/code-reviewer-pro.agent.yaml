@@ -1,0 +1,6 @@
+agent: code-reviewer-pro
+skills: ["code-security-reviewer", "code-quality-reviewer", "code-review-reporter"]
+orchestration: parallel-then-merge
+description: "Comprehensive code review agent that analyzes security vulnerabilities and code quality, then generates structured educational feedback"
+consumes: ["code-files", "git-diff", "project-context"]
+produces: ["code-review-report"]

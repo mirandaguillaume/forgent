@@ -239,3 +239,146 @@ func TestExecute_Timeout_S5_NodeCancelled(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "deadline exceeded")
 }
+
+func TestExecute_BoundedCycle_IteratesCorrectly(t *testing.T) {
+	var mu sync.Mutex
+	callCount := 0
+
+	d, err := dag.New(
+		&dag.Node{
+			ID:       "produce",
+			Produces: []string{"val"},
+			Run: func(ctx context.Context, inputs map[string]any) (map[string]any, error) {
+				mu.Lock()
+				callCount++
+				c := callCount
+				mu.Unlock()
+				return map[string]any{"val": c}, nil
+			},
+		},
+		&dag.Node{
+			ID:       "consume",
+			Consumes: []string{"val"},
+			Produces: []string{"result"},
+			Run: func(ctx context.Context, inputs map[string]any) (map[string]any, error) {
+				v := inputs["val"].(int)
+				return map[string]any{"result": v * 10}, nil
+			},
+		},
+	)
+	require.NoError(t, err)
+
+	// Back-edge: consume → produce, max 2 iterations
+	require.NoError(t, d.AddBackEdge("consume", "produce", 2))
+
+	results, err := d.Execute(context.Background())
+	require.NoError(t, err)
+
+	// produce runs 3 times (1 initial + 2 iterations), consume runs 3 times
+	assert.Equal(t, 3, callCount)
+	// Final result is from the last iteration
+	assert.Equal(t, 30, results["result"])
+}
+
+func TestExecute_BoundedCycle_OnNodeComplete(t *testing.T) {
+	var completions []string
+	var mu sync.Mutex
+
+	d, err := dag.New(
+		&dag.Node{
+			ID:       "a",
+			Produces: []string{"x"},
+			Run: func(ctx context.Context, inputs map[string]any) (map[string]any, error) {
+				return map[string]any{"x": "data"}, nil
+			},
+		},
+		&dag.Node{
+			ID:       "b",
+			Consumes: []string{"x"},
+			Produces: []string{"y"},
+			Run: func(ctx context.Context, inputs map[string]any) (map[string]any, error) {
+				return map[string]any{"y": "done"}, nil
+			},
+		},
+	)
+	require.NoError(t, err)
+	require.NoError(t, d.AddBackEdge("b", "a", 1))
+
+	_, err = d.Execute(context.Background(), dag.WithOnNodeComplete(func(nodeID string) {
+		mu.Lock()
+		completions = append(completions, nodeID)
+		mu.Unlock()
+	}))
+	require.NoError(t, err)
+
+	// 2 passes × 2 nodes = 4 completions
+	assert.Len(t, completions, 4)
+}
+
+func TestExecute_EventDriven_NoCycle_SameResultAsLayerBased(t *testing.T) {
+	// Verify that a simple pipeline works the same with event-driven (triggered by a back-edge)
+	d, err := dag.New(
+		&dag.Node{
+			ID:       "a",
+			Produces: []string{"x"},
+			Run: func(ctx context.Context, inputs map[string]any) (map[string]any, error) {
+				return map[string]any{"x": 1}, nil
+			},
+		},
+		&dag.Node{
+			ID:       "b",
+			Consumes: []string{"x"},
+			Produces: []string{"y"},
+			Run: func(ctx context.Context, inputs map[string]any) (map[string]any, error) {
+				return map[string]any{"y": inputs["x"].(int) + 1}, nil
+			},
+		},
+		&dag.Node{
+			ID:       "c",
+			Consumes: []string{"y"},
+			Produces: []string{"z"},
+			Run: func(ctx context.Context, inputs map[string]any) (map[string]any, error) {
+				return map[string]any{"z": inputs["y"].(int) + 1}, nil
+			},
+		},
+	)
+	require.NoError(t, err)
+	// Add back-edge with MaxIterations=1 so event-driven is used
+	require.NoError(t, d.AddBackEdge("c", "a", 1))
+
+	results, err := d.Execute(context.Background())
+	require.NoError(t, err)
+	// After 2 passes: z = 3 (first pass), then z = 3 again (inputs refresh from store)
+	assert.Equal(t, 3, results["z"])
+}
+
+func TestExecute_BoundedCycle_ErrorStopsExecution(t *testing.T) {
+	callCount := 0
+	d, err := dag.New(
+		&dag.Node{
+			ID:       "a",
+			Produces: []string{"x"},
+			Run: func(ctx context.Context, inputs map[string]any) (map[string]any, error) {
+				callCount++
+				if callCount > 1 {
+					return nil, errors.New("fail on second pass")
+				}
+				return map[string]any{"x": 1}, nil
+			},
+		},
+		&dag.Node{
+			ID:       "b",
+			Consumes: []string{"x"},
+			Produces: []string{"y"},
+			Run: func(ctx context.Context, inputs map[string]any) (map[string]any, error) {
+				return map[string]any{"y": 2}, nil
+			},
+		},
+	)
+	require.NoError(t, err)
+	require.NoError(t, d.AddBackEdge("b", "a", 3))
+
+	_, err = d.Execute(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "fail on second pass")
+}

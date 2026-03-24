@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -135,7 +136,7 @@ func TestParseLLMResponse_StripsFences(t *testing.T) {
 	inner := buildMockResponse([]string{"test-skill"}, "")
 	fenced := "```json\n" + inner + "\n```"
 
-	skills, agent, rawYAMLs, err := parseLLMResponse(fenced)
+	skills, agent, rawYAMLs, _, err := parseLLMResponse(fenced)
 
 	require.NoError(t, err)
 	require.Len(t, skills, 1)
@@ -145,9 +146,38 @@ func TestParseLLMResponse_StripsFences(t *testing.T) {
 }
 
 func TestParseLLMResponse_InvalidJSON(t *testing.T) {
-	_, _, _, err := parseLLMResponse("not json at all")
+	_, _, _, _, err := parseLLMResponse("not json at all")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid JSON from LLM")
+}
+
+func TestParseLLMResponse_WithContracts(t *testing.T) {
+	resp := `{"skills": [{"yaml": "` + escapeForJSON(validSkillYAML("reviewer")) + `"}], "agent": null, "contracts": {"review_comments": "Provide review as structured list.\n\n1. Severity\n2. Location\n3. Issue"}}`
+
+	skills, _, _, contracts, err := parseLLMResponse(resp)
+
+	require.NoError(t, err)
+	require.Len(t, skills, 1)
+	require.NotNil(t, contracts)
+	assert.Contains(t, contracts, "review_comments")
+	assert.Contains(t, contracts["review_comments"], "structured list")
+}
+
+func TestParseLLMResponse_NilContracts(t *testing.T) {
+	resp := buildMockResponse([]string{"test-skill"}, "")
+
+	_, _, _, contracts, err := parseLLMResponse(resp)
+
+	require.NoError(t, err)
+	assert.Nil(t, contracts)
+}
+
+func escapeForJSON(s string) string {
+	escaped := strings.ReplaceAll(s, "\\", "\\\\")
+	escaped = strings.ReplaceAll(escaped, "\"", "\\\"")
+	escaped = strings.ReplaceAll(escaped, "\n", "\\n")
+	escaped = strings.ReplaceAll(escaped, "\t", "\\t")
+	return escaped
 }
 
 func TestValidateImport_CollectsWarnings(t *testing.T) {

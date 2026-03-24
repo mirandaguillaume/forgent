@@ -96,7 +96,12 @@ func runImport(source, providerFlag, outputDir string, minScore int, yes, dryRun
 		if result.Agent != nil {
 			agentCount = 1
 		}
-		fmt.Printf("Write %d skill(s) + %d agent(s)? [y/N] ", skillCount, agentCount)
+		contractCount := len(result.Contracts)
+		if contractCount > 0 {
+			fmt.Printf("Write %d skill(s) + %d agent(s) + %d contract(s)? [y/N] ", skillCount, agentCount, contractCount)
+		} else {
+			fmt.Printf("Write %d skill(s) + %d agent(s)? [y/N] ", skillCount, agentCount)
+		}
 		scanner := bufio.NewScanner(os.Stdin)
 		scanner.Scan()
 		answer := strings.TrimSpace(strings.ToLower(scanner.Text()))
@@ -168,6 +173,10 @@ func removeExistingFiles(result importer.ImportResult, outputDir string) {
 			name = "unknown"
 		}
 		path := filepath.Join(outputDir, "agents", name+".agent.yaml")
+		os.Remove(path)
+	}
+	for name := range result.Contracts {
+		path := filepath.Join(outputDir, "contracts", name+".md")
 		os.Remove(path)
 	}
 }

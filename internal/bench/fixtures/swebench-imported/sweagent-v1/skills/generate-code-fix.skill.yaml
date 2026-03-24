@@ -1,0 +1,31 @@
+skill: generate-code-fix
+version: 1.0.0
+context:
+  consumes: [root_cause, issue_description]
+  produces: [code_patch]
+  memory: short-term
+strategy:
+  tools: [read_file, edit_file]
+  approach: "Generate minimal code changes that resolve the identified issue"
+  steps:
+    - "Design minimal changes to resolve the root cause"
+    - "Validate that the fix covers relevant edge cases"
+    - "Verify changes don't break existing function/class names"
+    - "Generate unified diff patch for the changes"
+guardrails:
+  - "Only modify non-test files"
+  - "Do not change existing function or class names"
+  - "Do not suggest installing new packages"
+  - "Only use standard libraries"
+  - "Ensure changes are minimal and targeted"
+  - "Timeout after 180 seconds of fix generation"
+observability:
+  trace_level: detailed
+  metrics: [files_modified, lines_changed]
+security:
+  filesystem: read-write
+  network: none
+  secrets: []
+negotiation:
+  file_conflicts: override
+  priority: 200

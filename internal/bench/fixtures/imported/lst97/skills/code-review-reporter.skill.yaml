@@ -1,0 +1,30 @@
+skill: code-review-reporter
+version: 1.0.0
+context:
+  consumes: ["security-findings", "quality-assessment", "project-context"]
+  produces: ["code-review-report"]
+  memory: short-term
+strategy:
+  tools: ["task"]
+  approach: "report-generation"
+  steps:
+    - "Compile all findings into unified report"
+    - "Prioritize issues by severity"
+    - "Format findings with specific code examples"
+    - "Structure report with critical issues section"
+    - "Provide educational context for each recommendation"
+guardrails:
+  - "Maximum report generation time of 5 minutes"
+  - "Use specified terminal-optimized output format"
+  - "Maintain mentoring tone throughout report"
+  - "Provide concrete code examples for all suggestions"
+observability:
+  trace_level: minimal
+  metrics: ["report_generation_time", "total_findings_reported"]
+security:
+  filesystem: none
+  network: none
+  secrets: []
+negotiation:
+  file_conflicts: yield
+  priority: 70

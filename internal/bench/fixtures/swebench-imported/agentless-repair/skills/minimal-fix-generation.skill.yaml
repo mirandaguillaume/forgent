@@ -1,0 +1,33 @@
+skill: minimal-fix-generation
+version: 1.0.0
+context:
+  consumes: [bug_location_analysis, codebase_files]
+  produces: [unified_diff_patch]
+  memory: short-term
+strategy:
+  tools: [read_file, edit_file]
+  approach: "Generate minimal code fixes based on bug analysis to resolve issues without breaking existing functionality"
+  steps:
+    - "Review bug location analysis for root cause findings"
+    - "Generate minimal code changes that fix the identified issue"
+    - "Ensure changes preserve existing program functionality"
+    - "Output unified diff patch in proper format"
+guardrails:
+  - "Only modify files necessary to fix the reported bug"
+  - "Preserve all existing program functionality"
+  - "Do not refactor unrelated code"
+  - "Do not modify test files or write new tests"
+  - "Use proper Python indentation and syntax"
+  - "Make minimal changes to resolve the issue"
+  - "Import necessary libraries only if needed for the fix"
+  - timeout: 300
+observability:
+  trace_level: standard
+  metrics: [lines_changed, files_modified, fix_generation_time]
+security:
+  filesystem: read-write
+  network: none
+  secrets: []
+negotiation:
+  file_conflicts: override
+  priority: 5

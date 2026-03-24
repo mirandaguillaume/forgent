@@ -226,28 +226,37 @@ func testStagedResolvedSkills() []model.SkillBehavior {
 	}
 }
 
-func TestGenerateCopilotAgentMd_Staged_HasStageHeaders(t *testing.T) {
+func TestGenerateCopilotAgentMd_Staged_PipelineTable(t *testing.T) {
 	md := copilot.GenerateCopilotAgentMd(testStagedAgent(), testStagedResolvedSkills(), ".github")
-	assert.Contains(t, md, "### Stage: preflight (sequential)")
-	assert.Contains(t, md, "### Stage: analysis (parallel)")
-	assert.Contains(t, md, "### Stage: publish (sequential)")
+	assert.Contains(t, md, "## Pipeline")
+	assert.Contains(t, md, "| Stage | Strategy | Skills |")
+	assert.Contains(t, md, "| preflight | sequential | eligibility-checker, summarizer |")
+	assert.Contains(t, md, "| analysis | parallel | bug-scanner, history-reviewer |")
+	assert.Contains(t, md, "| publish | sequential | commenter |")
+}
+
+func TestGenerateCopilotAgentMd_Staged_FlatSteps(t *testing.T) {
+	md := copilot.GenerateCopilotAgentMd(testStagedAgent(), testStagedResolvedSkills(), ".github")
+	assert.Contains(t, md, "### Step 1: Eligibility Checker")
+	assert.Contains(t, md, "### Step 2: Summarizer")
+	assert.Contains(t, md, "### Step 3: Bug Scanner")
+	assert.Contains(t, md, "### Step 5: Commenter")
+	// h3, not h4
+	assert.NotContains(t, md, "#### Step")
+}
+
+func TestGenerateCopilotAgentMd_Staged_NoOrchestrationDirectives(t *testing.T) {
+	md := copilot.GenerateCopilotAgentMd(testStagedAgent(), testStagedResolvedSkills(), ".github")
+	assert.NotContains(t, md, "Launch these subagents in parallel")
+	assert.NotContains(t, md, "### Stage:")
+	assert.NotContains(t, md, "stages sequentially")
+	assert.NotContains(t, md, "across 3 stages")
 }
 
 func TestGenerateCopilotAgentMd_Staged_SkillPaths(t *testing.T) {
 	md := copilot.GenerateCopilotAgentMd(testStagedAgent(), testStagedResolvedSkills(), ".github")
 	assert.Contains(t, md, "Skill: `.github/skills/eligibility-checker/SKILL.md`")
 	assert.Contains(t, md, "Skill: `.github/skills/commenter/SKILL.md`")
-}
-
-func TestGenerateCopilotAgentMd_Staged_ParallelNote(t *testing.T) {
-	md := copilot.GenerateCopilotAgentMd(testStagedAgent(), testStagedResolvedSkills(), ".github")
-	assert.Contains(t, md, "Launch these subagents in parallel")
-}
-
-func TestGenerateCopilotAgentMd_Staged_StepNumbers(t *testing.T) {
-	md := copilot.GenerateCopilotAgentMd(testStagedAgent(), testStagedResolvedSkills(), ".github")
-	assert.Contains(t, md, "#### Step 1: Eligibility Checker")
-	assert.Contains(t, md, "#### Step 5: Commenter")
 }
 
 func TestGenerateCopilotAgentMd_Staged_Frontmatter(t *testing.T) {

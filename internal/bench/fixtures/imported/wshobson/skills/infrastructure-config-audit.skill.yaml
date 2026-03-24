@@ -1,0 +1,29 @@
+skill: infrastructure-config-audit
+version: 1.0.0
+context:
+  consumes: [config_files, infrastructure_code]
+  produces: [config_audit_report]
+  memory: short-term
+strategy:
+  tools: [read_file, grep, search, bash]
+  approach: Production configuration security assessment through policy validation
+  steps:
+    - Review production configuration security
+    - Validate container configurations
+    - Assess Infrastructure as Code templates
+    - Check CI/CD pipeline configurations
+    - Verify secrets management setup
+guardrails:
+  - timeout: 300s
+  - require_production_config_approval: true
+  - validate_before_deployment: true
+observability:
+  trace_level: detailed
+  metrics: [config_issues_found, security_violations, compliance_score]
+security:
+  filesystem: read-only
+  network: allowlist
+  secrets: []
+negotiation:
+  file_conflicts: override
+  priority: 8
