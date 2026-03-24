@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/mirandaguillaume/forgent/compare/v0.4.0...v0.5.0) (2026-03-15)
+
+
+### Features
+
+* whitepaper v2 — formal properties, frontiers, and experience ([#15](https://github.com/mirandaguillaume/forgent/issues/15)) ([ea3f72f](https://github.com/mirandaguillaume/forgent/commit/ea3f72fedff41fcffb221774c6e50bd69a7af563))
+
 ## [0.4.0](https://github.com/mirandaguillaume/forgent/compare/v0.3.0...v0.4.0) (2026-03-13)
 
 
