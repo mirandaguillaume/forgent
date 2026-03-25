@@ -28,16 +28,6 @@
 - Prompt template builder from skill specs
 - OpenRouter support with `--input`/`--output` flags
 
-### Benchmark Framework (`forgent bench`)
-- Token overhead measurement
-- Build determinism test
-- Cross-target isomorphism validation
-- Formal property tests (P10–P15)
-- Pass@k consistency measurement
-- LLM-as-judge evaluation (composed vs monolithic)
-- SWE-bench lite wrapper
-- Gremlins mutation testing integration
-
 ## Next
 
 ### Quick Wins
@@ -64,3 +54,15 @@
 | MCP Server for Copilot | `cmd/forgent-mcp/` binary exposing `dispatch_skill()` tool — multi-agent on platforms without native dispatch |
 | `forgent test` | Behavioral testing for skills — validate agent behavior against expectations |
 | Approval gate facet | Human-in-the-loop approval gates as a first-class skill facet |
+
+## Internal Tools
+
+### Benchmark Framework (`forgent bench`)
+- Token overhead measurement
+- Build determinism test
+- Cross-target isomorphism validation
+- Formal property tests (P10–P15)
+- Pass@k consistency measurement
+- LLM-as-judge evaluation (composed vs monolithic)
+- SWE-bench lite wrapper
+- Gremlins mutation testing integration
