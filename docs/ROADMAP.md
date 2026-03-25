@@ -30,34 +30,42 @@
 
 ## Next
 
-### Quick Wins
+### Phase 1 — Format Maturity
 
-| Feature | Description |
-|---------|-------------|
-| Copilot model mapping | Map effort to GPT models (light=gpt-4o-mini, medium/heavy=gpt-4o) instead of Anthropic names |
-| Auto effort inference | Determine effort from skill complexity (step count, tool count, guardrails) instead of manual declaration |
-| Orphan step guard | Warn or skip when a skill is in `agent.Skills` but absent from `resolvedSkills` |
+| Feature | Size | Description |
+|---------|------|-------------|
+| Typed contracts | Medium | Schema for consumes/produces — compatibility validation between skills, primitive types (string, json, file...) |
+| Skill documentation fields | Quick | Promote `when_to_use`, `examples`, `anti_patterns` to first-class fields — stripped at build time (dev-only, not in generated output) |
+| Semantic versioning | Medium | `version` with compatibility rules, breaking change detection on contracts |
 
-### Medium
+### Phase 2 — Compiler Quality
 
-| Feature | Description |
-|---------|-------------|
-| Parallel group generation | Group independent skills (no shared inputs) into a parallel block in generated agent markdown |
-| Multi-level hierarchy | Agent → Agent → Skills (currently one level: orchestrator → skills) |
-| `forgent import` batch mode | Process entire directories of agent .md files |
+| Feature | Size | Description |
+|---------|------|-------------|
+| Auto effort inference | Quick | Determine effort from skill complexity (step count, tool count, guardrails) instead of manual declaration |
+| Orphan step guard | Quick | Warn or skip when a skill is in `agent.Skills` but absent from `resolvedSkills` |
+| `forgent test` | Large | Behavioral testing — validate that a compiled agent produces expected results |
+| Parallel group generation | Medium | Group independent skills (no shared inputs) into a parallel block in generated markdown |
 
-### Large
+### Phase 3 — Extension
 
-| Feature | Description |
-|---------|-------------|
-| DAG v2 | Race, fallback, map-reduce, and HITL (human-in-the-loop) node kinds |
-| MCP Server for Copilot | `cmd/forgent-mcp/` binary exposing `dispatch_skill()` tool — multi-agent on platforms without native dispatch |
-| `forgent test` | Behavioral testing for skills — validate agent behavior against expectations |
-| Approval gate facet | Human-in-the-loop approval gates as a first-class skill facet |
+| Feature | Size | Description |
+|---------|------|-------------|
+| DAG v2 | Large | Race, fallback, map-reduce, HITL node kinds |
+| Multi-level hierarchy | Medium | Agent → Agent → Skills (currently one level: orchestrator → skills) |
+| `forgent import` batch mode | Medium | Process entire directories of agent .md files |
+| New build targets | Large | Cursor, Windsurf, or others based on demand |
+
+### Deferred
+
+| Feature | Reason |
+|---------|--------|
+| MCP Server for Copilot | Premature — format must stabilize first |
+| Copilot model mapping | Trivial — will be done when touching the Copilot generator |
 
 ## Internal Tools
 
-### Benchmark Framework (`forgent bench`)
+### Benchmark Framework (`forgent-bench`)
 - Token overhead measurement
 - Build determinism test
 - Cross-target isomorphism validation
