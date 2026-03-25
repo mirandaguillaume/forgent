@@ -52,6 +52,7 @@
 | Feature | Size | Description |
 |---------|------|-------------|
 | DAG v2 | Large | Race, fallback, map-reduce, HITL node kinds |
+| Cyclic graphs (DG) | Large | Allow cycles for feedback/refinement loops — requires termination control (max iterations, exit conditions) |
 | Multi-level hierarchy | Medium | Agent → Agent → Skills (currently one level: orchestrator → skills) |
 | `forgent import` batch mode | Medium | Process entire directories of agent .md files |
 | New build targets | Large | Cursor, Windsurf, or others based on demand |
