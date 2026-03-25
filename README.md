@@ -1,18 +1,6 @@
-# forgent — Forge agents from composable skill specs
+# forgent — Define agent skills once in YAML, compile to any framework
 
-A CLI for designing, building, and composing AI agents across frameworks.
-
-Agents are compositions of **Skill Behaviors** — reusable behavioral units described by 5 facets:
-
-| Facet | What it defines |
-|-------|----------------|
-| **Context** | Memory, inputs consumed, outputs produced |
-| **Strategy** | Tools, approach, execution steps, effort level |
-| **Guardrails** | Rules, limits, constraints |
-| **Observability** | Traces, metrics, structured logging |
-| **Security** | Filesystem, network, secrets, sandboxing |
-
-Skills are pure interfaces (consumes/produces). Agents declare their own I/O contract and orchestration. Skills are defined in YAML, validated against a schema, and compiled to framework-specific formats.
+Forgent is a skill compiler. You describe agent skills in YAML with explicit contracts (consumes/produces, guardrails, security). Forgent compiles them into framework-native formats for Claude Code, GitHub Copilot, or a standalone Go runtime. One source of truth, multiple targets.
 
 ## Install
 
@@ -27,6 +15,18 @@ go install github.com/mirandaguillaume/forgent/cmd/forgent@latest
 ```
 
 Requires Go 1.22+.
+
+## Quick Start
+
+```bash
+mkdir my-agent && cd my-agent
+forgent init
+forgent skill create search-web --tools web_search,read_url
+forgent lint
+forgent build
+```
+
+This creates a skill YAML, validates it, and compiles it to Claude Code format (default target).
 
 ## Commands
 
@@ -43,22 +43,19 @@ forgent build --compact                # Reduce structural overhead
 forgent build --watch                  # Watch and rebuild on changes
 forgent import <source>               # Import agent .md files as Forgent skill specs
 forgent import <source> --yes          # Skip confirmation, write directly
-forgent bench <repo-path>             # Benchmark agent composition quality
 ```
-
-## Quick Start
-
-```bash
-mkdir my-agent && cd my-agent
-forgent init
-forgent skill create search-web --tools web_search,read_url
-forgent lint
-forgent build
-```
-
-This creates a skill YAML, validates it, and compiles it to Claude Code format (default target).
 
 ## Skill Anatomy
+
+Skills are pure interfaces (consumes/produces) described by 5 facets:
+
+| Facet | What it defines |
+|-------|----------------|
+| **Context** | Memory, inputs consumed, outputs produced |
+| **Strategy** | Tools, approach, execution steps, effort level |
+| **Guardrails** | Rules, limits, constraints |
+| **Observability** | Traces, metrics, structured logging |
+| **Security** | Filesystem, network, secrets, sandboxing |
 
 ```yaml
 skill: search-web
@@ -98,6 +95,21 @@ security:
 | GitHub Copilot | `.github/` (SKILL.md + agent.md + instructions) | Available |
 | Forgent | standalone Go binary (runtime + prompt) | Available |
 
+## Advanced Features
+
+Forgent includes an executable DAG engine (`pkg/dag`) for auto-wiring skill dependencies and a Go runtime target (`--target forgent`) that compiles skills into standalone binaries.
+
+## Development
+
+```bash
+git clone https://github.com/mirandaguillaume/forgent.git
+cd forgent
+go test ./...                  # run tests
+go build ./cmd/forgent         # compile
+go build ./cmd/forgent-bench   # bench binary (internal)
+go vet ./...                   # static analysis
+```
+
 ## Roadmap
 
 | Feature | Status |
@@ -107,31 +119,15 @@ security:
 | `forgent build` — Claude Code + Copilot targets | Done |
 | `forgent build --watch` — file watcher | Done |
 | SRP lint rules (single produces, name matches output) | Done |
-| Codebase scanner + skill enricher | Done |
 | `forgent import` — LLM-powered agent decomposition | Done |
 | LLM providers — Anthropic + OpenRouter | Done |
-| Vercel skill resolver (`vercel:skill-name`) | Done |
-| Validation-driven retry loop (linter feedback → LLM) | Done |
-| Multi-agent dispatch with effort levels | Done |
-| Staged agent pipelines (multi-stage orchestration) | Done |
-| `--compact` mode (reduces overhead 117% → 14%) | Done |
+| `--compact` mode (reduces overhead) | Done |
 | Executable DAG engine (`pkg/dag`) | Done |
 | `forgent build --target forgent` — Go runtime generator | Done |
-| `forgent bench` — composition quality benchmarks | Done |
 | DAG v2 (race, fallback, map-reduce, HITL) | Planned |
 | `forgent import` — batch directory processing | Planned |
 | Approval gate facet (human-in-the-loop) | Planned |
 | `forgent test` — behavioral testing for skills | Planned |
-
-## Development
-
-```bash
-git clone https://github.com/mirandaguillaume/forgent.git
-cd forgent
-go test ./...           # run tests
-go build ./cmd/forgent  # compile
-go vet ./...            # static analysis
-```
 
 ## License
 
