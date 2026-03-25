@@ -2,7 +2,7 @@
 
 ## Context
 
-Standalone Go CLI that forges AI agents from composable skill specs across frameworks (Claude Code, GitHub Copilot, and more).
+Standalone Go CLI that compiles agent skill specs (YAML) into framework-native formats across targets (Claude Code, GitHub Copilot, standalone Go runtime).
 
 Core concept: agents are **compositions of Skill Behaviors** — reusable behavioral units with 5 facets (Context, Strategy, Guardrails, Observability, Security). Skills are pure interfaces (consumes/produces). Agents declare their own I/O contract and orchestration.
 
@@ -30,7 +30,6 @@ forgent build --compact                # Reduce structural overhead
 forgent build --watch                  # Watch and rebuild on changes
 forgent import <source>               # Import agent .md files as Forgent skill specs
 forgent import <source> --yes         # Skip confirmation, write directly
-forgent bench <repo-path>             # Benchmark agent composition quality
 ```
 
 ## Dev Commands
@@ -38,6 +37,7 @@ forgent bench <repo-path>             # Benchmark agent composition quality
 ```bash
 go test ./...                # Run all tests
 go build ./cmd/forgent       # Compile binary
+go build ./cmd/forgent-bench # Bench binary (internal)
 go vet ./...                 # Static analysis
 ```
 
@@ -61,7 +61,8 @@ internal/
   enricher/                  # Skill enricher (codebase_index injection)
   llm/                       # LLM provider interface (Anthropic, OpenRouter)
   builder/                   # Build orchestration
-  bench/                     # Benchmark framework (token, isomorphism, SWE-bench, H2H)
+  bench/                     # Benchmark framework (consumed by forgent-bench only)
+    cmd/                     # Bench CLI entry point (forgent-bench binary)
   importer/                  # Agent .md → skill spec decomposition pipeline
   generator/
     claude/                  # Claude Code generator (skill, agent, toolmap)
