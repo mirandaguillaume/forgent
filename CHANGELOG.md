@@ -1,5 +1,44 @@
 # Changelog
 
+## [0.6.0](https://github.com/mirandaguillaume/forgent/compare/v0.5.0...v0.6.0) (2026-03-24)
+
+
+### Features
+
+* add --compact flag to reduce structural overhead 117% → 14% ([3f2d965](https://github.com/mirandaguillaume/forgent/commit/3f2d965139afa9017774239e3f43ad9f01694a52))
+* add 10 granular code-review SMB skill specs ([dca3755](https://github.com/mirandaguillaume/forgent/commit/dca3755e4f146cd297ad7333ce3bd77b9ed82b6e))
+* add AllSkills() helper for flat and staged agents ([787262e](https://github.com/mirandaguillaume/forgent/commit/787262e73938c0a937f912be1d0d5ddc11398c50))
+* add effort level to all skills and template ([24c7ee0](https://github.com/mirandaguillaume/forgent/commit/24c7ee0f7dc816b3e568656f3071d0308a46977b))
+* add EffortToModel mapping (light→haiku, medium→sonnet, heavy→opus) ([4524947](https://github.com/mirandaguillaume/forgent/commit/452494719cc0267593041f64623617c91c8f7750))
+* add Stage struct and Stages field to AgentComposition ([483354f](https://github.com/mirandaguillaume/forgent/commit/483354fde790c44d5bb9b47955c0dbfea5e7d4cc))
+* add strategy.effort field (light/medium/heavy) to skill model ([af040d9](https://github.com/mirandaguillaume/forgent/commit/af040d945262a0f06a9901c25c3a4aa7087d0235))
+* **build:** register forgent as build target ([289e77b](https://github.com/mirandaguillaume/forgent/commit/289e77b97bdc0be6f2b9cf8764ace9265a88f731))
+* Claude generator supports staged agent pipelines ([f9f5ddf](https://github.com/mirandaguillaume/forgent/commit/f9f5ddfe144c77173507a5a1029afc191de8c4db))
+* copilot agent generator with subagent dispatch format ([3e0107d](https://github.com/mirandaguillaume/forgent/commit/3e0107de6e067a2a772b11eb4edda307f8c199e8))
+* Copilot generator supports staged agent pipelines ([8b3cf41](https://github.com/mirandaguillaume/forgent/commit/8b3cf411ced4ce1372be23c1fbba0f40e4513cc4))
+* **dag:** add core types — Node, DAG, auto-wiring ([8c3fa0e](https://github.com/mirandaguillaume/forgent/commit/8c3fa0e0d0e398994f3681377fa19298ceea078d))
+* **dag:** add cycle detection and topology hint validation ([97a3395](https://github.com/mirandaguillaume/forgent/commit/97a3395a2cfafb373d78589bffac9dd2b9a61b3b))
+* **dag:** add layer decomposition — T1-T10 topologies ([8479e36](https://github.com/mirandaguillaume/forgent/commit/8479e36c8de1e5ba531591ff315868a946cf03ba))
+* **dag:** add layer-parallel execution engine with router support ([8ba8287](https://github.com/mirandaguillaume/forgent/commit/8ba8287e6bd42d39a95aa3b6894a38667e938d05))
+* **forgent-target:** add --input and --output flags to generated runtime ([f45e66f](https://github.com/mirandaguillaume/forgent/commit/f45e66f84c7beb29ae4d470e770ec64435684eb5))
+* **forgent-target:** add Go code generator for agent runtime ([6154ebb](https://github.com/mirandaguillaume/forgent/commit/6154ebb9bb59bd77af1ce7e6bd58d0ba52c1d96f))
+* **forgent-target:** add OpenRouter support — OPENROUTER_API_KEY with model selection ([2173d94](https://github.com/mirandaguillaume/forgent/commit/2173d941ff45806d83771374b3f65cb5d0c3a216))
+* **forgent-target:** add prompt template builder ([372332f](https://github.com/mirandaguillaume/forgent/commit/372332f0a3319c1a440b86203da11a6becdc4b4b))
+* **forgent-target:** register forgent as build target ([b7c0859](https://github.com/mirandaguillaume/forgent/commit/b7c08593e942d6aa9b11cca9faa66b6ba61ff56c))
+* generate orchestrator agents with Task() dispatch and per-skill model ([d7955d7](https://github.com/mirandaguillaume/forgent/commit/d7955d7d453ac70526c437904fe2c45625f719b9))
+* update docs, generators, DAG engine, bench framework and importers ([7fb396b](https://github.com/mirandaguillaume/forgent/commit/7fb396be2c217fe4bf7d7bf450fc0a33752e2d1d))
+* validate staged agents with mutual exclusivity and stage rules ([a9d7f70](https://github.com/mirandaguillaume/forgent/commit/a9d7f70e227ff45751a3b1994119ba7280720934))
+
+
+### Bug Fixes
+
+* **dag:** add arg validation, duplicate producer check, cycle guard, copy returns ([998ab18](https://github.com/mirandaguillaume/forgent/commit/998ab18728733353b22a64638b2a696fd405895b))
+* **forgent-target:** add test coverage for header comment and module sanitization ([26de0d5](https://github.com/mirandaguillaume/forgent/commit/26de0d5b0f778968721050a0738b234f843088ae))
+* **forgent-target:** fix sanitisation inconsistency and ContextDir ([f0b0167](https://github.com/mirandaguillaume/forgent/commit/f0b016773a52b88b7d58bda1de9a008d459a84cc))
+* **forgent-target:** forward ctx to HTTP request, check go mod tidy error ([630b587](https://github.com/mirandaguillaume/forgent/commit/630b587b997e535f3345acb02bfd4feff49337e5))
+* **forgent-target:** guard empty consumes/produces, use FormatGuardrail ([10fca22](https://github.com/mirandaguillaume/forgent/commit/10fca229c42f09d2f479155f1c91a8366cacc6e0))
+* **forgent-target:** use agent name in output, format source, sanitize module name ([f30cde0](https://github.com/mirandaguillaume/forgent/commit/f30cde03e299b00cf328add692ce42f856830bcc))
+
 ## [0.5.0](https://github.com/mirandaguillaume/forgent/compare/v0.4.0...v0.5.0) (2026-03-15)
 
 
