@@ -2,6 +2,7 @@ package dag_test
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 
 	"github.com/mirandaguillaume/forgent/pkg/dag"
@@ -200,13 +201,13 @@ func TestKindBatch_ChunkProcessing(t *testing.T) {
 }
 
 func TestKindBatch_DefaultBatchSize(t *testing.T) {
-	callCount := 0
+	var callCount int32
 	d, _ := dag.New(
 		&dag.Node{
 			ID: "b", Kind: dag.KindBatch,
 			Consumes: []string{"items"}, Produces: []string{"out"},
 			Run: func(ctx context.Context, in map[string]any) (map[string]any, error) {
-				callCount++
+				atomic.AddInt32(&callCount, 1)
 				chunk := in["items"].([]any)
 				return map[string]any{"out": chunk}, nil
 			},
@@ -218,7 +219,7 @@ func TestKindBatch_DefaultBatchSize(t *testing.T) {
 	}))
 	require.NoError(t, err)
 	// Default batch size is 1, so 3 calls
-	assert.Equal(t, 3, callCount)
+	assert.Equal(t, int32(3), atomic.LoadInt32(&callCount))
 }
 
 // --- KindZip ---

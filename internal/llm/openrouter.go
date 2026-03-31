@@ -2,16 +2,20 @@ package llm
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 const (
-	openRouterBaseURL = "https://openrouter.ai/api/v1/chat/completions"
-	openRouterModel   = "anthropic/claude-sonnet-4"
-	openRouterMaxTok  = 8192
+	openRouterBaseURL        = "https://openrouter.ai/api/v1/chat/completions"
+	openRouterModel          = "anthropic/claude-sonnet-4"
+	openRouterMaxTok         = 8192
+	openRouterDefaultTimeout = 120 * time.Second
 )
 
 // OpenRouterProvider calls the OpenRouter API (OpenAI-compatible format).
@@ -19,6 +23,7 @@ type OpenRouterProvider struct {
 	apiKey  string
 	baseURL string
 	model   string
+	timeout time.Duration
 }
 
 type openRouterRequest struct {
@@ -58,11 +63,19 @@ func (p *OpenRouterProvider) Complete(prompt string) (string, error) {
 		return "", fmt.Errorf("marshal request: %w", err)
 	}
 
+	timeout := p.timeout
+	if timeout == 0 {
+		timeout = openRouterDefaultTimeout
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
 	url := p.baseURL
 	if url == "" {
 		url = openRouterBaseURL
 	}
-	req, err := http.NewRequest("POST", url, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 	if err != nil {
 		return "", fmt.Errorf("create request: %w", err)
 	}
@@ -72,11 +85,14 @@ func (p *OpenRouterProvider) Complete(prompt string) (string, error) {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
+			return "", fmt.Errorf("OpenRouter request timed out after %s. Try a smaller file or use `--provider ollama`", timeout)
+		}
 		return "", fmt.Errorf("send request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20)) // 10MB limit
 	if err != nil {
 		return "", fmt.Errorf("read response: %w", err)
 	}
@@ -107,6 +123,7 @@ func registerOpenRouterProvider() {
 			apiKey:  apiKey,
 			baseURL: openRouterBaseURL,
 			model:   openRouterModel,
+			timeout: openRouterDefaultTimeout,
 		}
 	})
 }

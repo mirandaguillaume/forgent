@@ -2,23 +2,28 @@ package llm
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 const (
-	defaultBaseURL    = "https://api.anthropic.com/v1/messages"
-	anthropicVersion  = "2023-06-01"
-	anthropicModel    = "claude-sonnet-4-20250514"
-	anthropicMaxTok   = 8192
+	defaultBaseURL           = "https://api.anthropic.com/v1/messages"
+	anthropicVersion         = "2023-06-01"
+	anthropicModel           = "claude-sonnet-4-20250514"
+	anthropicMaxTok          = 8192
+	anthropicDefaultTimeout  = 120 * time.Second
 )
 
 // AnthropicProvider calls the Anthropic Messages API.
 type AnthropicProvider struct {
 	apiKey  string
 	baseURL string
+	timeout time.Duration
 }
 
 type anthropicRequest struct {
@@ -59,11 +64,19 @@ func (p *AnthropicProvider) Complete(prompt string) (string, error) {
 		return "", fmt.Errorf("marshal request: %w", err)
 	}
 
+	timeout := p.timeout
+	if timeout == 0 {
+		timeout = anthropicDefaultTimeout
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
 	url := p.baseURL
 	if url == "" {
 		url = defaultBaseURL
 	}
-	req, err := http.NewRequest("POST", url, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 	if err != nil {
 		return "", fmt.Errorf("create request: %w", err)
 	}
@@ -74,11 +87,14 @@ func (p *AnthropicProvider) Complete(prompt string) (string, error) {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
+			return "", fmt.Errorf("Anthropic request timed out after %s. Try a smaller file or use `--provider ollama`", timeout)
+		}
 		return "", fmt.Errorf("send request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	respBody, err := io.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(io.LimitReader(resp.Body, 10<<20)) // 10MB limit
 	if err != nil {
 		return "", fmt.Errorf("read response: %w", err)
 	}
@@ -108,6 +124,7 @@ func registerAnthropicProvider() {
 		return &AnthropicProvider{
 			apiKey:  apiKey,
 			baseURL: defaultBaseURL,
+			timeout: anthropicDefaultTimeout,
 		}
 	})
 }
