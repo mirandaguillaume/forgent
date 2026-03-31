@@ -34,7 +34,7 @@ This creates a skill YAML, validates it, and compiles it to Claude Code format (
 forgent init                           # Initialize a Forgent project
 forgent skill create <name>            # Scaffold a new skill
 forgent lint [path]                    # Lint skills for best practices
-forgent doctor [path]                  # Full diagnostic (lint + deps + loops)
+forgent doctor <file>                  # LLM-powered agent analysis
 forgent score [path]                   # Score design quality
 forgent build --target claude          # Build for Claude Code (default)
 forgent build --target copilot         # Build for GitHub Copilot
@@ -95,6 +95,38 @@ security:
 | GitHub Copilot | `.github/` (SKILL.md + agent.md + instructions) | Available |
 | Forgent | standalone Go binary (runtime + prompt) | Available |
 
+## Doctor — LLM-Powered Agent Analysis
+
+`forgent doctor` analyzes any agent definition file and produces research-backed recommendations to improve it. It works on Claude Code agents, GitHub Copilot agents, and Forgent YAML skills — you don't need to use Forgent's build pipeline to benefit from it.
+
+```bash
+# Analyze a Claude Code agent
+forgent doctor .claude/agents/code-reviewer.md
+
+# Analyze a GitHub Copilot agent
+forgent doctor .github/agents/dash.agent.md
+
+# Analyze a Forgent skill
+forgent doctor skills/review-commenter.skill.yaml
+
+# Use a specific provider
+forgent doctor agent.md --provider openrouter
+forgent doctor agent.md --provider anthropic
+```
+
+Doctor checks 12 categories drawn from recent research (Liu et al. 2024, SkillsBench 2026, Mu et al. 2025, and others), including:
+
+- **Guardrails** — are there explicit constraints (timeouts, output limits)?
+- **Security** — are filesystem, network, and secrets access declared?
+- **Ordering** — are critical instructions placed first to exploit primacy bias?
+- **Decomposition** — should this be split into focused skills?
+- **Redundancy** — are instructions duplicating what the model already infers?
+- **Specificity** — are directives measurable or just vague ("be thorough")?
+
+Each finding includes a confidence level (HIGH / MOD / LOW), a description of the current state, and a concrete suggested improvement.
+
+**LLM provider fallback chain:** Ollama (local, no key needed) > `OPENROUTER_API_KEY` > `ANTHROPIC_API_KEY`. If no LLM is available, doctor falls back to static analysis only.
+
 ## Advanced Features
 
 Forgent includes an executable DAG engine (`pkg/dag`) for auto-wiring skill dependencies and a Go runtime target (`--target forgent`) that compiles skills into standalone binaries.
@@ -115,7 +147,8 @@ go vet ./...                   # static analysis
 | Feature | Status |
 |---------|--------|
 | Skill YAML format + validation | Done |
-| `forgent lint` / `doctor` / `score` | Done |
+| `forgent lint` / `score` — static analysis | Done |
+| `forgent doctor` — LLM-powered agent analysis (12 research-backed checks) | Done |
 | `forgent build` — Claude Code + Copilot targets | Done |
 | `forgent build --watch` — file watcher | Done |
 | SRP lint rules (single produces, name matches output) | Done |

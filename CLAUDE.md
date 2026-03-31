@@ -21,7 +21,10 @@ Core concept: agents are **compositions of Skill Behaviors** — reusable behavi
 forgent init                           # Initialize Forgent project
 forgent skill create <name>           # Scaffold a new skill
 forgent lint [path]                    # Lint skills for best practices
-forgent doctor [path]                  # Full diagnostic (lint + dependency + loop analysis)
+forgent doctor <file>                  # LLM-powered agent analysis (12 research-backed checks)
+forgent doctor <file> --provider ollama      # Use specific LLM provider
+forgent doctor <file> --model <name>         # Use specific model
+forgent doctor <file> --debug                # Show debug output on stderr
 forgent score [path]                   # Score design quality
 forgent build --target claude          # Generate skills/agents for Claude Code
 forgent build --target copilot         # Generate skills/agents for GitHub Copilot
@@ -59,7 +62,13 @@ internal/
   yaml/                      # YAML loader
   scanner/                   # Codebase scanner
   enricher/                  # Skill enricher (codebase_index injection)
-  llm/                       # LLM provider interface (Anthropic, OpenRouter)
+  llm/                       # LLM provider interface (Ollama, Anthropic, OpenRouter)
+  doctor/                    # forgent doctor — LLM-powered agent analysis
+    parser/                  # Format detection + parsing (Claude, Copilot, Forgent YAML)
+    analyzer/                # LLM prompt builder + finding extraction
+    registry/                # Research registry (12 categories, embedded YAML)
+    llmutil/                 # YAML extraction + finding parser from LLM responses
+    render.go                # TTY/plain output rendering
   builder/                   # Build orchestration
   bench/                     # Benchmark framework (consumed by forgent-bench only)
     cmd/                     # Bench CLI entry point (forgent-bench binary)

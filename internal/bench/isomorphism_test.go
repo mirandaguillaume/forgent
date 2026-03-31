@@ -15,9 +15,9 @@ func TestIsomorphism_CIReviewer(t *testing.T) {
 	assert.True(t, result.SkillNamesMatch, "skill names should match across targets")
 	assert.True(t, result.IOContractsMatch, "I/O contracts should match")
 	assert.Equal(t, 1.0, result.StructureScore, "structure should be identical")
-	// Should find all 16 skills
-	assert.Len(t, result.ClaudeSkills, 16)
-	assert.Len(t, result.CopilotSkills, 16)
+	// Should find all 18 skills
+	assert.Len(t, result.ClaudeSkills, 18)
+	assert.Len(t, result.CopilotSkills, 18)
 	t.Logf("Claude skills: %v", result.ClaudeSkills)
 	t.Logf("Copilot skills: %v", result.CopilotSkills)
 }
