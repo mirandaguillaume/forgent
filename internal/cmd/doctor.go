@@ -120,8 +120,20 @@ Examples:
 				color.NoColor = true
 			}
 
+			// Check if target is an index file
+			var indexContent []byte
+			isIndex := false
+			if !info.IsDir() {
+				if c, err := os.ReadFile(target); err == nil {
+					indexContent = c
+					isIndex = docindex.IsIndex(c)
+				}
+			}
+
 			var analysisErr error
-			if mode == "quick" && formatFlag == "" && !ciFlag {
+			if isIndex {
+				analysisErr = runIndexModeWithContent(target, indexContent, mode, formatFlag, ciFlag, reg)
+			} else if mode == "quick" && formatFlag == "" && !ciFlag {
 				analysisErr = runQuickMode(target, reg)
 			} else if mode == "quick" && (formatFlag != "" || ciFlag) {
 				// Quick mode but with structured output — use pipeline
@@ -242,6 +254,49 @@ func runQuickMode(target string, reg *registry.Registry) error {
 // sectionMappingCount for structural score — must match static/presence.go (15 sections).
 // ComputeStructural adds +1 for secrets check internally.
 const sectionMappingCount = 15
+
+// runIndexModeWithContent analyzes an AGENTS.md index by resolving links and computing aggregate score.
+func runIndexModeWithContent(target string, content []byte, mode, formatFlag string, ciFlag bool, reg *registry.Registry) error {
+	baseDir := filepath.Dir(target)
+	resolved := docindex.ResolveIndex(content, baseDir)
+	tty := doctor.IsTTY() && !ciFlag
+
+	// Show index resolution
+	if tty {
+		fmt.Printf("\nIndex: %s (%d referenced files)\n", target, len(resolved))
+	} else {
+		fmt.Printf("Index: %s (%d referenced files)\n", target, len(resolved))
+	}
+
+	// Show missing file findings
+	missingFindings := docindex.MissingFiles(resolved)
+	for _, f := range missingFindings {
+		if tty {
+			fmt.Printf("  %s %s\n", color.RedString("x"), f.Issue)
+		} else {
+			fmt.Printf("  MISSING: %s\n", f.Issue)
+		}
+	}
+
+	// Compute aggregate score
+	agg := docindex.ScoreIndex(resolved, mode)
+
+	// Render
+	if formatFlag == "json" {
+		jsonBytes, err := docindex.AggregateToJSON(agg, target)
+		if err != nil {
+			return fmt.Errorf("JSON output: %w", err)
+		}
+		fmt.Println(string(jsonBytes))
+	} else {
+		fmt.Print(docindex.FormatAggregate(agg))
+	}
+
+	if len(missingFindings) > 0 || agg.Covered < agg.Total {
+		return ErrFindings
+	}
+	return nil
+}
 
 // runScaffoldMode generates AGENTS.md index + .agents/*.md from the original file.
 func runScaffoldMode(target string, debugFlag bool, reg *registry.Registry) error {

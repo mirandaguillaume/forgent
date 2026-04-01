@@ -24,9 +24,9 @@ type SpecializedFile struct {
 var DefaultFiles = []SpecializedFile{
 	{
 		Name: "identity.md", Title: "Identity",
-		Description: "persona, goals, decision authority",
-		Categories:  []string{"identity", "goals", "decision_authority"},
-		Keywords:    []string{"identity", "persona", "role", "you are", "your role", "goal", "objective", "purpose", "decision", "authority", "autonomy", "escalat"},
+		Description: "persona, goals, decision authority, memory strategy, workflow triggers",
+		Categories:  []string{"identity", "goals", "decision_authority", "memory_management", "workflow_triggers"},
+		Keywords:    []string{"identity", "persona", "role", "you are", "your role", "goal", "objective", "purpose", "decision", "authority", "autonomy", "escalat", "memory", "session", "trigger", "invoke", "when to use"},
 	},
 	{
 		Name: "security.md", Title: "Security",
@@ -36,15 +36,15 @@ var DefaultFiles = []SpecializedFile{
 	},
 	{
 		Name: "testing.md", Title: "Testing",
-		Description: "test commands, conventions, coverage expectations",
-		Categories:  []string{"testing", "examples"},
-		Keywords:    []string{"test", "testing", "spec", "assert", "example", "sample", "demo"},
+		Description: "test commands, conventions, coverage, examples",
+		Categories:  []string{"testing", "examples", "build_commands"},
+		Keywords:    []string{"test", "testing", "spec", "assert", "example", "sample", "demo", "build", "run", "commands", "scripts"},
 	},
 	{
 		Name: "architecture.md", Title: "Architecture",
-		Description: "layers, patterns, data flow, key abstractions",
+		Description: "layers, patterns, data flow, dependencies",
 		Categories:  []string{"architecture_hints", "context", "dependency_declaration"},
-		Keywords:    []string{"architecture", "structure", "design", "pattern", "layer", "input", "output", "consumes", "produces", "dependencies"},
+		Keywords:    []string{"architecture", "structure", "design", "pattern", "layer", "input", "output", "consumes", "produces", "dependencies", "i/o"},
 	},
 	{
 		Name: "guardrails.md", Title: "Guardrails",
@@ -205,11 +205,30 @@ func getTemplate(sf SpecializedFile, ctx *scanner.CodebaseContext) string {
 
 You are a development assistant for this project.
 
+## Goals
+
+<!-- TODO: Define the primary objectives -->
+
+- Deliver correct, maintainable code
+- Follow project conventions consistently
+
 ## Decision Authority
 
 - **Autonomous:** Code changes within existing patterns, test fixes, lint fixes
 - **Requires approval:** New dependencies, API changes, database migrations
 - **Escalate:** Security-sensitive changes, breaking changes
+
+## Memory Strategy
+
+- **Session:** Current task context only
+- **Persistent:** Project conventions loaded from this file
+<!-- TODO: Define what should persist across sessions -->
+
+## When to Invoke
+
+- Use for development tasks within this project
+- Not for infrastructure, deployment, or external system changes
+<!-- TODO: Define specific trigger conditions -->
 `
 	case "security.md":
 		return `## Filesystem Access
@@ -246,7 +265,17 @@ You are a development assistant for this project.
 - Tests live next to source files
 - Every PR must have tests for new functionality
 - Mock external dependencies, never hit real APIs in tests
-`
+
+## Build Commands
+
+` + "```bash\n# TODO: add your build command\n```\n\n"
+
+		tmpl += `## Examples
+
+<!-- TODO: Add 1-2 concrete examples of expected behavior -->
+
+Example test pattern:
+` + "```\n// TODO: add a representative test example\n```\n"
 		return tmpl
 	case "architecture.md":
 		tmpl := "## Project Structure\n\n"
@@ -268,6 +297,11 @@ You are a development assistant for this project.
 		tmpl += `## Patterns
 
 <!-- TODO: describe key architectural patterns -->
+
+## Dependencies
+
+- **Input:** <!-- TODO: what data/context this agent consumes -->
+- **Output:** <!-- TODO: what this agent produces -->
 `
 		return tmpl
 	case "guardrails.md":
