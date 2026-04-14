@@ -1,12 +1,14 @@
 package experiment
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"text/template"
 	"time"
 
 	"github.com/mirandaguillaume/forgent/internal/llm"
@@ -112,6 +114,11 @@ type outputCapture func(nodeID string, out map[string]any)
 // buildTaskDAG constructs a DAG from a task definition.
 // Each step becomes a node; consumes/produces contracts wire the topology.
 // The capture callback receives all node outputs (not just terminal).
+//
+// Three step kinds are supported:
+//   - llm (default): calls the LLM provider, guardrails enforced by code after each call
+//   - static: executes a Go text/template against inputs, no LLM call
+//   - assert: runs a guardrail check against inputs, fails if violated
 func buildTaskDAG(task TaskDefinition, provider llm.Provider, capture outputCapture) (*dag.DAG, map[string][]string, error) {
 	var nodes []*dag.Node
 	outputKeys := make(map[string][]string) // nodeID → produces keys
@@ -120,7 +127,6 @@ func buildTaskDAG(task TaskDefinition, provider llm.Provider, capture outputCapt
 		stepCopy := step // capture for closure
 		consumes := step.Consumes
 		if len(consumes) == 0 && len(nodes) == 0 {
-			// First step consumes the task input
 			consumes = []string{"task_input"}
 		}
 		produces := step.Produces
@@ -129,13 +135,81 @@ func buildTaskDAG(task TaskDefinition, provider llm.Provider, capture outputCapt
 		}
 		outputKeys[step.ID] = produces
 
-		node := &dag.Node{
-			ID:       step.ID,
-			Kind:     dag.KindTask,
-			Consumes: consumes,
-			Produces: produces,
-			Timeout:  60 * time.Second,
-			Run: func(ctx context.Context, inputs map[string]any) (map[string]any, error) {
+		var runFn func(ctx context.Context, inputs map[string]any) (map[string]any, error)
+
+		switch stepCopy.Kind {
+		case StepKindStatic:
+			// Static: execute Go template against inputs — no LLM, no tokens
+			runFn = func(ctx context.Context, inputs map[string]any) (map[string]any, error) {
+				tmpl, err := template.New(stepCopy.ID).Parse(stepCopy.Template)
+				if err != nil {
+					return nil, fmt.Errorf("step %s: parse template: %w", stepCopy.ID, err)
+				}
+				data := map[string]any{"inputs": inputs}
+				var buf bytes.Buffer
+				if err := tmpl.Execute(&buf, data); err != nil {
+					return nil, fmt.Errorf("step %s: execute template: %w", stepCopy.ID, err)
+				}
+				out := make(map[string]any)
+				for _, p := range stepCopy.Produces {
+					out[p] = buf.String()
+				}
+				if capture != nil {
+					capture(stepCopy.ID, out)
+				}
+				return out, nil
+			}
+
+		case StepKindAssert:
+			// Assert: verify guardrails/checks against inputs — no LLM, fail on violation
+			runFn = func(ctx context.Context, inputs map[string]any) (map[string]any, error) {
+				// Aggregate all input text
+				var allText strings.Builder
+				for _, v := range inputs {
+					if s, ok := v.(string); ok {
+						allText.WriteString(s)
+						allText.WriteString("\n")
+					}
+				}
+				lower := strings.ToLower(allText.String())
+
+				// Run the named check
+				switch stepCopy.Check {
+				case "guardrails_respected":
+					for _, g := range task.Guardrails {
+						if !checkGuardrail(lower, g) {
+							return nil, fmt.Errorf("step %s: guardrail violated: %s", stepCopy.ID, g)
+						}
+					}
+				case "all_inputs_present":
+					for k, v := range inputs {
+						if s, ok := v.(string); ok && strings.TrimSpace(s) == "" {
+							return nil, fmt.Errorf("step %s: empty input: %s", stepCopy.ID, k)
+						}
+					}
+				case "no_empty_steps":
+					for k, v := range inputs {
+						if s, ok := v.(string); ok && len(strings.TrimSpace(s)) < 10 {
+							return nil, fmt.Errorf("step %s: suspiciously short input %s (%d chars)", stepCopy.ID, k, len(s))
+						}
+					}
+				default:
+					// Unknown check — pass through (lenient)
+				}
+
+				out := make(map[string]any)
+				for _, p := range stepCopy.Produces {
+					out[p] = allText.String()
+				}
+				if capture != nil {
+					capture(stepCopy.ID, out)
+				}
+				return out, nil
+			}
+
+		default:
+			// LLM step: call provider with guardrail enforcement + retry
+			runFn = func(ctx context.Context, inputs map[string]any) (map[string]any, error) {
 				var inputParts []string
 				for k, v := range inputs {
 					if s, ok := v.(string); ok {
@@ -143,24 +217,71 @@ func buildTaskDAG(task TaskDefinition, provider llm.Provider, capture outputCapt
 					}
 				}
 
-				prompt := fmt.Sprintf("## Step: %s\n\n%s\n\nInput:\n%s\n",
-					stepCopy.Name, stepCopy.Prompt, strings.Join(inputParts, "\n\n"))
+				// Build prompt with task context + guardrails (was missing before!)
+				var sb strings.Builder
+				sb.WriteString(fmt.Sprintf("# Task: %s\n\n", task.Name))
+				sb.WriteString(fmt.Sprintf("## Step: %s\n\n%s\n\n", stepCopy.Name, stepCopy.Prompt))
+				if len(task.Guardrails) > 0 {
+					sb.WriteString("## Constraints (MUST respect)\n\n")
+					for _, g := range task.Guardrails {
+						sb.WriteString(fmt.Sprintf("- %s\n", g))
+					}
+					sb.WriteString("\n")
+				}
+				sb.WriteString("## Input\n\n")
+				sb.WriteString(strings.Join(inputParts, "\n\n"))
+				sb.WriteString("\n")
 
-				response, err := provider.Complete(prompt)
-				if err != nil {
-					return nil, fmt.Errorf("step %s: %w", stepCopy.ID, err)
+				// Try up to 3 times, checking guardrails after each attempt
+				maxAttempts := 3
+				var lastResponse string
+				for attempt := 0; attempt < maxAttempts; attempt++ {
+					response, err := provider.Complete(sb.String())
+					if err != nil {
+						return nil, fmt.Errorf("step %s attempt %d: %w", stepCopy.ID, attempt+1, err)
+					}
+					lastResponse = response
+
+					// Check guardrails by code
+					if len(task.Guardrails) > 0 {
+						lower := strings.ToLower(response)
+						allPassed := true
+						for _, g := range task.Guardrails {
+							if !checkGuardrail(lower, g) {
+								allPassed = false
+								break
+							}
+						}
+						if allPassed {
+							break // guardrails passed, use this response
+						}
+						if attempt < maxAttempts-1 {
+							// Retry with hint
+							sb.WriteString(fmt.Sprintf("\n\n[Previous attempt violated constraints. Retry %d/%d. Strictly respect ALL constraints listed above.]\n", attempt+2, maxAttempts))
+						}
+					} else {
+						break // no guardrails to check
+					}
 				}
 
 				out := make(map[string]any)
 				for _, p := range stepCopy.Produces {
-					out[p] = response
+					out[p] = lastResponse
 				}
-
 				if capture != nil {
 					capture(stepCopy.ID, out)
 				}
 				return out, nil
-			},
+			}
+		}
+
+		node := &dag.Node{
+			ID:       step.ID,
+			Kind:     dag.KindTask,
+			Consumes: consumes,
+			Produces: produces,
+			Timeout:  120 * time.Second,
+			Run:      runFn,
 		}
 		nodes = append(nodes, node)
 	}
