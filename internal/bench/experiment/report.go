@@ -148,6 +148,49 @@ func FormatReport(cr *ComparisonResult, opts ReportOpts) string {
 	}
 
 	sb.WriteString("\n")
+
+	// Efficiency metrics
+	em := cr.Efficiency
+	if em.TextTokens > 0 {
+		sb.WriteString("## Cost-Efficiency\n\n")
+		sb.WriteString("| Metric | Text | Runtime |\n")
+		sb.WriteString("|--------|------|--------|\n")
+		sb.WriteString(fmt.Sprintf("| Quality score (weighted) | %.1f%% | %.1f%% |\n", em.TextQuality*100, em.RuntimeQuality*100))
+		sb.WriteString(fmt.Sprintf("| Mean tokens/run | %.0f | %.0f |\n", em.TextTokens, em.RuntimeTokens))
+		sb.WriteString(fmt.Sprintf("| Efficiency (quality per 1k tokens) | %.3f | %.3f |\n", em.TextEfficiency, em.RuntimeEfficiency))
+		if em.CostPerDetection > 0 {
+			sb.WriteString(fmt.Sprintf("| Cost per detection | — | %.0f extra tokens |\n", em.CostPerDetection))
+		}
+		sb.WriteString("\n")
+		sb.WriteString("*Quality = 40% completion + 30% ordering + 30% guardrails. Efficiency = quality / (tokens/1000).*\n\n")
+	}
+
+	// Step breakdown
+	if len(cr.StepBreakdowns) > 0 {
+		sb.WriteString("## Per-Step Breakdown\n\n")
+		sb.WriteString("| Step | Text Complete | Runtime Complete | Text Keywords | Runtime Keywords |\n")
+		sb.WriteString("|------|-------------|-----------------|--------------|----------------|\n")
+		for _, s := range cr.StepBreakdowns {
+			sb.WriteString(fmt.Sprintf("| %s | %.0f%% | %.0f%% | %.0f%% | %.0f%% |\n",
+				s.StepID, s.TextCompletionPct, s.RTCompletionPct, s.TextKeywordPct, s.RTKeywordPct))
+		}
+		sb.WriteString("\n")
+		sb.WriteString("*Sorted by text completion rate (lowest first = most fragile steps).*\n\n")
+	}
+
+	// Stability metrics
+	if len(cr.Stability) > 0 {
+		sb.WriteString("## Stability (Standard Deviation across runs)\n\n")
+		sb.WriteString("| Task | Text σ(completion) | RT σ(completion) | Text σ(ordering) | RT σ(ordering) | Text σ(guardrail) | RT σ(guardrail) |\n")
+		sb.WriteString("|------|-------------------|-----------------|-----------------|---------------|------------------|----------------|\n")
+		for _, s := range cr.Stability {
+			sb.WriteString(fmt.Sprintf("| %s | %.3f | %.3f | %.3f | %.3f | %.3f | %.3f |\n",
+				s.TaskID, s.TextCompletionStd, s.RTCompletionStd, s.TextOrderingStd, s.RTOrderingStd, s.TextGuardrailStd, s.RTGuardrailStd))
+		}
+		sb.WriteString("\n")
+		sb.WriteString("*Lower σ = more stable. Runtime σ(ordering) should be 0.000 (guaranteed by topological sort).*\n\n")
+	}
+
 	return sb.String()
 }
 

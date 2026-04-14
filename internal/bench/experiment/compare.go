@@ -66,6 +66,11 @@ func Compare(textResults, runtimeResults []TaskResult) *ComparisonResult {
 	// Harness detection rate: pair text/runtime results by index
 	cr.DetectionRate = ComputeDetectionRate(textResults, runtimeResults)
 
+	// Derived metrics
+	cr.Efficiency = ComputeEfficiency(textResults, runtimeResults, cr.DetectionRate)
+	cr.StepBreakdowns = ComputeStepBreakdowns(textResults, runtimeResults)
+	cr.Stability = ComputeStability(textResults, runtimeResults)
+
 	return cr
 }
 
@@ -255,4 +260,193 @@ func meanMetric(results []TaskResult, metric func(TaskResult) float64) float64 {
 		sum += metric(r)
 	}
 	return sum / float64(len(results))
+}
+
+// qualityScore computes a weighted quality score from a TaskResult.
+// Weights: completion 40%, ordering 30%, guardrails 30%.
+func qualityScore(r TaskResult) float64 {
+	comp := 0.0
+	if r.Completed {
+		comp = 1.0
+	}
+	return comp*0.4 + r.OrderingScore*0.3 + r.GuardrailScore*0.3
+}
+
+// ComputeEfficiency calculates quality-per-token for each condition.
+func ComputeEfficiency(text, runtime []TaskResult, dm DetectionMetrics) EfficiencyMetrics {
+	em := EfficiencyMetrics{}
+	if len(text) == 0 || len(runtime) == 0 {
+		return em
+	}
+
+	for _, r := range text {
+		em.TextQuality += qualityScore(r)
+		em.TextTokens += float64(r.TokensUsed)
+	}
+	em.TextQuality /= float64(len(text))
+	em.TextTokens /= float64(len(text))
+
+	for _, r := range runtime {
+		em.RuntimeQuality += qualityScore(r)
+		em.RuntimeTokens += float64(r.TokensUsed)
+	}
+	em.RuntimeQuality /= float64(len(runtime))
+	em.RuntimeTokens /= float64(len(runtime))
+
+	if em.TextTokens > 0 {
+		em.TextEfficiency = em.TextQuality / (em.TextTokens / 1000)
+	}
+	if em.RuntimeTokens > 0 {
+		em.RuntimeEfficiency = em.RuntimeQuality / (em.RuntimeTokens / 1000)
+	}
+
+	// Cost per detection: extra tokens per failure caught
+	if dm.AnyCaught > 0 {
+		extraTokensPerRun := em.RuntimeTokens - em.TextTokens
+		totalExtraTokens := extraTokensPerRun * float64(len(runtime))
+		em.CostPerDetection = totalExtraTokens / float64(dm.AnyCaught)
+	}
+
+	return em
+}
+
+// ComputeStepBreakdowns aggregates per-step completion and keyword rates.
+func ComputeStepBreakdowns(text, runtime []TaskResult) []StepBreakdown {
+	type stepAcc struct {
+		textCompleted, textRuns   int
+		rtCompleted, rtRuns       int
+		textKwSum                 float64
+		textKwCount               int
+		rtKwSum                   float64
+		rtKwCount                 int
+	}
+
+	acc := make(map[string]*stepAcc)
+
+	collect := func(results []TaskResult, isRuntime bool) {
+		for _, r := range results {
+			for _, sr := range r.StepResults {
+				a, ok := acc[sr.StepID]
+				if !ok {
+					a = &stepAcc{}
+					acc[sr.StepID] = a
+				}
+				if isRuntime {
+					a.rtRuns++
+					if sr.Completed {
+						a.rtCompleted++
+					}
+					if sr.KeywordsTotal > 0 {
+						a.rtKwSum += float64(sr.KeywordsHit) / float64(sr.KeywordsTotal)
+						a.rtKwCount++
+					}
+				} else {
+					a.textRuns++
+					if sr.Completed {
+						a.textCompleted++
+					}
+					if sr.KeywordsTotal > 0 {
+						a.textKwSum += float64(sr.KeywordsHit) / float64(sr.KeywordsTotal)
+						a.textKwCount++
+					}
+				}
+			}
+		}
+	}
+
+	collect(text, false)
+	collect(runtime, true)
+
+	var breakdowns []StepBreakdown
+	for stepID, a := range acc {
+		sb := StepBreakdown{StepID: stepID, Runs: a.textRuns}
+		if a.textRuns > 0 {
+			sb.TextCompletionPct = float64(a.textCompleted) / float64(a.textRuns) * 100
+		}
+		if a.rtRuns > 0 {
+			sb.RTCompletionPct = float64(a.rtCompleted) / float64(a.rtRuns) * 100
+		}
+		if a.textKwCount > 0 {
+			sb.TextKeywordPct = a.textKwSum / float64(a.textKwCount) * 100
+		}
+		if a.rtKwCount > 0 {
+			sb.RTKeywordPct = a.rtKwSum / float64(a.rtKwCount) * 100
+		}
+		breakdowns = append(breakdowns, sb)
+	}
+
+	sort.Slice(breakdowns, func(i, j int) bool {
+		return breakdowns[i].TextCompletionPct < breakdowns[j].TextCompletionPct
+	})
+
+	return breakdowns
+}
+
+// ComputeStability measures variance per task across runs.
+func ComputeStability(text, runtime []TaskResult) []StabilityMetrics {
+	textByTask := groupByTask(text)
+	rtByTask := groupByTask(runtime)
+
+	allTasks := make(map[string]bool)
+	for k := range textByTask {
+		allTasks[k] = true
+	}
+	for k := range rtByTask {
+		allTasks[k] = true
+	}
+
+	var metrics []StabilityMetrics
+	for taskID := range allTasks {
+		sm := StabilityMetrics{TaskID: taskID}
+
+		if results, ok := textByTask[taskID]; ok && len(results) > 1 {
+			sm.TextCompletionStd = stddev(results, func(r TaskResult) float64 {
+				if r.Completed {
+					return 1
+				}
+				return 0
+			})
+			sm.TextOrderingStd = stddev(results, func(r TaskResult) float64 { return r.OrderingScore })
+			sm.TextGuardrailStd = stddev(results, func(r TaskResult) float64 { return r.GuardrailScore })
+		}
+
+		if results, ok := rtByTask[taskID]; ok && len(results) > 1 {
+			sm.RTCompletionStd = stddev(results, func(r TaskResult) float64 {
+				if r.Completed {
+					return 1
+				}
+				return 0
+			})
+			sm.RTOrderingStd = stddev(results, func(r TaskResult) float64 { return r.OrderingScore })
+			sm.RTGuardrailStd = stddev(results, func(r TaskResult) float64 { return r.GuardrailScore })
+		}
+
+		metrics = append(metrics, sm)
+	}
+
+	sort.Slice(metrics, func(i, j int) bool {
+		return metrics[i].TaskID < metrics[j].TaskID
+	})
+
+	return metrics
+}
+
+func stddev(results []TaskResult, metric func(TaskResult) float64) float64 {
+	if len(results) < 2 {
+		return 0
+	}
+	mean := 0.0
+	for _, r := range results {
+		mean += metric(r)
+	}
+	mean /= float64(len(results))
+
+	variance := 0.0
+	for _, r := range results {
+		d := metric(r) - mean
+		variance += d * d
+	}
+	variance /= float64(len(results) - 1) // sample variance
+
+	return math.Sqrt(variance)
 }

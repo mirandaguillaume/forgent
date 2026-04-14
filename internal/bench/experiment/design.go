@@ -99,6 +99,11 @@ type ComparisonResult struct {
 	// Harness detection metrics
 	// "How many text failures would the runtime harness have caught?"
 	DetectionRate         DetectionMetrics
+
+	// Derived metrics
+	Efficiency            EfficiencyMetrics
+	StepBreakdowns        []StepBreakdown
+	Stability             []StabilityMetrics
 }
 
 // DetectionMetrics measures how many soft-harness (text) failures are caught
@@ -124,6 +129,38 @@ type DetectionMetrics struct {
 	AnyFailures        int
 	AnyCaught          int
 	AnyRate            float64
+}
+
+// EfficiencyMetrics measures quality-per-token for each condition.
+type EfficiencyMetrics struct {
+	TextQuality       float64 // weighted quality score (0-1)
+	RuntimeQuality    float64
+	TextTokens        float64 // mean tokens per run
+	RuntimeTokens     float64
+	TextEfficiency    float64 // quality / (tokens/1000)
+	RuntimeEfficiency float64
+	CostPerDetection  float64 // extra tokens spent per failure detected
+}
+
+// StepBreakdown provides per-step completion and keyword rates across runs.
+type StepBreakdown struct {
+	StepID            string
+	TextCompletionPct float64 // % of runs where step completed (text)
+	RTCompletionPct   float64 // % of runs where step completed (runtime)
+	TextKeywordPct    float64 // mean(keywords_hit/keywords_total) (text)
+	RTKeywordPct      float64 // mean(keywords_hit/keywords_total) (runtime)
+	Runs              int     // number of runs sampled
+}
+
+// StabilityMetrics measures variance across runs for each condition × task.
+type StabilityMetrics struct {
+	TaskID             string
+	TextCompletionStd  float64 // std dev of completion (0/1) across runs
+	RTCompletionStd    float64
+	TextOrderingStd    float64
+	RTOrderingStd      float64
+	TextGuardrailStd   float64
+	RTGuardrailStd     float64
 }
 
 // LoadTasks reads task definitions from YAML files in a directory.
