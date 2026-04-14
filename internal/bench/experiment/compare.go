@@ -70,6 +70,13 @@ func Compare(textResults, runtimeResults []TaskResult) *ComparisonResult {
 	cr.Efficiency = ComputeEfficiency(textResults, runtimeResults, cr.DetectionRate)
 	cr.StepBreakdowns = ComputeStepBreakdowns(textResults, runtimeResults)
 	cr.Stability = ComputeStability(textResults, runtimeResults)
+	cr.CascadeRate = ComputeCascadeRate(textResults, runtimeResults)
+	cr.DifficultyGradient = ComputeDifficultyGradient(textResults, runtimeResults)
+	cr.Convergence = ComputeConvergence(textResults, runtimeResults)
+	cr.FailureCorrelation = ComputeFailureCorrelation(textResults)
+	cr.FirstFailureSteps = ComputeFirstFailureSteps(textResults, runtimeResults)
+	cr.OutputLengthCV = ComputeOutputLengthCV(textResults, runtimeResults)
+	cr.GuardrailSeverity = ComputeGuardrailSeverity(textResults, runtimeResults)
 
 	return cr
 }
