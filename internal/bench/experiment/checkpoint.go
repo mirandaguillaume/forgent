@@ -118,6 +118,7 @@ func LoadCheckpoint(path string) ([]CheckpointEntry, error) {
 
 	var entries []CheckpointEntry
 	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 1<<20), 1<<20) // 1MB max line size
 	for scanner.Scan() {
 		line := scanner.Bytes()
 		if len(line) == 0 {
