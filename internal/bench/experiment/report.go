@@ -191,6 +191,91 @@ func FormatReport(cr *ComparisonResult, opts ReportOpts) string {
 		sb.WriteString("*Lower σ = more stable. Runtime σ(ordering) should be 0.000 (guaranteed by topological sort).*\n\n")
 	}
 
+	// Cascade rate
+	cas := cr.CascadeRate
+	if cas.TextRunsWithFailure > 0 || cas.RuntimeRunsWithFailure > 0 {
+		sb.WriteString("## Failure Cascade Rate\n\n")
+		sb.WriteString("| Condition | Runs with failure | Runs with cascade (2+ consecutive) | Cascade rate |\n")
+		sb.WriteString("|-----------|------------------|------------------------------------|--------------|\n")
+		sb.WriteString(fmt.Sprintf("| Text | %d | %d | %.0f%% |\n",
+			cas.TextRunsWithFailure, cas.TextRunsWithCascade, cas.TextCascadeRate*100))
+		sb.WriteString(fmt.Sprintf("| Runtime | %d | %d | %.0f%% |\n",
+			cas.RuntimeRunsWithFailure, cas.RuntimeRunsWithCascade, cas.RuntimeCascadeRate*100))
+		sb.WriteString("\n*Cascade = 2+ consecutive steps failed in the same run. Runtime isolates steps, preventing propagation.*\n\n")
+	}
+
+	// Difficulty gradient
+	dg := cr.DifficultyGradient
+	if len(dg.Points) > 0 {
+		sb.WriteString("## Difficulty Gradient\n\n")
+		sb.WriteString("Does the runtime advantage grow with task complexity?\n\n")
+		sb.WriteString("| Task | Steps | Completion Δ | Ordering Δ |\n")
+		sb.WriteString("|------|-------|-------------|------------|\n")
+		for _, p := range dg.Points {
+			sb.WriteString(fmt.Sprintf("| %s | %d | %+.0f%% | %+.0f%% |\n",
+				p.TaskID, p.NumSteps, p.CompletionDelta*100, p.OrderingDelta*100))
+		}
+		sb.WriteString(fmt.Sprintf("\nSpearman ρ (steps vs completion Δ): **%.3f**\n", dg.SpearmanComp))
+		sb.WriteString(fmt.Sprintf("Spearman ρ (steps vs ordering Δ): **%.3f**\n\n", dg.SpearmanOrder))
+		sb.WriteString("*Positive ρ = runtime advantage increases with complexity.*\n\n")
+	}
+
+	// Convergence
+	conv := cr.Convergence
+	if conv.TextConvergence > 0 {
+		sb.WriteString("## Convergence Speed\n\n")
+		sb.WriteString(fmt.Sprintf("| Condition | Runs to converge (±1%%) |\n"))
+		sb.WriteString("|-----------|------------------------|\n")
+		sb.WriteString(fmt.Sprintf("| Text | %d |\n", conv.TextConvergence))
+		sb.WriteString(fmt.Sprintf("| Runtime | %d |\n\n", conv.RuntimeConvergence))
+		sb.WriteString("*Fewer runs = more predictable behavior.*\n\n")
+	}
+
+	// Failure correlation
+	fc := cr.FailureCorrelation
+	if fc.CompletionOrdering != 0 || fc.CompletionGuardrail != 0 || fc.OrderingGuardrail != 0 {
+		sb.WriteString("## Failure Mode Correlation (text condition)\n\n")
+		sb.WriteString("| Pair | Pearson r |\n")
+		sb.WriteString("|------|-----------|\n")
+		sb.WriteString(fmt.Sprintf("| Completion ↔ Ordering | %.3f |\n", fc.CompletionOrdering))
+		sb.WriteString(fmt.Sprintf("| Completion ↔ Guardrails | %.3f |\n", fc.CompletionGuardrail))
+		sb.WriteString(fmt.Sprintf("| Ordering ↔ Guardrails | %.3f |\n\n", fc.OrderingGuardrail))
+		sb.WriteString("*High r = failure modes are correlated (same root cause). Low r = independent failure modes (harness must protect each separately).*\n\n")
+	}
+
+	// First failure step
+	if len(cr.FirstFailureSteps) > 0 {
+		sb.WriteString("## First Failure Step\n\n")
+		sb.WriteString("Which step fails first in failed runs?\n\n")
+		sb.WriteString("| Step | Text (first fail count) | Runtime (first fail count) |\n")
+		sb.WriteString("|------|------------------------|---------------------------|\n")
+		for _, e := range cr.FirstFailureSteps {
+			sb.WriteString(fmt.Sprintf("| %s | %d | %d |\n", e.StepID, e.TextCount, e.RuntimeCount))
+		}
+		sb.WriteString("\n")
+	}
+
+	// Output length CV
+	ol := cr.OutputLengthCV
+	if ol.TextMeanCV > 0 || ol.RuntimeMeanCV > 0 {
+		sb.WriteString("## Output Length Consistency\n\n")
+		sb.WriteString(fmt.Sprintf("| Condition | Mean CV (coefficient of variation) |\n"))
+		sb.WriteString("|-----------|------------------------------------|\n")
+		sb.WriteString(fmt.Sprintf("| Text | %.3f |\n", ol.TextMeanCV))
+		sb.WriteString(fmt.Sprintf("| Runtime | %.3f |\n\n", ol.RuntimeMeanCV))
+		sb.WriteString("*Lower CV = more consistent output lengths. Runtime isolates step context.*\n\n")
+	}
+
+	// Guardrail severity
+	gsev := cr.GuardrailSeverity
+	if gsev.TextMeanViolations > 0 || gsev.RuntimeMeanViolations > 0 {
+		sb.WriteString("## Guardrail Violation Severity\n\n")
+		sb.WriteString("| Condition | Mean violations/failed run | Max violations |\n")
+		sb.WriteString("|-----------|--------------------------|----------------|\n")
+		sb.WriteString(fmt.Sprintf("| Text | %.1f | %d |\n", gsev.TextMeanViolations, gsev.TextMaxViolations))
+		sb.WriteString(fmt.Sprintf("| Runtime | %.1f | %d |\n\n", gsev.RuntimeMeanViolations, gsev.RuntimeMaxViolations))
+	}
+
 	return sb.String()
 }
 

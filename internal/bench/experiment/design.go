@@ -104,6 +104,13 @@ type ComparisonResult struct {
 	Efficiency            EfficiencyMetrics
 	StepBreakdowns        []StepBreakdown
 	Stability             []StabilityMetrics
+	CascadeRate           CascadeMetrics
+	DifficultyGradient    DifficultyMetrics
+	Convergence           ConvergenceMetrics
+	FailureCorrelation    CorrelationMetrics
+	FirstFailureSteps     []FirstFailureEntry
+	OutputLengthCV        OutputLengthMetrics
+	GuardrailSeverity     GuardrailSeverityMetrics
 }
 
 // DetectionMetrics measures how many soft-harness (text) failures are caught
@@ -161,6 +168,65 @@ type StabilityMetrics struct {
 	RTOrderingStd      float64
 	TextGuardrailStd   float64
 	RTGuardrailStd     float64
+}
+
+// CascadeMetrics measures failure propagation: when a step fails, do subsequent steps also fail?
+type CascadeMetrics struct {
+	TextRunsWithFailure    int
+	TextRunsWithCascade    int     // runs where 2+ consecutive steps failed
+	TextCascadeRate        float64 // cascade / failure
+	RuntimeRunsWithFailure int
+	RuntimeRunsWithCascade int
+	RuntimeCascadeRate     float64
+}
+
+// DifficultyMetrics measures whether the runtime advantage grows with task complexity.
+type DifficultyMetrics struct {
+	Points        []DifficultyPoint
+	SpearmanComp  float64 // Spearman rank correlation: n_steps vs completion delta
+	SpearmanOrder float64 // Spearman rank correlation: n_steps vs ordering delta
+}
+
+// DifficultyPoint is one task's complexity vs delta.
+type DifficultyPoint struct {
+	TaskID          string
+	NumSteps        int
+	CompletionDelta float64
+	OrderingDelta   float64
+}
+
+// ConvergenceMetrics measures how many runs are needed for stable means.
+type ConvergenceMetrics struct {
+	TextConvergence    int // runs needed for text completion mean to stabilize (±1%)
+	RuntimeConvergence int
+}
+
+// CorrelationMetrics measures whether failure modes are correlated across runs.
+type CorrelationMetrics struct {
+	CompletionOrdering  float64 // Pearson r between completion and ordering failure indicators
+	CompletionGuardrail float64
+	OrderingGuardrail   float64
+}
+
+// FirstFailureEntry tracks which step fails first in failed runs.
+type FirstFailureEntry struct {
+	StepID       string
+	TextCount    int
+	RuntimeCount int
+}
+
+// OutputLengthMetrics measures output length consistency via coefficient of variation.
+type OutputLengthMetrics struct {
+	TextMeanCV    float64 // mean CV across steps (text)
+	RuntimeMeanCV float64
+}
+
+// GuardrailSeverityMetrics measures how badly guardrails are violated.
+type GuardrailSeverityMetrics struct {
+	TextMeanViolations    float64 // mean violations per failed run
+	RuntimeMeanViolations float64
+	TextMaxViolations     int
+	RuntimeMaxViolations  int
 }
 
 // LoadTasks reads task definitions from YAML files in a directory.
