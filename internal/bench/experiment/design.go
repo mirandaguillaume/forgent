@@ -37,14 +37,26 @@ type TaskDefinition struct {
 	Guardrails  []string     `yaml:"guardrails"` // constraints that must be respected
 }
 
+// StepKind discriminates how a step is executed in the runtime.
+type StepKind string
+
+const (
+	StepKindLLM    StepKind = ""       // default: LLM call
+	StepKindStatic StepKind = "static" // deterministic template
+	StepKindAssert StepKind = "assert" // verification check
+)
+
 // StepDef defines a single step within a multi-step task.
 type StepDef struct {
 	ID       string   `yaml:"id"`
 	Name     string   `yaml:"name"`
-	Prompt   string   `yaml:"prompt"`   // instruction for this step
-	Consumes []string `yaml:"consumes"` // data keys this step needs (for DAG wiring)
-	Produces []string `yaml:"produces"` // data keys this step outputs
-	ExpectedKeywords []string `yaml:"expected_keywords"` // keywords to check in output
+	Kind     StepKind `yaml:"kind,omitempty"`     // default "" = llm
+	Prompt   string   `yaml:"prompt,omitempty"`   // for kind: llm
+	Template string   `yaml:"template,omitempty"` // for kind: static (Go text/template)
+	Check    string   `yaml:"check,omitempty"`    // for kind: assert (check function name)
+	Consumes []string `yaml:"consumes"`
+	Produces []string `yaml:"produces"`
+	ExpectedKeywords []string `yaml:"expected_keywords"`
 }
 
 // TaskResult captures the outcome of executing a task under one condition.
