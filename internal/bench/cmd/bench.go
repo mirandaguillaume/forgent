@@ -1551,76 +1551,82 @@ func runExperimentBench(cmd *cobra.Command) error {
 		defer cpWriter.Close()
 	}
 
-	// Build configs per condition
-	textConfig := experiment.ExperimentConfig{
-		Tasks:       tasks,
-		Provider:    provider,
-		Model:       modelName,
-		RunsPerTask: runs,
-		SkipMap:     experiment.BuildSkipMap(existingEntries, "text"),
-		OnResult: func(r experiment.TaskResult, run int) {
-			if cpWriter != nil {
-				_ = cpWriter.Append(experiment.CheckpointEntry{
-					TaskID:    r.TaskID,
-					Condition: "text",
-					Run:       run,
-					Result:    experiment.ToResultJSON(r),
-				})
-			}
-		},
+	textSkipMap := experiment.BuildSkipMap(existingEntries, "text")
+	runtimeSkipMap := experiment.BuildSkipMap(existingEntries, "runtime")
+
+	fmt.Fprintf(os.Stderr, "Running experiment: %d tasks, %d runs per task (per-task pairing)...\n", len(tasks), runs)
+
+	// Per-task execution: text + runtime for each task before moving to next.
+	// This ensures each task has both conditions complete — a crash at task N
+	// leaves tasks 1..N-1 fully paired for comparison.
+	var newTextResults, newRuntimeResults []experiment.TaskResult
+
+	for i, task := range tasks {
+		fmt.Fprintf(os.Stderr, "\n── Task %d/%d: %s ──\n", i+1, len(tasks), task.ID)
+
+		// Text condition for this task
+		singleTextConfig := experiment.ExperimentConfig{
+			Tasks:       []experiment.TaskDefinition{task},
+			Provider:    provider,
+			Model:       modelName,
+			RunsPerTask: runs,
+			SkipMap:     map[string]int{task.ID: textSkipMap[task.ID]},
+			OnResult: func(r experiment.TaskResult, run int) {
+				if cpWriter != nil {
+					_ = cpWriter.Append(experiment.CheckpointEntry{
+						TaskID:    r.TaskID,
+						Condition: "text",
+						Run:       run,
+						Result:    experiment.ToResultJSON(r),
+					})
+				}
+			},
+		}
+		textRes, err := experiment.RunTextExperiment(singleTextConfig)
+		if err != nil {
+			return fmt.Errorf("text experiment task %s: %w", task.ID, err)
+		}
+		newTextResults = append(newTextResults, textRes...)
+
+		// Runtime condition for this task
+		singleRTConfig := experiment.ExperimentConfig{
+			Tasks:       []experiment.TaskDefinition{task},
+			Provider:    provider,
+			Model:       modelName,
+			RunsPerTask: runs,
+			SkipMap:     map[string]int{task.ID: runtimeSkipMap[task.ID]},
+			OnResult: func(r experiment.TaskResult, run int) {
+				if cpWriter != nil {
+					_ = cpWriter.Append(experiment.CheckpointEntry{
+						TaskID:    r.TaskID,
+						Condition: "runtime",
+						Run:       run,
+						Result:    experiment.ToResultJSON(r),
+					})
+				}
+			},
+		}
+		rtRes, err := experiment.RunRuntimeExperiment(singleRTConfig)
+		if err != nil {
+			return fmt.Errorf("runtime experiment task %s: %w", task.ID, err)
+		}
+		newRuntimeResults = append(newRuntimeResults, rtRes...)
+
+		fmt.Fprintf(os.Stderr, "  ✓ %s complete: %d text + %d runtime runs\n", task.ID, len(textRes), len(rtRes))
 	}
 
-	runtimeConfig := experiment.ExperimentConfig{
-		Tasks:       tasks,
-		Provider:    provider,
-		Model:       modelName,
-		RunsPerTask: runs,
-		SkipMap:     experiment.BuildSkipMap(existingEntries, "runtime"),
-		OnResult: func(r experiment.TaskResult, run int) {
-			if cpWriter != nil {
-				_ = cpWriter.Append(experiment.CheckpointEntry{
-					TaskID:    r.TaskID,
-					Condition: "runtime",
-					Run:       run,
-					Result:    experiment.ToResultJSON(r),
-				})
-			}
-		},
-	}
-
-	fmt.Fprintf(os.Stderr, "Running experiment: %d tasks, %d runs per task...\n", len(tasks), runs)
-
-	// Condition 1: Text
-	fmt.Fprintf(os.Stderr, "Condition 1: Text instruction...\n")
-	newTextResults, err := experiment.RunTextExperiment(textConfig)
-	if err != nil {
-		return fmt.Errorf("text experiment: %w", err)
-	}
 	textResults := append(priorTextResults, newTextResults...)
+	runtimeResults := append(priorRuntimeResults, newRuntimeResults...)
 
-	// Flush text condition snapshot
+	// Flush condition snapshots
 	if outputPath != "" {
 		flushPath := strings.TrimSuffix(outputPath, filepath.Ext(outputPath)) + ".text.json"
 		if data, jsonErr := json.MarshalIndent(textResults, "", "  "); jsonErr == nil {
 			_ = os.WriteFile(flushPath, data, 0644)
-			fmt.Fprintf(os.Stderr, "Text results flushed to %s\n", flushPath)
 		}
-	}
-
-	// Condition 2: Runtime
-	fmt.Fprintf(os.Stderr, "Condition 2: Runtime (DAG)...\n")
-	newRuntimeResults, err := experiment.RunRuntimeExperiment(runtimeConfig)
-	if err != nil {
-		return fmt.Errorf("runtime experiment: %w", err)
-	}
-	runtimeResults := append(priorRuntimeResults, newRuntimeResults...)
-
-	// Flush runtime condition snapshot
-	if outputPath != "" {
-		flushPath := strings.TrimSuffix(outputPath, filepath.Ext(outputPath)) + ".runtime.json"
+		flushPath = strings.TrimSuffix(outputPath, filepath.Ext(outputPath)) + ".runtime.json"
 		if data, jsonErr := json.MarshalIndent(runtimeResults, "", "  "); jsonErr == nil {
 			_ = os.WriteFile(flushPath, data, 0644)
-			fmt.Fprintf(os.Stderr, "Runtime results flushed to %s\n", flushPath)
 		}
 	}
 
