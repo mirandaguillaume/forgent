@@ -203,6 +203,55 @@ func TestCompare_WithResults(t *testing.T) {
 	assert.NotEqual(t, cr.CompletionCI, [2]float64{0, 0})
 }
 
+func TestComputeDetectionRate(t *testing.T) {
+	text := []TaskResult{
+		{TaskID: "t1", Completed: true, OrderingScore: 0.8, GuardrailScore: 0.5},  // ordering + guardrail fail
+		{TaskID: "t2", Completed: false, OrderingScore: 0.5, GuardrailScore: 1.0}, // completion + ordering fail
+		{TaskID: "t3", Completed: true, OrderingScore: 1.0, GuardrailScore: 1.0},  // all pass
+		{TaskID: "t4", Completed: false, OrderingScore: 1.0, GuardrailScore: 0.8}, // completion + guardrail fail
+	}
+	runtime := []TaskResult{
+		{TaskID: "t1", Completed: true, OrderingScore: 1.0, GuardrailScore: 1.0},  // catches both
+		{TaskID: "t2", Completed: true, OrderingScore: 1.0, GuardrailScore: 1.0},  // catches both
+		{TaskID: "t3", Completed: true, OrderingScore: 1.0, GuardrailScore: 1.0},  // no failure to catch
+		{TaskID: "t4", Completed: true, OrderingScore: 1.0, GuardrailScore: 0.9},  // catches completion, not guardrail
+	}
+
+	dm := ComputeDetectionRate(text, runtime)
+
+	// Completion: t2 and t4 failed in text. Runtime caught both.
+	assert.Equal(t, 2, dm.CompletionFailures)
+	assert.Equal(t, 2, dm.CompletionCaught)
+	assert.Equal(t, 1.0, dm.CompletionRate)
+
+	// Ordering: t1 (0.8) and t2 (0.5) failed. Runtime caught both (1.0).
+	assert.Equal(t, 2, dm.OrderingFailures)
+	assert.Equal(t, 2, dm.OrderingCaught)
+	assert.Equal(t, 1.0, dm.OrderingRate)
+
+	// Guardrails: t1 (0.5) and t4 (0.8) failed. Runtime caught t1 (1.0) but not t4 (0.9).
+	assert.Equal(t, 2, dm.GuardrailFailures)
+	assert.Equal(t, 1, dm.GuardrailCaught)
+	assert.Equal(t, 0.5, dm.GuardrailRate)
+
+	// Any: t1, t2, t4 had failures. t1 and t2 fully caught, t4 not (guardrail still bad).
+	assert.Equal(t, 3, dm.AnyFailures)
+	assert.Equal(t, 2, dm.AnyCaught) // t1 and t2 fully caught
+}
+
+func TestComputeDetectionRate_NoFailures(t *testing.T) {
+	text := []TaskResult{
+		{Completed: true, OrderingScore: 1.0, GuardrailScore: 1.0},
+	}
+	runtime := []TaskResult{
+		{Completed: true, OrderingScore: 1.0, GuardrailScore: 1.0},
+	}
+
+	dm := ComputeDetectionRate(text, runtime)
+	assert.Equal(t, 0, dm.AnyFailures)
+	assert.Equal(t, 0.0, dm.AnyRate)
+}
+
 func TestCompare_Empty(t *testing.T) {
 	cr := Compare(nil, nil)
 	assert.Equal(t, 0, cr.Tasks)
