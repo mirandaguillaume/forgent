@@ -95,6 +95,35 @@ type ComparisonResult struct {
 	FaultToleranceText    float64 // % of runs that succeed with error injection (text)
 	FaultToleranceRuntime float64 // % of runs that succeed with error injection (runtime)
 	CrossContamination    float64 // 0.0-1.0: similarity between parallel step outputs in text mode
+
+	// Harness detection metrics
+	// "How many text failures would the runtime harness have caught?"
+	DetectionRate         DetectionMetrics
+}
+
+// DetectionMetrics measures how many soft-harness (text) failures are caught
+// by the hard-harness (runtime). This is the core harness metric:
+// not "does the harness improve results?" but "does the harness catch failures?"
+type DetectionMetrics struct {
+	// Completion: runs where text failed to complete but runtime succeeded
+	CompletionFailures int     // total text completion failures
+	CompletionCaught   int     // of those, how many runtime completed successfully
+	CompletionRate     float64 // caught / failures (0 if no failures)
+
+	// Ordering: runs where text had imperfect ordering but runtime had perfect
+	OrderingFailures   int
+	OrderingCaught     int
+	OrderingRate       float64
+
+	// Guardrails: runs where text violated guardrails but runtime respected them
+	GuardrailFailures  int
+	GuardrailCaught    int
+	GuardrailRate      float64
+
+	// Combined: runs with ANY text failure that runtime would have caught
+	AnyFailures        int
+	AnyCaught          int
+	AnyRate            float64
 }
 
 // LoadTasks reads task definitions from YAML files in a directory.
