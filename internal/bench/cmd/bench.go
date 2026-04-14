@@ -1501,9 +1501,29 @@ func runExperimentBench(cmd *cobra.Command) error {
 		return fmt.Errorf("experiment requires an LLM provider: %w", err)
 	}
 
-	tasks, err := experiment.LoadTasks(tasksDir)
+	allTasks, err := experiment.LoadTasks(tasksDir)
 	if err != nil {
 		return fmt.Errorf("load tasks: %w", err)
+	}
+
+	// Filter tasks by --only flag
+	onlyFlag, _ := cmd.Flags().GetString("only")
+	tasks := allTasks
+	if onlyFlag != "" {
+		allowed := make(map[string]bool)
+		for _, name := range strings.Split(onlyFlag, ",") {
+			allowed[strings.TrimSpace(name)] = true
+		}
+		tasks = nil
+		for _, t := range allTasks {
+			if allowed[t.ID] {
+				tasks = append(tasks, t)
+			}
+		}
+		if len(tasks) == 0 {
+			return fmt.Errorf("--only matched no tasks (available: %d)", len(allTasks))
+		}
+		fmt.Fprintf(os.Stderr, "Filtered to %d/%d tasks\n", len(tasks), len(allTasks))
 	}
 
 	// Resolve checkpoint path
@@ -1613,6 +1633,22 @@ func runExperimentBench(cmd *cobra.Command) error {
 		newRuntimeResults = append(newRuntimeResults, rtRes...)
 
 		fmt.Fprintf(os.Stderr, "  ✓ %s complete: %d text + %d runtime runs\n", task.ID, len(textRes), len(rtRes))
+
+		// Intermediate results: compare accumulated results so far
+		accumText := append(priorTextResults, newTextResults...)
+		accumRT := append(priorRuntimeResults, newRuntimeResults...)
+		if len(accumText) > 0 && len(accumRT) > 0 {
+			interim := experiment.Compare(accumText, accumRT)
+			dm := interim.DetectionRate
+			textComp := experiment.CompletionRatePublic(accumText)
+			rtComp := experiment.CompletionRatePublic(accumRT)
+			fmt.Fprintf(os.Stderr, "  ── Interim (%d/%d tasks) ── completion: text %.0f%% / runtime %.0f%% | detection: %d/%d caught",
+				i+1, len(tasks), textComp*100, rtComp*100, dm.AnyCaught, dm.AnyFailures)
+			if dm.AnyFailures > 0 {
+				fmt.Fprintf(os.Stderr, " (%.0f%%)", dm.AnyRate*100)
+			}
+			fmt.Fprintf(os.Stderr, "\n")
+		}
 	}
 
 	textResults := append(priorTextResults, newTextResults...)
