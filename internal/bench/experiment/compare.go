@@ -148,6 +148,11 @@ func ComputeDetectionRate(text, runtime []TaskResult) DetectionMetrics {
 	return dm
 }
 
+// CompletionRatePublic returns the completion rate for a set of results.
+func CompletionRatePublic(results []TaskResult) float64 {
+	return completionRate(results)
+}
+
 func completionRate(results []TaskResult) float64 {
 	if len(results) == 0 {
 		return 0
