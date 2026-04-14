@@ -277,6 +277,49 @@ func TestOnResult_CalledPerRun(t *testing.T) {
 	assert.Len(t, called, 4, "OnResult should be called for each run")
 }
 
+// ─── SkipMap tests ────────────────────────────────────────────────────────────
+
+func TestRunTextExperiment_WithSkipMap(t *testing.T) {
+	var called int
+	cfg := ExperimentConfig{
+		Tasks:       sampleTasks(),
+		Provider:    sampleProvider(),
+		RunsPerTask: 3,
+		SkipMap:     map[string]int{"code-review": 2}, // skip first 2 runs of code-review
+		OnResult: func(r TaskResult, run int) {
+			called++
+		},
+	}
+
+	results, err := RunTextExperiment(cfg)
+	require.NoError(t, err)
+
+	// code-review: 3 runs - 2 skipped = 1 new
+	// doc-gen: 3 runs - 0 skipped = 3 new
+	assert.Len(t, results, 4)
+	assert.Equal(t, 4, called)
+}
+
+func TestRunRuntimeExperiment_WithSkipMap(t *testing.T) {
+	var called int
+	cfg := ExperimentConfig{
+		Tasks:       sampleTasks(),
+		Provider:    sampleProvider(),
+		RunsPerTask: 3,
+		SkipMap:     map[string]int{"doc-gen": 3}, // skip all runs of doc-gen
+		OnResult: func(r TaskResult, run int) {
+			called++
+		},
+	}
+
+	results, err := RunRuntimeExperiment(cfg)
+	require.NoError(t, err)
+
+	// code-review: 3 new, doc-gen: 0 new
+	assert.Len(t, results, 3)
+	assert.Equal(t, 3, called)
+}
+
 // ─── End-to-end test ──────────────────────────────────────────────────────────
 
 func TestEndToEnd_TextVsRuntime(t *testing.T) {
