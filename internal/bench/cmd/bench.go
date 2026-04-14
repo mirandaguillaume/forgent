@@ -11,8 +11,10 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/mirandaguillaume/forgent/internal/bench"
-	"github.com/mirandaguillaume/forgent/internal/builder"
+	"github.com/mirandaguillaume/forgent/internal/bench/experiment"
 	"github.com/mirandaguillaume/forgent/internal/bench/formal"
+	"github.com/mirandaguillaume/forgent/internal/builder"
+	"github.com/mirandaguillaume/forgent/internal/doctor/registry"
 	"github.com/mirandaguillaume/forgent/internal/llm"
 	"github.com/mirandaguillaume/forgent/internal/scanner"
 	yamlloader "github.com/mirandaguillaume/forgent/internal/yaml"
@@ -45,6 +47,11 @@ func init() {
 	benchCmd.Flags().String("martian", "internal/bench/testdata/martian/", "Path to Martian golden comments directory")
 	benchCmd.Flags().Int("review-passes", 1, "Number of review passes per task in H2H bench (1=single-pass)")
 	benchCmd.Flags().String("output", "", "Write h2h results to this JSON file (appends if file exists)")
+	benchCmd.Flags().String("corpus", "", "Corpus directory for InstructionBench (instruction level)")
+	benchCmd.Flags().String("golden", "", "Golden set YAML for false positive measurement (instruction level)")
+	benchCmd.Flags().String("tasks-dir", "", "Task definitions directory (experiment level)")
+	benchCmd.Flags().Int("runs", 1, "Runs per task for experiment level")
+	benchCmd.Flags().String("resume", "", "Resume from checkpoint file (empty with --output = auto-detect)")
 	rootCmd.AddCommand(benchCmd)
 }
 
@@ -87,12 +94,16 @@ func runBench(cmd *cobra.Command, args []string) error {
 		return runSWEBenchLiveCmd(cmd, repoPath)
 	case "swebench-eval":
 		return runSWEBenchEvalCmd(cmd)
+	case "instruction":
+		return runInstructionBench(cmd)
+	case "experiment":
+		return runExperimentBench(cmd)
 	case "report":
 		return runReportCmd(cmd, repoPath)
 	case "all":
 		return runAllStructural(cmd, repoPath)
 	default:
-		return fmt.Errorf("unknown level %q (use 'proxy', 'agent', 'token', 'determinism', 'isomorphism', 'formal', 'eval', 'consistency', 'swebench', 'swebench-h2h', 'swebench-live', 'swebench-eval', 'mutate', 'h2h', 'h2h-tokens', or 'all')", level)
+		return fmt.Errorf("unknown level %q (use 'proxy', 'agent', 'token', 'determinism', 'isomorphism', 'formal', 'eval', 'consistency', 'swebench', 'swebench-h2h', 'swebench-live', 'swebench-eval', 'mutate', 'h2h', 'h2h-tokens', 'instruction', 'experiment', or 'all')", level)
 	}
 }
 
@@ -667,7 +678,8 @@ func resolveLLMProvider(cmd *cobra.Command) (llm.Provider, error) {
 		return nil, fmt.Errorf("unknown provider %q (use 'anthropic' or 'openrouter')", providerName)
 	}
 
-	return llm.GetProvider(providerName, apiKey)
+	modelName, _ := cmd.Flags().GetString("model")
+	return llm.GetProviderWithModel(providerName, apiKey, modelName)
 }
 
 func runMutateBench(cmd *cobra.Command, repoPath string) error {
@@ -1415,6 +1427,219 @@ func runH2HTokensBench(cmd *cobra.Command, repoPath string) error {
 	totalColor := color.New(color.Bold)
 	fmt.Fprintf(out, "%-30s %10d w %10d w %10d w ", "TOTAL", totalHW, totalStd, totalCompact)
 	totalColor.Fprintf(out, "%+8.0f%%  %+8.0f%%\n", avgStdDelta, avgCptDelta)
+
+	return nil
+}
+
+func runInstructionBench(cmd *cobra.Command) error {
+	corpusDir, _ := cmd.Flags().GetString("corpus")
+	if corpusDir == "" {
+		return fmt.Errorf("--corpus is required for instruction level")
+	}
+
+	goldenPath, _ := cmd.Flags().GetString("golden")
+	modelName, _ := cmd.Flags().GetString("model")
+
+	var provider llm.Provider
+	var err error
+	provider, err = resolveLLMProvider(cmd)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: no LLM provider available (%v) — running static-only\n", err)
+		provider = nil
+	}
+
+	reg, err := registry.Load("")
+	if err != nil {
+		return fmt.Errorf("load registry: %w", err)
+	}
+
+	fmt.Fprintf(os.Stderr, "Running InstructionBench on %s...\n", corpusDir)
+	result, err := bench.RunInstructionBench(bench.InstructionBenchOpts{
+		CorpusDir:  corpusDir,
+		Provider:   provider,
+		GoldenPath: goldenPath,
+		Registry:   reg,
+		Model:      modelName,
+	})
+	if err != nil {
+		return fmt.Errorf("instruction bench: %w", err)
+	}
+
+	report := bench.FormatInstructionReport(result, bench.InstructionReportOpts{
+		Model:       modelName,
+		CorpusDir:   corpusDir,
+		Version:     reg.Version,
+		GoldenFiles: result.GoldenFileCount,
+	})
+
+	outputPath, _ := cmd.Flags().GetString("output")
+	if outputPath != "" {
+		if err := os.WriteFile(outputPath, []byte(report), 0644); err != nil {
+			return fmt.Errorf("write report: %w", err)
+		}
+		fmt.Fprintf(os.Stderr, "Report written to %s\n", outputPath)
+	} else {
+		fmt.Print(report)
+	}
+
+	return nil
+}
+
+func runExperimentBench(cmd *cobra.Command) error {
+	tasksDir, _ := cmd.Flags().GetString("tasks-dir")
+	if tasksDir == "" {
+		return fmt.Errorf("--tasks-dir is required for experiment level")
+	}
+
+	modelName, _ := cmd.Flags().GetString("model")
+	runs, _ := cmd.Flags().GetInt("runs")
+	outputPath, _ := cmd.Flags().GetString("output")
+	resumePath, _ := cmd.Flags().GetString("resume")
+
+	provider, err := resolveLLMProvider(cmd)
+	if err != nil {
+		return fmt.Errorf("experiment requires an LLM provider: %w", err)
+	}
+
+	tasks, err := experiment.LoadTasks(tasksDir)
+	if err != nil {
+		return fmt.Errorf("load tasks: %w", err)
+	}
+
+	// Resolve checkpoint path
+	checkpointPath := resumePath
+	if checkpointPath == "" && outputPath != "" {
+		checkpointPath = strings.TrimSuffix(outputPath, filepath.Ext(outputPath)) + ".checkpoint.jsonl"
+	}
+
+	// Load existing checkpoint for resume
+	var existingEntries []experiment.CheckpointEntry
+	var priorTextResults, priorRuntimeResults []experiment.TaskResult
+
+	if resumePath != "" {
+		if _, statErr := os.Stat(resumePath); statErr == nil {
+			existingEntries, err = experiment.LoadCheckpoint(resumePath)
+			if err != nil {
+				return fmt.Errorf("load checkpoint: %w", err)
+			}
+			priorTextResults = experiment.ExtractResults(existingEntries, "text")
+			priorRuntimeResults = experiment.ExtractResults(existingEntries, "runtime")
+			fmt.Fprintf(os.Stderr, "Resumed from checkpoint: %d text results, %d runtime results\n",
+				len(priorTextResults), len(priorRuntimeResults))
+		}
+	} else if checkpointPath != "" {
+		// Auto-detect: try to load checkpoint alongside output
+		if _, statErr := os.Stat(checkpointPath); statErr == nil {
+			existingEntries, err = experiment.LoadCheckpoint(checkpointPath)
+			if err != nil {
+				return fmt.Errorf("load checkpoint: %w", err)
+			}
+			priorTextResults = experiment.ExtractResults(existingEntries, "text")
+			priorRuntimeResults = experiment.ExtractResults(existingEntries, "runtime")
+			fmt.Fprintf(os.Stderr, "Auto-resumed from checkpoint: %d text results, %d runtime results\n",
+				len(priorTextResults), len(priorRuntimeResults))
+		}
+	}
+
+	// Open checkpoint writer
+	var cpWriter *experiment.CheckpointWriter
+	if checkpointPath != "" {
+		cpWriter, err = experiment.NewCheckpointWriter(checkpointPath)
+		if err != nil {
+			return fmt.Errorf("open checkpoint: %w", err)
+		}
+		defer cpWriter.Close()
+	}
+
+	// Build configs per condition
+	textConfig := experiment.ExperimentConfig{
+		Tasks:       tasks,
+		Provider:    provider,
+		Model:       modelName,
+		RunsPerTask: runs,
+		SkipMap:     experiment.BuildSkipMap(existingEntries, "text"),
+		OnResult: func(r experiment.TaskResult, run int) {
+			if cpWriter != nil {
+				_ = cpWriter.Append(experiment.CheckpointEntry{
+					TaskID:    r.TaskID,
+					Condition: "text",
+					Run:       run,
+					Result:    experiment.ToResultJSON(r),
+				})
+			}
+		},
+	}
+
+	runtimeConfig := experiment.ExperimentConfig{
+		Tasks:       tasks,
+		Provider:    provider,
+		Model:       modelName,
+		RunsPerTask: runs,
+		SkipMap:     experiment.BuildSkipMap(existingEntries, "runtime"),
+		OnResult: func(r experiment.TaskResult, run int) {
+			if cpWriter != nil {
+				_ = cpWriter.Append(experiment.CheckpointEntry{
+					TaskID:    r.TaskID,
+					Condition: "runtime",
+					Run:       run,
+					Result:    experiment.ToResultJSON(r),
+				})
+			}
+		},
+	}
+
+	fmt.Fprintf(os.Stderr, "Running experiment: %d tasks, %d runs per task...\n", len(tasks), runs)
+
+	// Condition 1: Text
+	fmt.Fprintf(os.Stderr, "Condition 1: Text instruction...\n")
+	newTextResults, err := experiment.RunTextExperiment(textConfig)
+	if err != nil {
+		return fmt.Errorf("text experiment: %w", err)
+	}
+	textResults := append(priorTextResults, newTextResults...)
+
+	// Flush text condition snapshot
+	if outputPath != "" {
+		flushPath := strings.TrimSuffix(outputPath, filepath.Ext(outputPath)) + ".text.json"
+		if data, jsonErr := json.MarshalIndent(textResults, "", "  "); jsonErr == nil {
+			_ = os.WriteFile(flushPath, data, 0644)
+			fmt.Fprintf(os.Stderr, "Text results flushed to %s\n", flushPath)
+		}
+	}
+
+	// Condition 2: Runtime
+	fmt.Fprintf(os.Stderr, "Condition 2: Runtime (DAG)...\n")
+	newRuntimeResults, err := experiment.RunRuntimeExperiment(runtimeConfig)
+	if err != nil {
+		return fmt.Errorf("runtime experiment: %w", err)
+	}
+	runtimeResults := append(priorRuntimeResults, newRuntimeResults...)
+
+	// Flush runtime condition snapshot
+	if outputPath != "" {
+		flushPath := strings.TrimSuffix(outputPath, filepath.Ext(outputPath)) + ".runtime.json"
+		if data, jsonErr := json.MarshalIndent(runtimeResults, "", "  "); jsonErr == nil {
+			_ = os.WriteFile(flushPath, data, 0644)
+			fmt.Fprintf(os.Stderr, "Runtime results flushed to %s\n", flushPath)
+		}
+	}
+
+	// Compare + report
+	fmt.Fprintf(os.Stderr, "Comparing results...\n")
+	comparison := experiment.Compare(textResults, runtimeResults)
+
+	report := experiment.FormatReport(comparison, experiment.ReportOpts{
+		Model: modelName,
+	})
+
+	if outputPath != "" {
+		if err := os.WriteFile(outputPath, []byte(report), 0644); err != nil {
+			return fmt.Errorf("write report: %w", err)
+		}
+		fmt.Fprintf(os.Stderr, "Report written to %s\n", outputPath)
+	} else {
+		fmt.Print(report)
+	}
 
 	return nil
 }
