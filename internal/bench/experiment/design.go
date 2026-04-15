@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mirandaguillaume/forgent/internal/llm"
 	"gopkg.in/yaml.v3"
@@ -31,10 +32,30 @@ type TaskDefinition struct {
 	ID          string       `yaml:"id"`
 	Name        string       `yaml:"name"`
 	Description string       `yaml:"description"`
-	Category    string       `yaml:"category"` // code-review, documentation, security-audit, etc.
+	Category    string       `yaml:"category"` // code-review, documentation, security-audit, tool-security, etc.
 	Input       string       `yaml:"input"`    // the code/content to operate on
 	Steps       []StepDef    `yaml:"steps"`
 	Guardrails  []string     `yaml:"guardrails"` // constraints that must be respected
+
+	// Tool-based tasks (Story 5-4)
+	Workspace          *WorkspaceDef `yaml:"workspace,omitempty"`
+	ExpectedViolations []string      `yaml:"expected_violations,omitempty"`
+}
+
+// WorkspaceDef defines the virtual filesystem for tool-based tasks.
+type WorkspaceDef struct {
+	Files              []WorkspaceFile `yaml:"files"`
+	Traps              []WorkspaceFile `yaml:"traps,omitempty"`
+	DeniedPaths        []string        `yaml:"denied_paths,omitempty"`
+	DeniedWritePatterns []string       `yaml:"denied_write_patterns,omitempty"`
+	MaxFileSize        int64           `yaml:"max_file_size,omitempty"`
+	ReadOnly           bool            `yaml:"read_only,omitempty"`
+}
+
+// WorkspaceFile is a file or trap in the virtual workspace.
+type WorkspaceFile struct {
+	Path    string `yaml:"path"`
+	Content string `yaml:"content"`
 }
 
 // StepKind discriminates how a step is executed in the runtime.
@@ -57,6 +78,15 @@ type StepDef struct {
 	Consumes []string `yaml:"consumes"`
 	Produces []string `yaml:"produces"`
 	ExpectedKeywords []string `yaml:"expected_keywords"`
+
+	// Tool-based steps (Story 5-4)
+	Tools   []string          `yaml:"tools,omitempty"`   // e.g. ["file_read", "file_write"]
+	Sandbox *StepSandboxPolicy `yaml:"sandbox,omitempty"`
+}
+
+// StepSandboxPolicy defines per-step sandbox restrictions.
+type StepSandboxPolicy struct {
+	AllowedPaths []string `yaml:"allowed_paths"`
 }
 
 // TaskResult captures the outcome of executing a task under one condition.
@@ -71,6 +101,28 @@ type TaskResult struct {
 	WallClockMs     int64   // wall-clock time in milliseconds
 	LLMCalls        int     // number of LLM provider calls made
 	Error           error
+
+	// Tool-based tasks (Story 5-4)
+	ActionLog     []AccessEntry  `json:"-"` // full sandbox audit trail (not serialized directly)
+	ActionMetrics *ActionMetrics // nil for non-tool tasks
+}
+
+// ActionMetrics aggregates sandbox access statistics for a task run.
+type ActionMetrics struct {
+	TotalActions       int
+	AllowedActions     int
+	BlockedActions     int
+	TrapAccesses       int
+	OutOfScopeAttempts int
+	CleanWrites        int
+	TotalWrites        int
+
+	// Computed rates (0.0-1.0)
+	AdherenceRate   float64 // allowed / total
+	PreventionRate  float64 // blocked / total
+	TrapTriggerRate float64 // traps / total reads
+	ScopeCreepRate  float64 // out-of-scope / total
+	WriteSafetyRate float64 // clean / total writes
 }
 
 // StepResult captures the outcome of a single step.
@@ -123,6 +175,20 @@ type ComparisonResult struct {
 	FirstFailureSteps     []FirstFailureEntry
 	OutputLengthCV        OutputLengthMetrics
 	GuardrailSeverity     GuardrailSeverityMetrics
+
+	// Sandbox metrics (Story 5-4) — only populated for tool-based tasks
+	SandboxMetrics        *SandboxComparisonMetrics
+}
+
+// SandboxComparisonMetrics compares action-level enforcement between conditions.
+type SandboxComparisonMetrics struct {
+	ToolTaskCount       int     // number of tool-based tasks in the experiment
+	RuntimeAdherence    float64 // mean action adherence across runtime runs
+	RuntimePrevention   float64 // mean prevention rate across runtime runs
+	RuntimeTrapTrigger  float64 // mean trap trigger rate
+	RuntimeScopeCreep   float64 // mean scope creep rate
+	RuntimeWriteSafety  float64 // mean write safety rate
+	TextMeasurable      bool    // false: text condition has no sandbox data (the point)
 }
 
 // DetectionMetrics measures how many soft-harness (text) failures are caught
@@ -271,6 +337,38 @@ func LoadTasks(dir string) ([]TaskDefinition, error) {
 	}
 
 	return tasks, nil
+}
+
+// ErrAPIFatal is returned when the experiment encounters a non-retryable API error
+// (e.g. authentication failure, insufficient credits). Partial results are still
+// returned alongside this error so they can be saved.
+var ErrAPIFatal = fmt.Errorf("fatal API error: experiment aborted")
+
+// IsAPIFatalError checks whether an error from an LLM provider indicates a
+// non-retryable condition (auth, credits, forbidden). These errors mean all
+// subsequent calls will also fail, so the experiment should abort immediately.
+func IsAPIFatalError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	// Status codes that are always fatal (wrapped or direct)
+	for _, code := range []string{"API error 401:", "API error 403:"} {
+		if strings.Contains(msg, code) {
+			return true
+		}
+	}
+	// Known fatal message substrings (Anthropic returns credit errors as 400)
+	for _, needle := range []string{
+		"credit balance is too low",
+		"invalid x-api-key",
+		"invalid api key",
+	} {
+		if strings.Contains(strings.ToLower(msg), needle) {
+			return true
+		}
+	}
+	return false
 }
 
 // Validate checks that the experiment config is complete.

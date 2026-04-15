@@ -1,6 +1,8 @@
 package experiment
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -367,6 +369,84 @@ func TestRunRuntimeExperiment_WithSkipMap(t *testing.T) {
 	// code-review: 3 new, doc-gen: 0 new
 	assert.Len(t, results, 3)
 	assert.Equal(t, 3, called)
+}
+
+// ─── IsAPIFatalError tests ───────────────────────────────────────────────────
+
+func TestIsAPIFatalError(t *testing.T) {
+	tests := []struct {
+		name  string
+		err   error
+		fatal bool
+	}{
+		{"nil", nil, false},
+		{"task-level error", fmt.Errorf("step identify: no keywords matched"), false},
+		{"rate limit 429", fmt.Errorf("API error 429: rate limited"), false},
+		{"server error 500", fmt.Errorf("API error 500: internal server error"), false},
+		{"unauthorized 401", fmt.Errorf("API error 401: invalid api key"), true},
+		{"forbidden 403", fmt.Errorf("API error 403: forbidden"), true},
+		{"credit balance direct", fmt.Errorf(`API error 400: {"error":{"message":"Your credit balance is too low to access the Anthropic API."}}`), true},
+		{"credit balance wrapped in DAG", fmt.Errorf(`execute DAG: node "runbook": step runbook attempt 3: API error 400: {"error":{"message":"Your credit balance is too low"}}`), true},
+		{"invalid api key message", fmt.Errorf("API error 400: invalid x-api-key header"), true},
+		{"timeout", fmt.Errorf("Anthropic request timed out after 2m0s"), false},
+		{"network error", fmt.Errorf("send request: connection refused"), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.fatal, IsAPIFatalError(tt.err))
+		})
+	}
+}
+
+// ─── Fail-fast tests ────────────────────────────────────────────────────────
+
+// failAfterNProvider returns real responses for the first N calls, then a fatal API error.
+type failAfterNProvider struct {
+	inner    llm.Provider
+	maxCalls int
+	calls    int
+}
+
+func (p *failAfterNProvider) Complete(prompt string) (string, error) {
+	p.calls++
+	if p.calls > p.maxCalls {
+		return "", fmt.Errorf(`API error 400: {"error":{"message":"Your credit balance is too low to access the Anthropic API."}}`)
+	}
+	return p.inner.Complete(prompt)
+}
+
+func TestRunTextExperiment_FailFast(t *testing.T) {
+	// Allow 1 call (enough for code-review task 1), then fail
+	provider := &failAfterNProvider{inner: sampleProvider(), maxCalls: 1}
+	cfg := ExperimentConfig{
+		Tasks:       sampleTasks(), // 2 tasks
+		Provider:    provider,
+		RunsPerTask: 3,
+	}
+
+	results, err := RunTextExperiment(cfg)
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, ErrAPIFatal), "should wrap ErrAPIFatal")
+	// Should have partial results: the 1 successful run + 1 failed run
+	assert.True(t, len(results) >= 1, "should return partial results, got %d", len(results))
+	assert.True(t, len(results) < 6, "should abort before all 6 runs, got %d", len(results))
+}
+
+func TestRunRuntimeExperiment_FailFast(t *testing.T) {
+	// code-review has 3 steps (3 LLM calls per run). Allow 3, then fail.
+	provider := &failAfterNProvider{inner: sampleProvider(), maxCalls: 3}
+	cfg := ExperimentConfig{
+		Tasks:       sampleTasks(), // 2 tasks
+		Provider:    provider,
+		RunsPerTask: 3,
+	}
+
+	results, err := RunRuntimeExperiment(cfg)
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, ErrAPIFatal), "should wrap ErrAPIFatal")
+	assert.True(t, len(results) >= 1, "should return partial results, got %d", len(results))
+	assert.True(t, len(results) < 6, "should abort before all 6 runs, got %d", len(results))
 }
 
 // ─── End-to-end test ──────────────────────────────────────────────────────────
