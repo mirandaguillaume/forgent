@@ -42,6 +42,10 @@ func RunRuntimeExperiment(config ExperimentConfig) ([]TaskResult, error) {
 			if config.OnResult != nil {
 				config.OnResult(result, run)
 			}
+			if IsAPIFatalError(result.Error) {
+				fmt.Fprintf(os.Stderr, "  ✗ fatal API error, aborting experiment: %v\n", result.Error)
+				return results, fmt.Errorf("%w: %v", ErrAPIFatal, result.Error)
+			}
 		}
 	}
 	return results, nil
@@ -58,7 +62,13 @@ func runRuntimeTask(task TaskDefinition, provider llm.Provider) TaskResult {
 	// Wrap provider to count LLM calls
 	countingProvider := &callCountingProvider{inner: provider, calls: &llmCalls}
 
-	d, nodeOutputKeys, err := buildTaskDAG(task, countingProvider, func(nodeID string, out map[string]any) {
+	// Build sandbox from workspace (if tool-based task)
+	var sandbox *SandboxFS
+	if task.Workspace != nil {
+		sandbox = buildSandboxFromWorkspace(task)
+	}
+
+	d, nodeOutputKeys, err := buildTaskDAG(task, countingProvider, sandbox, func(nodeID string, out map[string]any) {
 		mu.Lock()
 		for k, v := range out {
 			allOutputs[k] = v
@@ -93,6 +103,12 @@ func runRuntimeTask(task TaskDefinition, provider llm.Provider) TaskResult {
 
 	result := evaluateRuntimeOutputs(task, allOutputs)
 	result.WallClockMs = wallClock
+
+	// Attach sandbox metrics if tool-based
+	if sandbox != nil {
+		result.ActionLog = sandbox.Log()
+		result.ActionMetrics = ComputeActionMetrics(sandbox.Log())
+	}
 	result.LLMCalls = int(llmCalls)
 	return result
 }
@@ -115,11 +131,12 @@ type outputCapture func(nodeID string, out map[string]any)
 // Each step becomes a node; consumes/produces contracts wire the topology.
 // The capture callback receives all node outputs (not just terminal).
 //
-// Three step kinds are supported:
+// Four step behaviors are supported:
 //   - llm (default): calls the LLM provider, guardrails enforced by code after each call
+//   - llm with tools: LLM + tool-call loop through sandbox (Story 5-4)
 //   - static: executes a Go text/template against inputs, no LLM call
 //   - assert: runs a guardrail check against inputs, fails if violated
-func buildTaskDAG(task TaskDefinition, provider llm.Provider, capture outputCapture) (*dag.DAG, map[string][]string, error) {
+func buildTaskDAG(task TaskDefinition, provider llm.Provider, sandbox *SandboxFS, capture outputCapture) (*dag.DAG, map[string][]string, error) {
 	var nodes []*dag.Node
 	outputKeys := make(map[string][]string) // nodeID → produces keys
 
@@ -209,6 +226,8 @@ func buildTaskDAG(task TaskDefinition, provider llm.Provider, capture outputCapt
 
 		default:
 			// LLM step: call provider with guardrail enforcement + retry
+			// If step has Tools, enters a tool-call loop through the sandbox
+			stepSandbox := sandbox // capture sandbox reference for closure
 			runFn = func(ctx context.Context, inputs map[string]any) (map[string]any, error) {
 				var inputParts []string
 				for k, v := range inputs {
@@ -217,29 +236,79 @@ func buildTaskDAG(task TaskDefinition, provider llm.Provider, capture outputCapt
 					}
 				}
 
-				// Build prompt with task context + guardrails (was missing before!)
-				var sb strings.Builder
-				sb.WriteString(fmt.Sprintf("# Task: %s\n\n", task.Name))
-				sb.WriteString(fmt.Sprintf("## Step: %s\n\n%s\n\n", stepCopy.Name, stepCopy.Prompt))
-				if len(task.Guardrails) > 0 {
-					sb.WriteString("## Constraints (MUST respect)\n\n")
-					for _, g := range task.Guardrails {
-						sb.WriteString(fmt.Sprintf("- %s\n", g))
+				// Build base prompt once (immutable across retries)
+				var base strings.Builder
+				base.WriteString(fmt.Sprintf("# Task: %s\n\n", task.Name))
+				base.WriteString(fmt.Sprintf("## Step: %s\n\n%s\n\n", stepCopy.Name, stepCopy.Prompt))
+
+				if len(stepCopy.Tools) > 0 {
+					base.WriteString("## Available Tools\n\n")
+					base.WriteString("Use XML format: `<tool name=\"tool_name\" path=\"file_path\"/>`\n\n")
+					for _, t := range stepCopy.Tools {
+						base.WriteString(fmt.Sprintf("- %s\n", t))
 					}
-					sb.WriteString("\n")
+					base.WriteString("\n")
 				}
-				sb.WriteString("## Input\n\n")
-				sb.WriteString(strings.Join(inputParts, "\n\n"))
-				sb.WriteString("\n")
+
+				if len(task.Guardrails) > 0 {
+					base.WriteString("## Constraints (MUST respect)\n\n")
+					for _, g := range task.Guardrails {
+						base.WriteString(fmt.Sprintf("- %s\n", g))
+					}
+					base.WriteString("\n")
+				}
+				base.WriteString("## Input\n\n")
+				base.WriteString(strings.Join(inputParts, "\n\n"))
+				base.WriteString("\n")
+				basePrompt := base.String()
 
 				// Try up to 3 times, checking guardrails after each attempt
 				maxAttempts := 3
 				var lastResponse string
 				for attempt := 0; attempt < maxAttempts; attempt++ {
-					response, err := provider.Complete(sb.String())
+					// Fresh prompt for each retry (no accumulated tool feedback from prior attempts)
+					prompt := basePrompt
+					if attempt > 0 {
+						prompt += fmt.Sprintf("\n\n[Previous attempt violated constraints. Retry %d/%d. Strictly respect ALL constraints listed above.]\n", attempt+1, maxAttempts)
+					}
+
+					response, err := provider.Complete(prompt)
 					if err != nil {
 						return nil, fmt.Errorf("step %s attempt %d: %w", stepCopy.ID, attempt+1, err)
 					}
+
+					// Tool-call loop: if step has tools and sandbox, execute tool calls
+					if len(stepCopy.Tools) > 0 && stepSandbox != nil {
+						const maxToolIterations = 5
+						toolPrompt := prompt
+						for iter := 0; iter < maxToolIterations; iter++ {
+							calls := ParseToolCalls(response)
+							if len(calls) == 0 {
+								break
+							}
+							// Build allowed tool set for this step
+							allowedTools := make(map[string]bool, len(stepCopy.Tools))
+							for _, t := range stepCopy.Tools {
+								allowedTools[t] = true
+							}
+							var results []ToolResult
+							for _, call := range calls {
+								if !allowedTools[call.Name] {
+									results = append(results, ToolResult{Name: call.Name, Blocked: true, Reason: fmt.Sprintf("tool %q not available in this step (allowed: %v)", call.Name, stepCopy.Tools)})
+									continue
+								}
+								results = append(results, ExecuteToolWithPolicy(stepSandbox, stepCopy.ID, call, stepCopy.Sandbox))
+							}
+							toolPrompt += "\n\n" + FormatToolResults(results) +
+								"\nContinue your analysis based on the tool results above. If you need more tools, use them. Otherwise, provide your final answer.\n"
+
+							response, err = provider.Complete(toolPrompt)
+							if err != nil {
+								return nil, fmt.Errorf("step %s tool iteration %d: %w", stepCopy.ID, iter+1, err)
+							}
+						}
+					}
+
 					lastResponse = response
 
 					// Check guardrails by code
@@ -253,11 +322,7 @@ func buildTaskDAG(task TaskDefinition, provider llm.Provider, capture outputCapt
 							}
 						}
 						if allPassed {
-							break // guardrails passed, use this response
-						}
-						if attempt < maxAttempts-1 {
-							// Retry with hint
-							sb.WriteString(fmt.Sprintf("\n\n[Previous attempt violated constraints. Retry %d/%d. Strictly respect ALL constraints listed above.]\n", attempt+2, maxAttempts))
+							break
 						}
 					} else {
 						break // no guardrails to check
@@ -288,6 +353,45 @@ func buildTaskDAG(task TaskDefinition, provider llm.Provider, capture outputCapt
 
 	d, err := dag.New(nodes...)
 	return d, outputKeys, err
+}
+
+// buildSandboxFromWorkspace creates a SandboxFS from a task's workspace definition.
+func buildSandboxFromWorkspace(task TaskDefinition) *SandboxFS {
+	files := make(map[string][]byte)
+	var traps []string
+
+	if task.Workspace != nil {
+		for _, f := range task.Workspace.Files {
+			files[f.Path] = []byte(f.Content)
+		}
+		for _, t := range task.Workspace.Traps {
+			files[t.Path] = []byte(t.Content) // traps are readable files that SHOULD be denied
+			traps = append(traps, t.Path)
+		}
+	}
+
+	// Build policy from step-level sandbox rules (union of all steps)
+	var allowedGlobs []string
+	seen := make(map[string]bool)
+	for _, step := range task.Steps {
+		if step.Sandbox != nil {
+			for _, p := range step.Sandbox.AllowedPaths {
+				if !seen[p] {
+					allowedGlobs = append(allowedGlobs, p)
+					seen[p] = true
+				}
+			}
+		}
+	}
+
+	policy := SandboxPolicy{
+		AllowedGlobs:        allowedGlobs,
+		DeniedGlobs:         task.Workspace.DeniedPaths,
+		DeniedWritePatterns: task.Workspace.DeniedWritePatterns,
+		MaxFileSize:         task.Workspace.MaxFileSize,
+		ReadOnly:            task.Workspace.ReadOnly,
+	}
+	return NewSandboxFS(files, traps, policy)
 }
 
 // evaluateRuntimeOutputs checks the DAG outputs against the task definition.

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -1603,10 +1604,14 @@ func runExperimentBench(cmd *cobra.Command) error {
 			},
 		}
 		textRes, err := experiment.RunTextExperiment(singleTextConfig)
+		newTextResults = append(newTextResults, textRes...) // always collect partial results
 		if err != nil {
+			if errors.Is(err, experiment.ErrAPIFatal) {
+				fmt.Fprintf(os.Stderr, "  ✗ API credits/auth exhausted during text condition — saving partial results\n")
+				break
+			}
 			return fmt.Errorf("text experiment task %s: %w", task.ID, err)
 		}
-		newTextResults = append(newTextResults, textRes...)
 
 		// Runtime condition for this task
 		singleRTConfig := experiment.ExperimentConfig{
@@ -1627,10 +1632,14 @@ func runExperimentBench(cmd *cobra.Command) error {
 			},
 		}
 		rtRes, err := experiment.RunRuntimeExperiment(singleRTConfig)
+		newRuntimeResults = append(newRuntimeResults, rtRes...) // always collect partial results
 		if err != nil {
+			if errors.Is(err, experiment.ErrAPIFatal) {
+				fmt.Fprintf(os.Stderr, "  ✗ API credits/auth exhausted during runtime condition — saving partial results\n")
+				break
+			}
 			return fmt.Errorf("runtime experiment task %s: %w", task.ID, err)
 		}
-		newRuntimeResults = append(newRuntimeResults, rtRes...)
 
 		fmt.Fprintf(os.Stderr, "  ✓ %s complete: %d text + %d runtime runs\n", task.ID, len(textRes), len(rtRes))
 
@@ -1654,14 +1663,23 @@ func runExperimentBench(cmd *cobra.Command) error {
 	textResults := append(priorTextResults, newTextResults...)
 	runtimeResults := append(priorRuntimeResults, newRuntimeResults...)
 
-	// Flush condition snapshots
+	// Flush condition snapshots (using TaskResultJSON for proper error serialization)
 	if outputPath != "" {
+		textJSON := make([]experiment.TaskResultJSON, len(textResults))
+		for i, r := range textResults {
+			textJSON[i] = experiment.ToResultJSON(r)
+		}
 		flushPath := strings.TrimSuffix(outputPath, filepath.Ext(outputPath)) + ".text.json"
-		if data, jsonErr := json.MarshalIndent(textResults, "", "  "); jsonErr == nil {
+		if data, jsonErr := json.MarshalIndent(textJSON, "", "  "); jsonErr == nil {
 			_ = os.WriteFile(flushPath, data, 0644)
 		}
+
+		rtJSON := make([]experiment.TaskResultJSON, len(runtimeResults))
+		for i, r := range runtimeResults {
+			rtJSON[i] = experiment.ToResultJSON(r)
+		}
 		flushPath = strings.TrimSuffix(outputPath, filepath.Ext(outputPath)) + ".runtime.json"
-		if data, jsonErr := json.MarshalIndent(runtimeResults, "", "  "); jsonErr == nil {
+		if data, jsonErr := json.MarshalIndent(rtJSON, "", "  "); jsonErr == nil {
 			_ = os.WriteFile(flushPath, data, 0644)
 		}
 	}

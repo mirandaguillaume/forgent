@@ -1,6 +1,8 @@
 package experiment
 
 import (
+	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -139,4 +141,45 @@ func TestExtractResults(t *testing.T) {
 func TestLoadCheckpoint_FileNotFound(t *testing.T) {
 	_, err := LoadCheckpoint(filepath.Join(t.TempDir(), "nonexistent.jsonl"))
 	require.Error(t, err)
+}
+
+// TestTaskResultJSON_ErrorSerializesToString verifies that the error field
+// in TaskResultJSON marshals to a readable string, not an empty object "{}".
+// This was the root cause of invisible errors in experiment-results-v2.
+func TestTaskResultJSON_ErrorSerializesToString(t *testing.T) {
+	creditErr := fmt.Errorf(`API error 400: {"error":{"message":"Your credit balance is too low"}}`)
+	result := TaskResult{
+		TaskID:    "test",
+		Condition: "text",
+		Error:     creditErr,
+	}
+
+	j := ToResultJSON(result)
+	data, err := json.Marshal(j)
+	require.NoError(t, err)
+
+	jsonStr := string(data)
+	assert.Contains(t, jsonStr, "credit balance is too low", "error message should be readable in JSON")
+	assert.NotContains(t, jsonStr, `"error":{}`, "error should NOT serialize as empty object")
+
+	// Verify it also unmarshals back correctly
+	var decoded TaskResultJSON
+	require.NoError(t, json.Unmarshal(data, &decoded))
+	assert.Contains(t, decoded.Error, "credit balance is too low")
+}
+
+// TestTaskResult_DirectMarshalLosesError demonstrates the bug that was fixed:
+// directly marshaling TaskResult (with error interface) produces "{}".
+func TestTaskResult_DirectMarshalLosesError(t *testing.T) {
+	result := TaskResult{
+		TaskID: "test",
+		Error:  fmt.Errorf("some error"),
+	}
+
+	data, err := json.Marshal(result)
+	require.NoError(t, err)
+
+	// This is the bug: error interface marshals as {}
+	assert.Contains(t, string(data), `"Error":{}`,
+		"raw TaskResult.Error marshals as {} — this is why we use TaskResultJSON")
 }

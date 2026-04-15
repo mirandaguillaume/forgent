@@ -37,6 +37,10 @@ func RunTextExperiment(config ExperimentConfig) ([]TaskResult, error) {
 			if config.OnResult != nil {
 				config.OnResult(result, run)
 			}
+			if IsAPIFatalError(result.Error) {
+				fmt.Fprintf(os.Stderr, "  ✗ fatal API error, aborting experiment: %v\n", result.Error)
+				return results, fmt.Errorf("%w: %v", ErrAPIFatal, result.Error)
+			}
 		}
 	}
 	return results, nil
@@ -77,6 +81,15 @@ func buildTextPrompt(task TaskDefinition) string {
 		sb.WriteString("## Input\n\n")
 		sb.WriteString(task.Input)
 		sb.WriteString("\n\n")
+	}
+
+	// For tool-based tasks, include workspace file listing in the prompt
+	// (text condition gets no tool access — just the file contents as context)
+	if task.Workspace != nil {
+		sb.WriteString("## Available Files\n\n")
+		for _, f := range task.Workspace.Files {
+			sb.WriteString(fmt.Sprintf("### %s\n```\n%s\n```\n\n", f.Path, f.Content))
+		}
 	}
 
 	sb.WriteString("## Steps (execute in order)\n\n")

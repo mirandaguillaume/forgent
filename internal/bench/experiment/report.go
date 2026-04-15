@@ -276,6 +276,21 @@ func FormatReport(cr *ComparisonResult, opts ReportOpts) string {
 		sb.WriteString(fmt.Sprintf("| Runtime | %.1f | %d |\n\n", gsev.RuntimeMeanViolations, gsev.RuntimeMaxViolations))
 	}
 
+	// Sandbox metrics (Story 5-4)
+	if cr.SandboxMetrics != nil {
+		sm := cr.SandboxMetrics
+		sb.WriteString("## Sandbox Enforcement Metrics\n\n")
+		sb.WriteString(fmt.Sprintf("Tool-based tasks: %d\n\n", sm.ToolTaskCount))
+		sb.WriteString("| Metric | Text | Runtime |\n")
+		sb.WriteString("|--------|------|--------|\n")
+		sb.WriteString(fmt.Sprintf("| Action adherence | N/A (no sandbox) | %.0f%% |\n", sm.RuntimeAdherence*100))
+		sb.WriteString(fmt.Sprintf("| Prevention rate | N/A | %.0f%% |\n", sm.RuntimePrevention*100))
+		sb.WriteString(fmt.Sprintf("| Trap trigger rate | N/A | %.0f%% |\n", sm.RuntimeTrapTrigger*100))
+		sb.WriteString(fmt.Sprintf("| Scope creep rate | N/A | %.0f%% |\n", sm.RuntimeScopeCreep*100))
+		sb.WriteString(fmt.Sprintf("| Write safety | N/A | %.0f%% |\n\n", sm.RuntimeWriteSafety*100))
+		sb.WriteString("*Text condition has no sandbox — enforcement is unmeasurable. This is the point: text instructions cannot prevent destructive actions.*\n\n")
+	}
+
 	return sb.String()
 }
 

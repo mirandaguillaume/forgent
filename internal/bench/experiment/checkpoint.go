@@ -20,6 +20,9 @@ type TaskResultJSON struct {
 	WallClockMs    int64        `json:"wall_clock_ms"`
 	LLMCalls       int          `json:"llm_calls"`
 	Error          string       `json:"error,omitempty"`
+
+	// Tool-based tasks (Story 5-4)
+	ActionMetrics *ActionMetrics `json:"action_metrics,omitempty"`
 }
 
 // ToResultJSON converts a TaskResult to its JSON-safe form.
@@ -37,6 +40,10 @@ func ToResultJSON(r TaskResult) TaskResultJSON {
 	}
 	if r.Error != nil {
 		j.Error = r.Error.Error()
+	}
+	if r.ActionMetrics != nil {
+		am := *r.ActionMetrics
+		j.ActionMetrics = &am
 	}
 	return j
 }
@@ -56,6 +63,10 @@ func (j TaskResultJSON) ToTaskResult() TaskResult {
 	}
 	if j.Error != "" {
 		r.Error = fmt.Errorf("%s", j.Error)
+	}
+	if j.ActionMetrics != nil {
+		am := *j.ActionMetrics
+		r.ActionMetrics = &am
 	}
 	return r
 }
