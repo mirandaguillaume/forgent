@@ -27,26 +27,27 @@ func RunRuntimeExperiment(config ExperimentConfig) ([]TaskResult, error) {
 
 	total := len(config.Tasks) * config.RunsPerTask
 	done := 0
+	label := config.Condition
+	if label == "" {
+		label = "runtime"
+	}
 	var results []TaskResult
 	for i, task := range config.Tasks {
 		skip := config.SkipMap[task.ID]
 		for run := 0; run < config.RunsPerTask; run++ {
 			done++
 			if run < skip {
-				fmt.Fprintf(os.Stderr, "  [runtime] task %d/%d (%s, %d steps) run %d/%d (%d/%d total) (skipped, resumed)\n",
-					i+1, len(config.Tasks), task.ID, len(task.Steps), run+1, config.RunsPerTask, done, total)
+				fmt.Fprintf(os.Stderr, "  [%s] task %d/%d (%s, %d steps) run %d/%d (%d/%d total) (skipped, resumed)\n",
+					label, i+1, len(config.Tasks), task.ID, len(task.Steps), run+1, config.RunsPerTask, done, total)
 				continue
 			}
-			fmt.Fprintf(os.Stderr, "  [runtime] task %d/%d (%s, %d steps) run %d/%d (%d/%d total)\n",
-				i+1, len(config.Tasks), task.ID, len(task.Steps), run+1, config.RunsPerTask, done, total)
+			fmt.Fprintf(os.Stderr, "  [%s] task %d/%d (%s, %d steps) run %d/%d (%d/%d total)\n",
+				label, i+1, len(config.Tasks), task.ID, len(task.Steps), run+1, config.RunsPerTask, done, total)
 			retriever := config.ContextRetriever
 			if retriever == nil {
 				retriever = NilRetriever{}
 			}
-			condition := config.Condition
-			if condition == "" {
-				condition = "runtime"
-			}
+			condition := label
 			result := runRuntimeTask(task, config.Provider, retriever, condition)
 			results = append(results, result)
 			if config.OnResult != nil {
