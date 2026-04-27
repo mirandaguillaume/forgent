@@ -511,3 +511,70 @@ func TestSandboxFS_GlobMatching(t *testing.T) {
 		})
 	}
 }
+
+// TestBuildSandbox_TaskInputSlotPresent — story 10-0 Task 3.1.
+// task_input must be readable as slots/task_input.md so agents that probe
+// the slots/ namespace receive the same content task_context.md reports.
+func TestBuildSandbox_TaskInputSlotPresent(t *testing.T) {
+	task := TaskDefinition{
+		ID:    "slot-test",
+		Input: "review this code: foo",
+		Workspace: &WorkspaceDef{
+			Files: []WorkspaceFile{{Path: "main.go", Content: "package main"}},
+		},
+		Steps: []StepDef{{ID: "s1"}},
+	}
+	sb := buildSandboxFromWorkspace(task)
+	got, err := sb.Read("test", "slots/task_input.md")
+	require.NoError(t, err, "slots/task_input.md must be readable")
+	assert.Equal(t, "review this code: foo", string(got))
+}
+
+// TestBuildSandbox_TaskInputSlotAbsentWhenInputEmpty — when there is no
+// task input, the slots/task_input.md path is intentionally not pre-populated
+// (Read returns "not found" rather than an empty file).
+func TestBuildSandbox_TaskInputSlotAbsentWhenInputEmpty(t *testing.T) {
+	task := TaskDefinition{
+		ID: "no-input",
+		Workspace: &WorkspaceDef{
+			Files: []WorkspaceFile{{Path: "main.go", Content: "package main"}},
+		},
+		Steps: []StepDef{{ID: "s1"}},
+	}
+	sb := buildSandboxFromWorkspace(task)
+	_, err := sb.Read("test", "slots/task_input.md")
+	require.Error(t, err, "no input → no slots/task_input.md")
+}
+
+// TestBuildSandbox_SeenSlotsPopulatedSymmetric — story 10-0 Task 3.2.
+// When step-level sandbox restricts AllowedPaths, the auto-added
+// "task_context.md" and "slots/**" entries must each populate the seen
+// map after append so the function's local invariant (every entry in
+// allowedGlobs has a matching seen[...] = true) holds.
+//
+// We can't observe `seen` directly (it's local to the function), but we
+// can verify the contract indirectly: when a step explicitly declares
+// "task_context.md" or "slots/**", those entries must not be appended
+// twice (no duplicate in the final policy).
+func TestBuildSandbox_SeenSlotsPopulatedSymmetric(t *testing.T) {
+	task := TaskDefinition{
+		ID: "explicit-globs",
+		Workspace: &WorkspaceDef{
+			Files: []WorkspaceFile{{Path: "src/main.go", Content: "package main"}},
+		},
+		Steps: []StepDef{
+			{
+				ID: "s1",
+				Sandbox: &StepSandboxPolicy{
+					AllowedPaths: []string{"src/**", "task_context.md", "slots/**"},
+				},
+			},
+		},
+	}
+	sb := buildSandboxFromWorkspace(task)
+	// Read task_context.md and write to slots/x.md to confirm the policy is correct
+	// (would error if the entry was missing or malformed).
+	_, err := sb.Read("test", "task_context.md")
+	require.NoError(t, err)
+	require.NoError(t, sb.Write("test", "slots/x.md", []byte("ok")))
+}

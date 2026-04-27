@@ -365,3 +365,185 @@ func TestRuntime_BackwardCompat_TaskGuardrailsWhenNoStepGuardrails(t *testing.T)
 	require.Len(t, results[0].StepResults, 1)
 	assert.Contains(t, results[0].StepResults[0].Output, "documentation", "output should contain the enforced task guardrail token")
 }
+
+// TestRuntime_StepGuardrails_3RetryExhaustion — story 10-0 Task 4.3.
+// All three attempts violate the step-level guardrail; the runtime should
+// stop retrying after the third attempt and return the task with the
+// guardrail violation surfaced (Completed reflects whether the slot was
+// produced; the violation is captured in GuardrailScore).
+func TestRuntime_StepGuardrails_3RetryExhaustion(t *testing.T) {
+	callCount := 0
+	provider := &callCountingMock{
+		fn: func(prompt string) (string, error) {
+			callCount++
+			// Always return output that violates the guardrail
+			return "The verdict is unclear and undetermined.", nil
+		},
+	}
+
+	task := TaskDefinition{
+		ID:    "guardrail-3retry-exhaustion",
+		Name:  "Three Retry Exhaustion",
+		Input: "some code",
+		Steps: []StepDef{
+			{
+				ID:         "review",
+				Name:       "Review",
+				Prompt:     "Review the code",
+				Guardrails: []string{"APPROVED"},
+				Produces:   []SlotSpec{{Key: "verdict"}},
+			},
+		},
+	}
+
+	config := ExperimentConfig{
+		Tasks:       []TaskDefinition{task},
+		Provider:    provider,
+		RunsPerTask: 1,
+	}
+
+	results, err := RunRuntimeExperiment(config)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	// Provider called 3 times = max attempts
+	assert.Equal(t, 3, callCount, "should call provider 3 times (max attempts) before giving up")
+	// GuardrailScore = 0 since "APPROVED" never present
+	assert.Equal(t, 0.0, results[0].GuardrailScore, "all 3 attempts violate guardrail → score 0")
+	// The step still produces output text on every attempt — Completed reflects
+	// slot production, not guardrail satisfaction. Pin both so a future refactor
+	// that errors out at attempt 3 instead of accepting the bad output would be
+	// detected.
+	assert.True(t, results[0].Completed, "step produces output on every attempt — Completed = true even when GuardrailScore is 0")
+	assert.NoError(t, results[0].Error, "guardrail violation should not be surfaced as a hard task error in the current contract")
+}
+
+// TestRuntime_StepGuardrails_NegativePrefix — story 10-0 Task 4.4.
+// "!token" semantics: output must NOT contain "token". Pre-existing logic
+// in checkGuardrail; this test pins the behaviour at the step level so a
+// future refactor of the guardrail evaluation path cannot silently break it.
+func TestRuntime_StepGuardrails_NegativePrefix(t *testing.T) {
+	provider := &mockGuardrailProvider{
+		responses: []string{
+			// Step output: contains "DROP TABLE" → !DROP TABLE guardrail violated
+			"DROP TABLE users; -- approved",
+			// Retry: clean output
+			"Approved without destructive SQL",
+		},
+	}
+
+	task := TaskDefinition{
+		ID:    "negative-step-guardrail",
+		Name:  "Negative Step Guardrail",
+		Input: "review this",
+		Steps: []StepDef{
+			{
+				ID:         "review",
+				Name:       "Review",
+				Prompt:     "Review the code",
+				Guardrails: []string{"!DROP TABLE"},
+				Produces:   []SlotSpec{{Key: "out"}},
+			},
+		},
+	}
+
+	config := ExperimentConfig{
+		Tasks:       []TaskDefinition{task},
+		Provider:    provider,
+		RunsPerTask: 1,
+	}
+
+	results, err := RunRuntimeExperiment(config)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+
+	// 2 calls (first retry succeeds because !DROP TABLE is now respected).
+	assert.Equal(t, 2, provider.callIdx)
+	assert.True(t, results[0].Completed)
+	assert.Equal(t, 1.0, results[0].GuardrailScore, "negative guardrail respected on second attempt")
+}
+
+// TestEffectiveGuardrails_ReturnsDefensiveCopy — story 10-0 Task 4.2.
+// Mutating the returned slice must not affect the source TaskDefinition or
+// StepDef. Required for concurrent-safe use under DAG execution.
+func TestEffectiveGuardrails_ReturnsDefensiveCopy(t *testing.T) {
+	task := TaskDefinition{Guardrails: []string{"task-rule"}}
+	step := StepDef{ID: "x"}
+	out := effectiveGuardrails(step, task)
+	require.Equal(t, []string{"task-rule"}, out)
+
+	out[0] = "MUTATED"
+	assert.Equal(t, "task-rule", task.Guardrails[0],
+		"mutating the returned slice must not affect the source TaskDefinition")
+
+	step2 := StepDef{ID: "y", Guardrails: []string{"step-rule"}}
+	out2 := effectiveGuardrails(step2, task)
+	out2[0] = "MUTATED"
+	assert.Equal(t, "step-rule", step2.Guardrails[0],
+		"mutating the returned slice must not affect the source StepDef")
+
+	// Disabled-with-step-guardrails case: the function returns nil, not an
+	// empty mutable slice. Pin the contract so a future caller assuming
+	// "always non-nil writable" is forced to nil-check first.
+	step3 := StepDef{ID: "z", DisableTaskGuardrails: true, Guardrails: []string{"x"}}
+	out3 := effectiveGuardrails(step3, task)
+	assert.Nil(t, out3, "DisableTaskGuardrails: true must return nil regardless of step.Guardrails")
+}
+
+// TestTaskContextContent_IncludesStepLevelGuardrails — story 10-0 Task 4.1.
+// task_context.md must list step-level guardrails when steps override the
+// task-level set, so an agent reading the audit file sees the full picture.
+func TestTaskContextContent_IncludesStepLevelGuardrails(t *testing.T) {
+	task := TaskDefinition{
+		ID:         "ctx-test",
+		Name:       "Ctx Test",
+		Input:      "code",
+		Guardrails: []string{"task-level-rule"},
+		Steps: []StepDef{
+			{ID: "s1", Name: "Step One", Guardrails: []string{"step-rule-A", "!secret"}},
+			{ID: "s2", Name: "Step Two", DisableTaskGuardrails: true},
+			{ID: "step-three"}, // no overrides — should not appear in step section
+		},
+	}
+	got := string(taskContextContent(task))
+	assert.Contains(t, got, "task-level-rule", "task-level guardrails always rendered")
+	assert.Contains(t, got, "Step One", "step with overrides rendered by name")
+	assert.Contains(t, got, "step-rule-A", "step-level guardrail listed")
+	assert.Contains(t, got, "!secret", "step-level negative guardrail listed verbatim")
+	assert.Contains(t, got, "Step Two", "step that disables task guardrails rendered")
+	assert.Contains(t, got, "task-level disabled", "disable_task_guardrails flag annotated")
+	assert.NotContains(t, got, "step-three", "step with no overrides not listed in step section")
+}
+
+// TestTaskContextContent_DisableSuppressesStepGuardrails — story 10-0 Task 4.1
+// + post-review patch P1. When DisableTaskGuardrails is true, effectiveGuardrails
+// returns nil regardless of step.Guardrails. The audit file must reflect that
+// — listing step.Guardrails as enforced when the runtime ignores them would
+// lie to the agent reading task_context.md.
+func TestTaskContextContent_DisableSuppressesStepGuardrails(t *testing.T) {
+	task := TaskDefinition{
+		ID:         "ctx-disable",
+		Name:       "Disable Test",
+		Input:      "code",
+		Guardrails: []string{"task-rule"},
+		Steps: []StepDef{
+			{
+				ID:                    "s1",
+				Name:                  "Disabled Step",
+				DisableTaskGuardrails: true,
+				Guardrails:            []string{"would-be-step-rule"},
+			},
+		},
+	}
+	got := string(taskContextContent(task))
+	assert.Contains(t, got, "Disabled Step", "step rendered in audit")
+	assert.Contains(t, got, "step-level suppressed", "first-line annotation distinguishes disabled-with-step-guardrails from disabled-without")
+	assert.Contains(t, got, "suppressed by disable_task_guardrails",
+		"step-level guardrails declared with disable flag must be marked suppressed, not enforced")
+	// Stronger than `- would-be-step-rule` — a regression that re-renders the
+	// suppressed rule with a different bullet style (`  ~ would-be-step-rule`,
+	// `  • would-be-step-rule`, etc.) would still leak the rule string. The
+	// rule name must not appear at all.
+	assert.NotContains(t, got, "would-be-step-rule",
+		"step.Guardrails string must NOT appear anywhere when DisableTaskGuardrails is set, regardless of bullet style")
+}

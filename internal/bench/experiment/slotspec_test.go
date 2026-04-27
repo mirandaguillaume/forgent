@@ -128,3 +128,66 @@ steps:
 	assert.Equal(t, "fixed_code", task.Steps[1].Produces[0].Key)
 	assert.Equal(t, "bugs", task.Steps[1].Consumes[0].Key)
 }
+
+// TestResolveTemplate_EmptyBaseDir_ReturnsError — story 10-0 Task 1.3.
+// Empty baseDir + non-empty TemplateFile must fail explicitly so callers cannot
+// silently fall through to reading the TemplateFile path from the process CWD.
+func TestResolveTemplate_EmptyBaseDir_ReturnsError(t *testing.T) {
+	s := SlotSpec{Key: "verdict", TemplateFile: "verdict-schema.md"}
+	_, err := s.ResolveTemplate("")
+	require.Error(t, err, "ResolveTemplate must reject empty baseDir when TemplateFile is set")
+	assert.Contains(t, err.Error(), "non-empty baseDir")
+}
+
+// TestResolveTemplate_EmptyBaseDir_NoTemplateFileIsOk — inline templates are
+// unaffected by the empty-baseDir rule.
+func TestResolveTemplate_EmptyBaseDir_NoTemplateFileIsOk(t *testing.T) {
+	s := SlotSpec{Key: "verdict", Template: "## Verdict"}
+	out, err := s.ResolveTemplate("")
+	require.NoError(t, err)
+	assert.Equal(t, "## Verdict", out)
+}
+
+// TestResolveTemplate_RejectsSymlinkOutsideBase — story 10-0 Task 1.3.
+// A symlink inside baseDir that resolves to a file outside baseDir must be
+// rejected even though the lexical filepath.Rel check passes (the symlink
+// path itself is inside baseDir; only EvalSymlinks reveals the target).
+func TestResolveTemplate_RejectsSymlinkOutsideBase(t *testing.T) {
+	baseDir := t.TempDir()
+	outsideDir := t.TempDir()
+
+	// Create a sensitive file outside baseDir.
+	secret := filepath.Join(outsideDir, "secret.md")
+	require.NoError(t, os.WriteFile(secret, []byte("secret content"), 0644))
+
+	// Create a symlink inside baseDir pointing to the outside file.
+	link := filepath.Join(baseDir, "alias.md")
+	if err := os.Symlink(secret, link); err != nil {
+		t.Skipf("symlinks not supported on this platform: %v", err)
+	}
+
+	s := SlotSpec{Key: "out", TemplateFile: "alias.md"}
+	_, err := s.ResolveTemplate(baseDir)
+	require.Error(t, err, "symlinked TemplateFile pointing outside baseDir must be rejected")
+	assert.Contains(t, err.Error(), "escapes base directory")
+}
+
+// TestResolveTemplate_AcceptsSymlinkInsideBase — symlinks that stay inside
+// baseDir are allowed (e.g. shared schema files in a sub-dir).
+func TestResolveTemplate_AcceptsSymlinkInsideBase(t *testing.T) {
+	baseDir := t.TempDir()
+
+	target := filepath.Join(baseDir, "schemas", "verdict.md")
+	require.NoError(t, os.MkdirAll(filepath.Dir(target), 0755))
+	require.NoError(t, os.WriteFile(target, []byte("## Verdict"), 0644))
+
+	link := filepath.Join(baseDir, "verdict.md")
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("symlinks not supported on this platform: %v", err)
+	}
+
+	s := SlotSpec{Key: "verdict", TemplateFile: "verdict.md"}
+	out, err := s.ResolveTemplate(baseDir)
+	require.NoError(t, err)
+	assert.Equal(t, "## Verdict", out)
+}

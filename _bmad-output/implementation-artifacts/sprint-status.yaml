@@ -57,9 +57,9 @@
 # Party mode consensus — all agents agreed.
 
 generated: 2026-03-30
-last_updated: 2026-04-27  # epic-9 retro done
-last_story_created: 10-2-fix-template-file-runtime
-last_story_modified: 9-3-shell-completion-and-cli-polish  # done
+last_updated: 2026-04-27  # 10-0 done (review patches applied)
+last_story_created: 10-0-epic9-debt-cleanup
+last_story_modified: 10-0-epic9-debt-cleanup
 last_epic_completed: epic-9  # retro done 2026-04-27
 project: Forgent
 project_key: NOKEY
@@ -170,6 +170,7 @@ development_status:
   # Baseline captured 2026-04-27: 0% guardrail detection, 3% scope creep.
   # Stories prove structural enforcement > keyword guardrails.
   epic-10: in-progress
+  10-0-epic9-debt-cleanup: done  # Tasks 1+3+4+5.5 + 12 review patches; Task 2 → 10-7, 5.2+5.4 → 10-4, 5.1+5.3 → polish
   10-1-node-level-guardrails: done
   10-2-fix-template-file-runtime: done
   10-3-file-level-permissions: backlog

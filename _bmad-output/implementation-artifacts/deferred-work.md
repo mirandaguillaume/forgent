@@ -35,6 +35,23 @@
 - ✅ `gate.go` `computeMetrics` Severity (6-0) — verified already fixed; effectiveSeverity pattern present (`sev := f.Severity; if sev == "" { sev = f.Confidence }`)
 - ✅ `secrets.go` `inCodeFence` skip (6-0) — verified already fixed; `if inCodeFence { continue }` present
 
+## Deferred from: second-pass code review of 10-0-epic9-debt-cleanup (2026-04-27)
+
+- **`ResolveTemplate` rejects valid bytes when `os.Lstat` errors with ENOENT after successful `os.ReadFile`** — rare TOCTOU between read and stat (file watcher rotation, FS hiccup). Hard-fail is the safer trade-off than fail-open; document the rationale.
+- **`alignResultsByTaskID` positional fallback aliases the caller's underlying slice** — no current Compute* mutates, but contract unenforced. Footgun for future contributors. Document or copy on fallback.
+- **`Compare([], runtimeNonEmpty)` loses diagnostic signal** — returns `cr.Tasks=0` hiding the runtime activity. No panic, just a UX gap when SkipMap fully drains one condition.
+- **`evaluateRuntimeOutputs` scores empty-string output for never-executed steps** — when upstream errors, downstream steps' `resultByStepID["s2"] = ""`, and negative guardrails (`!destructive`) are falsely credited as respected. Pre-existing pattern in both old positional and new map code; merits dedicated cleanup story.
+
+## Deferred from: code review of 10-0-epic9-debt-cleanup (2026-04-27)
+
+- **`buildSandboxFromWorkspace` produces-key collision with `slots/task_input.md`** — a step that produces a slot named `task_input` would overwrite the auto-injected input at first execution. Extremely unlikely in practice (no realistic naming convention would clash); revisit when slot keys become a formalised reserved namespace.
+- **`effectiveGuardrails` defensive-copy allocation cost in retry loop** — copies on every call; current architecture has no mutator that needs the safety. Revisit if profiling shows allocation hotspot.
+- **`taskContextContent` step-name fallback to `step.ID`** — exercised by no test. Coverage gap, not a behaviour gap.
+- **`slotspec.ResolveTemplate` lexical `strings.HasPrefix(rel, "..")`** — false-rejects `..backup.md`-style names; false-accepts impossible. Cosmetic.
+- **`cr.Tasks` / `cr.Runs` semantic drift after alignment** — pre-existing labeling confusion in `report.go`; alignment makes the divergence visible but does not introduce it. Fix labels (Tasks → "paired tasks") in a report polish pass.
+- **`alignResultsByTaskID` silently drops extra runs when `RunsPerTask > 1` with asymmetric SkipMap** — doc-comment is accurate; a stderr summary of dropped runs would aid debug-mode users.
+- **`LoadTasks` discards `EvalSymlinks` error silently on fallback** — pre-existing transparency gap; one-line stderr warning.
+
 ## Closed Bucket C — 2026-04-27 (won't fix)
 
 Sixteen items reviewed and accepted as-is, with the rationale below. They remain in their original sections for traceability but are no longer tracked as actionable.
