@@ -1,5 +1,23 @@
 # Deferred Work
 
+## Epic backlog: node-level behavioral contracts (2026-04-27)
+
+**Vision:** Behaviors (guardrails, tool permissions, I/O contracts, loop bounds) are node-level, not agent or task-level. A `StepDef` carries its complete behavioral contract. The task YAML becomes pure topology. The runtime enforces everything at each node boundary.
+
+**Why:** Current experiment baseline exposed the gap — guardrails are task-level, metrics aggregate across nodes with different behavioral profiles. The experiment can't validate the core thesis ("structural enforcement makes agents better") until enforcement is per-node. Node-level contracts also enable reusable nodes that carry their behavioral contract across tasks.
+
+**Stories to open:**
+
+- Move `guardrails []string` from `TaskDef` → `StepDef` (today it's shared across all steps)
+- Node-level tool permissions — each step declares its allowed tools, runtime enforces
+- Produces/consumes schema validation at slot boundary — validate content when node writes to `slots/*.md`
+- Per-node violation telemetry — log attempted vs. prevented violations per node boundary
+- Loop bounds at step level — DAG enforces iteration contract, not LLM decision
+
+**Experiment impact:** Once implemented, rerun the 16-task experiment. Delta vs. current baseline (keyword guardrails, task-level) = empirical proof of the thesis. Current experiment run (2026-04-27) is the formal pre-structural-enforcement baseline.
+
+**Relationship to guardrails structurels backlog entry (above):** Output contract, tool call, and network guardrails are the *content* of node-level contracts. This epic is the *infrastructure* to host them.
+
 ## Deferred from: code review of story-1.1 (2026-03-30)
 
 - **No `io.LimitReader` on API responses.** Theoretical OOM risk on malicious response. Pre-existing pattern from OpenRouter adapter — fix both together when hardening LLM providers.
@@ -163,6 +181,16 @@
 - **seen["slots/**"] asymmetry in buildSandboxFromWorkspace** — seen["task_context.md"] has a correct guard but seen["slots/**"] is never populated; "slots/**" is always appended unconditionally. Normalize both checks.
 - **funcProvider in experiment_test.go missing compile-time interface guard** — add `var _ llm.Provider = (*funcProvider)(nil)` for consistency with other test providers.
 - **AC4/AC5 not verified** — guardrail gap and token reduction improvements require running the 16-task forgent-bench experiment to confirm.
+
+## Backlog: guardrails structurels (2026-04-27)
+
+Remplacer les guardrails keyword par trois catégories déterministes :
+
+- **Output contract** — valider la structure de la réponse (JSON schema, champs obligatoires) via le `produces` contract. Lié à story 6-6 (`output-schema-and-produces-contract`).
+- **Tool call** — intercepter les appels d'outils dans le tool-call loop : `!file_delete`, `!bash(rm -rf)`, etc. Soit la tool n'a pas été appelée, soit le guardrail échoue. Zéro sémantique.
+- **Network** — sandbox réseau : bloquer les appels HTTP sortants non autorisés. Complémentaire au VirtualFS sandbox existant (story 5-4).
+
+Motivation : les guardrails keyword (`!LGTM`, `!safe`) sont des proxies sémantiques fragiles qui déclenchent des retries LLM inutiles. Ces trois catégories sont **observables et déterministes** — pas de retry possible sur un fait constaté.
 
 ## Deferred from: code review of 6-22-context-retriever (2026-04-17)
 

@@ -4,12 +4,19 @@ stepsCompleted:
   - step-02-design-epics
   - step-03-create-stories
   - step-04-final-validation
+  - step-01-validate-prerequisites-epic7
+  - step-02-design-epics-epic7
+  - step-03-create-stories-epic7
+  - step-04-final-validation-epic7
 status: 'complete'
 completedAt: '2026-03-30'
+updatedAt: '2026-04-27'
 inputDocuments:
   - _bmad-output/planning-artifacts/prd.md
   - _bmad-output/planning-artifacts/architecture.md
   - docs/plans/ (31 design documents)
+  - party-mode-discussion-2026-04-27 (node-level behavioral contracts)
+  - experiment-baseline-2026-04-27 (16-task corpus, text/runtime/ranked)
 ---
 
 # Forgent - Epic Breakdown
@@ -189,8 +196,24 @@ Not applicable — CLI tool. UX defined in PRD CLI Requirements section and NFRs
 | FR56 | Epic 6 | Export to YAML |
 | FR57 | Epic 6 | Doctor config |
 | FR58 | Epic 6 | Shell completion |
+| FR45 | Epic 7 | Contract enforcement — descend au niveau node (partiellement livré en Epic 4) |
+| FR52 | Epic 7 | Runtime-vs-text experiment — rerun post-enforcement structurel |
+| FR59 | Epic 7 | Guardrails déclarés au niveau StepDef |
+| FR60 | Epic 7 | Tool permissions par node (intercept-before-execute) |
+| FR61 | Epic 7 | Schema validation via template/template_file avec marqueurs REQUIRED |
+| FR62 | Epic 7 | Violation telemetry par node (attempted vs. prevented) |
+| FR63 | Epic 7 | Loop bounds au niveau node (max_iterations, DAG-enforced) |
+| FR64 | Epic 7 | Métriques d'expérience par node (contract compliance rate) |
+| FR65 | Epic 7 | Distinction Theory A / Theory B via telemetry FR62 |
+| FR66 | Epic 7 | Fix template_file runtime — résolution relative au répertoire source TaskDefinition |
+| FR67 | Epic 7 | HTTP proxy sandbox réseau — filtre outbound par domaine au niveau node |
 
-**Coverage:** 58/58 FRs mapped (40 to MVP epics, 10 existing, 2 deferred Growth, 6 existing exercised by Epic 4).
+**Coverage:** 67/67 FRs mapped (ajout FR59-FR67 pour Epic 7 — node-level behavioral contracts).
+
+### Non-Functional Requirements additionnels (Epic 7)
+
+- **NFR39** — Node-level contract violation logging < 1ms overhead par boundary
+- **NFR40** — Backward compatible : tâches sans node-level guardrails fonctionnent comme avant
 
 ## Epic List
 
@@ -217,6 +240,261 @@ InstructionBench measures recommendation quality across a corpus of real agent f
 ### Epic 6: Ecosystem & Developer Experience
 Developers can configure doctor defaults, list available targets, export analysis as YAML, and generate shell completion. Contributors have a documented workflow for adding new format targets.
 **FRs covered:** FR54, FR55, FR56, FR57, FR58
+
+### Epic 7: Node-Level Behavioral Contracts
+Le développeur peut déclarer des contrats comportementaux complets (guardrails, tool permissions, schéma I/O via template, loop bounds, sandbox réseau) au niveau de chaque step individuel. Le runtime Forgent les enforce structurellement à chaque boundary de node — intercept-before-execute pour les tools, template validation pour les outputs, HTTP proxy pour le réseau. L'expérience rerun démontre empiriquement que cet enforcement structurel surpasse le baseline keyword-guardrail établi en Epic 6.
+**FRs covered:** FR45 (étendu), FR52 (rerun), FR59, FR60, FR61, FR62, FR63, FR64, FR65, FR66, FR67
+
+**Séquence de livraison :**
+1. FR59 — Guardrails → StepDef
+2. FR66 — Fix template_file runtime (prerequisite FR61)
+3. FR60 — Tool permissions intercept-before-execute
+4. FR61 — Schema validation template/template_file + marqueurs REQUIRED
+5. FR67 — HTTP proxy sandbox réseau
+6. FR62 — Violation telemetry par node
+7. FR63 — Loop bounds au niveau node
+8. FR64+FR65 — Métriques d'expérience par node + Theory A/B
+9. FR52 — Rerun expérience (terminal)
+
+---
+
+## Epic 7: Node-Level Behavioral Contracts
+
+Le développeur peut déclarer des contrats comportementaux complets au niveau de chaque step. Le runtime les enforce structurellement à chaque boundary — intercept-before-execute pour les tools, template validation pour les outputs, HTTP proxy pour le réseau. L'expérience rerun produit la preuve empirique vs le baseline keyword-guardrail.
+
+### Story 7-1: Node-Level Guardrails
+
+As a **developer defining a Forgent task**,
+I want to declare guardrails at the individual step level,
+So that each node enforces its own behavioral constraints independently of other steps.
+
+**Acceptance Criteria:**
+
+**Given** a `StepDef` YAML with a `guardrails` field
+**When** the runtime executes that step
+**Then** only that step's guardrails are evaluated against its output — not the task-level guardrail list
+
+**Given** a step declares `guardrails: ["Bearer", "!DROP TABLE"]`
+**When** the LLM response violates one guardrail
+**Then** the runtime retries up to 3 times for that step only, without affecting other steps
+
+**Given** a task YAML with no `guardrails` at step level but with task-level guardrails
+**When** the runtime executes
+**Then** behavior is identical to before this story — full backward compatibility (NFR40)
+
+**Given** `go test ./...`
+**Then** tous les tests existants passent sans modification
+
+### Story 7-2: Fix template_file Runtime Resolution
+
+As a **developer defining step output contracts**,
+I want `template_file` to resolve relative to the task YAML's directory,
+So that I can reference schema files with predictable paths regardless of the process CWD at runtime.
+
+**Acceptance Criteria:**
+
+**Given** a step with `template_file: ./schemas/audit.md`
+**When** the runtime loads the task from `/project/tasks/security.yaml`
+**Then** the file is resolved as `/project/tasks/schemas/audit.md` — not relative to the process CWD
+
+**Given** a `template_file` pointing outside the task directory (path traversal `../../etc/passwd`)
+**When** the runtime attempts to resolve it
+**Then** an error is returned: `template_file path escapes task directory`
+
+**Given** a step with inline `template` (not `template_file`)
+**When** the runtime executes
+**Then** behavior is unchanged — no regression
+
+**Given** `go test ./...`
+**Then** all existing tests pass without modification
+
+### Story 7-3: File-Level Permission Model per Step
+
+As a **developer defining a Forgent task**,
+I want to declare file access permissions at the step level (`read-only`, `read-write`, `read-write-delete`),
+So that the VirtualFS sandbox enforces the boundary regardless of which tool the LLM uses.
+
+**Acceptance Criteria:**
+
+**Given** a step declares `file_access: read-only`
+**When** the LLM attempts any write or delete operation (via any tool)
+**Then** the sandbox returns `permission denied: step is read-only` before execution
+
+**Given** a step declares `file_access: read-write`
+**When** the LLM attempts a delete operation
+**Then** the sandbox returns `permission denied: step does not have delete permission`
+**And** write operations succeed normally
+
+**Given** a step declares `file_access: read-write-delete`
+**When** the LLM performs any file operation
+**Then** all operations are permitted — full sandbox access
+
+**Given** a step with no `file_access` declared
+**When** the runtime executes
+**Then** default behavior applies (read-write) — full backward compatibility (NFR40)
+
+**Given** a permission violation occurs
+**Then** it is recorded (attempted=true, prevented=true) for telemetry (FR62)
+**And** no retry — deterministic fail for that operation
+
+**Given** `go test ./...`
+**Then** all existing tests pass without modification
+
+### Story 7-4: Output Contract Validation via Template
+
+As a **developer defining a Forgent task**,
+I want to declare a required output structure via `template` or `template_file` in my step's `produces` contract,
+So that the runtime validates the LLM output before writing it to the slot.
+
+**Acceptance Criteria:**
+
+**Given** a step's `produces` declares a `template_file` with `<!-- REQUIRED: verdict -->` markers
+**When** the LLM output is missing one or more REQUIRED markers
+**Then** the runtime returns a contract violation before writing to `slots/*.md`
+**And** the violation is recorded for telemetry (FR62)
+
+**Given** all REQUIRED markers are present in the LLM output
+**When** the runtime validates
+**Then** the output is written to the slot normally
+
+**Given** a step's `produces` has no template declared
+**When** the runtime executes
+**Then** no validation occurs — full backward compatibility (NFR40)
+
+**Given** `template_file` is used (depends on Story 7-2)
+**When** the runtime resolves the path
+**Then** resolution is relative to the task YAML directory
+
+**Given** `go test ./...`
+**Then** all existing tests pass without modification
+
+### Story 7-5: HTTP Proxy Network Sandbox
+
+As a **developer defining a Forgent task**,
+I want to declare a network policy at the step level (`allowed_domains` or `forbidden_domains`),
+So that the runtime blocks unauthorized outbound HTTP calls via an injected proxy before they reach the network.
+
+**Acceptance Criteria:**
+
+**Given** a step declares `network_policy: { forbidden_domains: ["api.stripe.com", "*.internal"] }`
+**When** any code in the sandbox attempts an outbound HTTP request to a forbidden domain
+**Then** the proxy intercepts and returns `403 Forbidden: domain not permitted for this step`
+**And** the violation is recorded for telemetry (FR62)
+
+**Given** a step declares `network_policy: { allowed_domains: ["api.github.com"] }`
+**When** a request targets a domain not in `allowed_domains`
+**Then** the proxy blocks it with `403 Forbidden: domain not in allowed_domains`
+
+**Given** a step with no `network_policy` declared
+**When** the runtime executes
+**Then** no proxy is injected — full backward compatibility (NFR40)
+
+**Given** the proxy is active
+**Then** `HTTP_PROXY` and `HTTPS_PROXY` environment variables are injected in the sandbox environment
+**And** the proxy runs on a local ephemeral port, shut down after the step completes
+
+**Given** `go test ./...`
+**Then** all existing tests pass without modification
+
+### Story 7-6: Violation Telemetry per Node
+
+As a **developer running a Forgent experiment**,
+I want each node boundary to log attempted and prevented violations,
+So that I can distinguish between agents that comply naturally (Theory B) and agents coerced by enforcement (Theory A).
+
+**Acceptance Criteria:**
+
+**Given** a step violation occurs (guardrail, file permission, output contract, or network)
+**When** the runtime records it
+**Then** the violation log includes: `node_id`, `violation_type` (guardrail|file_permission|output_contract|network), `attempted: true`, `prevented: true|false`, `attempt_number`
+
+**Given** a step completes without any violation
+**When** the runtime records it
+**Then** no violation entry is emitted for that node
+
+**Given** an experiment run completes
+**Then** the `TaskResult` includes a `NodeViolations []NodeViolation` field
+**And** `GuardrailScore` is supplemented by `ContractComplianceRate` — fraction of node boundaries with zero violations on first attempt
+
+**Given** `go test ./...`
+**Then** all existing tests pass without modification
+
+### Story 7-7: Loop Bounds with Exit Criteria per Node
+
+As a **developer defining a Forgent task**,
+I want to declare loop bounds with explicit exit criteria at the step level,
+So that the DAG terminates the loop structurally when a condition is met, with `max_iterations` as a safety backstop.
+
+**Acceptance Criteria:**
+
+**Given** a step declares `loop.exit_when.output_marker: "<!-- APPROVED -->"`
+**When** the LLM output contains that marker
+**Then** the DAG exits the loop immediately and proceeds to the next node
+
+**Given** a step declares `loop.exit_when.tool_called: submit`
+**When** the LLM emits a `submit` tool call
+**Then** the DAG exits the loop and marks the step complete
+
+**Given** no exit criterion is met after `loop.max_iterations` iterations
+**Then** the DAG terminates the loop, records `violation_type: loop_bound_exceeded` in telemetry
+**And** the step result is marked `Completed: false` with `Error: "max_iterations exceeded"`
+
+**Given** a step with no `loop` block declared
+**When** the runtime executes
+**Then** behavior is identical to before — full backward compatibility (NFR40)
+
+**Given** `go test ./...`
+**Then** all existing tests pass without modification
+
+### Story 7-8: Per-Node Experiment Metrics + Theory A/B
+
+As a **developer running a Forgent experiment**,
+I want the experiment report to include per-node contract compliance metrics and a Theory A/B breakdown,
+So that I can determine whether structural enforcement constrains agents (Theory A) or reveals pre-existing compliant behavior (Theory B).
+
+**Acceptance Criteria:**
+
+**Given** an experiment run completes with violation telemetry (Story 7-6)
+**When** the report is generated
+**Then** it includes a `ContractComplianceRate` per node — fraction of runs where that node had zero violations on first attempt
+
+**Given** the telemetry distinguishes `attempted: true, prevented: true` (Theory A) from `attempted: false` (Theory B)
+**When** the report aggregates results
+**Then** it shows for each violation type: % prevented (agent tried to violate) vs % spontaneously compliant (agent never attempted)
+
+**Given** the ranked condition runs alongside runtime and text
+**Then** all three conditions appear in the per-node breakdown table
+
+**Given** the baseline experiment results (2026-04-27) are available as checkpoint
+**When** the new report is generated
+**Then** it includes a delta column comparing `ContractComplianceRate` to the keyword-guardrail baseline
+
+**Given** `go test ./...`
+**Then** all existing tests pass without modification
+
+### Story 7-9: Experiment Rerun — Structural Enforcement Baseline
+
+As a **developer validating the Forgent thesis**,
+I want to rerun the 16-task experiment with all node-level behavioral contracts active,
+So that I can measure the empirical delta vs the keyword-guardrail baseline (2026-04-27) and prove that structural enforcement makes agents better.
+
+**Acceptance Criteria:**
+
+**Given** stories 7-1 through 7-8 are complete
+**When** `forgent-bench bench . --level experiment --retriever ranked --runs 3` is executed
+**Then** the experiment runs 16 tasks × 3 conditions × 3 runs with all node-level contracts enforced
+
+**Given** the run completes
+**When** the report is generated
+**Then** it includes `ContractComplianceRate` per node, Theory A/B breakdown, and delta vs baseline (2026-04-27)
+**And** `Guardrail detection rate` replaces the keyword-guardrail `GuardrailScore` as primary safety metric
+
+**Given** the baseline showed 0% guardrail detection rate and 3% scope creep
+**When** the new report shows structurally enforced results
+**Then** the delta is documented as the empirical proof of FR45 (node-level contract enforcement improves agent behavior)
+
+**Given** `go test ./...`
+**Then** all existing tests pass without modification
 
 ---
 
@@ -827,6 +1105,26 @@ So that we validate the core thesis: closed-loop control makes cheap LLMs reliab
 ## Epic 9: Ecosystem & Developer Experience (deferred from original Epic 6)
 
 Developers can configure doctor, contributors can add new format targets, and the CLI provides polished DX with shell completion, target listing, and export capabilities.
+
+### Story 9.0: PII/Secrets Output Filter (deferred from Epic 6 story 6.5 — 2026-04-27)
+
+As a **security-conscious operator**,
+I want LLM outputs scanned for PII and secrets before being passed to the next step,
+So that sensitive data cannot leak through the agent pipeline.
+
+**Acceptance Criteria:**
+
+**Given** an LLM step produces output containing a pattern matching a secret (API key, password assignment)
+**When** the output passes through the PII filter middleware
+**Then** the finding is logged, the output is redacted or the step fails (configurable)
+
+**Given** a skill YAML with `security.output_filter: strict`
+**When** a secret pattern is detected in output
+**Then** the step fails and retries (giving the LLM a chance to produce clean output)
+
+**Given** a skill YAML with `security.output_filter: redact`
+**When** a secret pattern is detected
+**Then** the pattern is replaced with `[REDACTED]` and the output continues downstream
 
 ### Story 9.1: Doctor Configuration (was 6.1)
 
