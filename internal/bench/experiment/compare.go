@@ -9,7 +9,14 @@ import (
 // Compare computes deltas between text and runtime conditions with bootstrap
 // confidence intervals. The delta is always runtime - text, so positive values
 // mean runtime outperforms text.
+//
+// Pairs results by TaskID so downstream metrics that pair "by index" are not
+// silently misaligned when SkipMap caused one condition to skip runs the other
+// did not. Tasks present in only one condition are dropped from the comparison
+// rather than aliased against an arbitrary same-index counterpart.
 func Compare(textResults, runtimeResults []TaskResult) *ComparisonResult {
+	textResults, runtimeResults = alignResultsByTaskID(textResults, runtimeResults)
+
 	cr := &ComparisonResult{
 		Tasks:          len(textResults),
 		Runs:           len(textResults),
@@ -293,6 +300,71 @@ func bootstrapCI(text, runtime []TaskResult, metric func(TaskResult) float64) [2
 	return [2]float64{deltas[lo], deltas[hi]}
 }
 
+// alignResultsByTaskID returns text and runtime slices paired by TaskID so
+// downstream "pair by index" metric helpers are never aliased against the
+// wrong task. The order is the iteration order of `text`, with each entry
+// paired against the FIRST runtime result with the same TaskID. Tasks
+// present in only one condition are dropped. When multiple runs of the same
+// TaskID are present (RunsPerTask > 1), runs are paired in the order they
+// appear in each slice (run 0 of text with run 0 of runtime, etc.).
+//
+// Special cases:
+//   - Either input empty: returns (nil, nil) so the caller's post-alignment
+//     length is consistently 0 (no comparison is meaningful).
+//   - Either input has ANY entry with empty TaskID: falls back to positional
+//     pairing up to the shorter length. Without TaskIDs the map-based
+//     alignment would collapse all entries under the empty-string key,
+//     silently dropping every run after the first. Legacy callers and old
+//     checkpoint formats that never set TaskID stay correct on this path.
+func alignResultsByTaskID(text, runtime []TaskResult) ([]TaskResult, []TaskResult) {
+	if len(text) == 0 || len(runtime) == 0 {
+		return nil, nil
+	}
+	if !hasAllTaskIDs(text) || !hasAllTaskIDs(runtime) {
+		n := len(text)
+		if len(runtime) < n {
+			n = len(runtime)
+		}
+		// Slice (not copy) — callers do not mutate inputs.
+		return text[:n], runtime[:n]
+	}
+
+	// Index runtime results by TaskID, preserving slice order so multi-run
+	// pairing is stable.
+	runtimeByID := make(map[string][]int, len(runtime))
+	for i, r := range runtime {
+		runtimeByID[r.TaskID] = append(runtimeByID[r.TaskID], i)
+	}
+
+	textOut := make([]TaskResult, 0, len(text))
+	runtimeOut := make([]TaskResult, 0, len(text))
+
+	consumed := make(map[string]int, len(runtimeByID))
+	for _, t := range text {
+		idxs := runtimeByID[t.TaskID]
+		if consumed[t.TaskID] >= len(idxs) {
+			continue // task only present in text; drop
+		}
+		runtimeIdx := idxs[consumed[t.TaskID]]
+		consumed[t.TaskID]++
+		textOut = append(textOut, t)
+		runtimeOut = append(runtimeOut, runtime[runtimeIdx])
+	}
+	return textOut, runtimeOut
+}
+
+// hasAllTaskIDs reports whether every entry has a non-empty TaskID.
+// Used by alignResultsByTaskID to decide between map-based pairing and
+// positional fallback (legacy callers).
+func hasAllTaskIDs(rs []TaskResult) bool {
+	for _, r := range rs {
+		if r.TaskID == "" {
+			return false
+		}
+	}
+	return true
+}
+
 func resample(results []TaskResult, rng *rand.Rand) []TaskResult {
 	n := len(results)
 	sample := make([]TaskResult, n)
@@ -486,10 +558,57 @@ func stddev(results []TaskResult, metric func(TaskResult) float64) float64 {
 
 // CompareThree computes a comparison across text, runtime, and ranked conditions.
 // The ranked condition is a runtime experiment using a RankedRetriever.
-// Existing text vs runtime deltas are preserved; RankedResults is added for
-// report rendering to produce a third column.
+//
+// Ensures all three columns share the same TaskID denominator so per-column
+// aggregates in `report.go` are comparable. Tasks present in fewer than all
+// three conditions are dropped from the comparison rather than skewing the
+// per-column means with mismatched sample sizes.
+//
+// When TaskIDs are not set on any side (legacy callers), falls through to
+// `Compare` semantics with `rankedResults` truncated to the shared length.
 func CompareThree(textResults, runtimeResults, rankedResults []TaskResult) *ComparisonResult {
+	if len(rankedResults) > 0 &&
+		hasAllTaskIDs(textResults) && hasAllTaskIDs(runtimeResults) && hasAllTaskIDs(rankedResults) {
+		// Three-way intersection: only keep TaskIDs present in all three.
+		// Pair text<->runtime first to preserve their existing alignment
+		// guarantee, then intersect that pairing with ranked.
+		textPaired, runtimePaired := alignResultsByTaskID(textResults, runtimeResults)
+		textPairedAndRanked, rankedPaired := alignResultsByTaskID(textPaired, rankedResults)
+
+		// runtimePaired must be filtered to the same TaskIDs as textPairedAndRanked
+		// so all three columns line up positionally.
+		var runtimeFinal []TaskResult
+		if len(textPairedAndRanked) > 0 {
+			runtimeByID := make(map[string][]int, len(runtimePaired))
+			for i, r := range runtimePaired {
+				runtimeByID[r.TaskID] = append(runtimeByID[r.TaskID], i)
+			}
+			runtimeFinal = make([]TaskResult, 0, len(textPairedAndRanked))
+			consumed := make(map[string]int, len(runtimeByID))
+			for _, t := range textPairedAndRanked {
+				idxs := runtimeByID[t.TaskID]
+				if consumed[t.TaskID] >= len(idxs) {
+					continue
+				}
+				runtimeFinal = append(runtimeFinal, runtimePaired[idxs[consumed[t.TaskID]]])
+				consumed[t.TaskID]++
+			}
+		}
+
+		cr := Compare(textPairedAndRanked, runtimeFinal)
+		cr.RankedResults = rankedPaired
+		return cr
+	}
+
 	cr := Compare(textResults, runtimeResults)
-	cr.RankedResults = rankedResults
+	if len(rankedResults) > 0 {
+		// Legacy/no-TaskID path: positional truncation to keep ranked aligned
+		// to whatever Compare produced.
+		n := len(cr.TextResults)
+		if len(rankedResults) < n {
+			n = len(rankedResults)
+		}
+		cr.RankedResults = rankedResults[:n]
+	}
 	return cr
 }

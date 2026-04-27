@@ -310,8 +310,19 @@ type GuardrailSeverityMetrics struct {
 }
 
 // LoadTasks reads task definitions from YAML files in a directory.
+//
+// The directory is symlink-resolved via filepath.EvalSymlinks before being
+// stored as TaskDir, so TemplateFile path resolution always works against
+// the canonical filesystem location regardless of how the caller reached it.
+// If EvalSymlinks fails (e.g. dir does not exist), falls back to the
+// caller-supplied path — ReadDir below will then surface the underlying error.
 func LoadTasks(dir string) ([]TaskDefinition, error) {
-	entries, err := os.ReadDir(dir)
+	canonicalDir, evalErr := filepath.EvalSymlinks(dir)
+	if evalErr != nil {
+		canonicalDir = dir
+	}
+
+	entries, err := os.ReadDir(canonicalDir)
 	if err != nil {
 		return nil, fmt.Errorf("read tasks dir: %w", err)
 	}
@@ -322,7 +333,7 @@ func LoadTasks(dir string) ([]TaskDefinition, error) {
 			continue
 		}
 
-		data, err := os.ReadFile(filepath.Join(dir, e.Name()))
+		data, err := os.ReadFile(filepath.Join(canonicalDir, e.Name()))
 		if err != nil {
 			return nil, fmt.Errorf("read %s: %w", e.Name(), err)
 		}
@@ -335,7 +346,17 @@ func LoadTasks(dir string) ([]TaskDefinition, error) {
 		if td.ID == "" {
 			td.ID = e.Name()
 		}
-		td.TaskDir = dir
+		// Backfill step IDs the same way td.ID is backfilled. The runtime path
+		// indexes StepResults by step ID and `Validate()` rejects empty IDs;
+		// authoring YAML without per-step IDs (positional steps) was a legal
+		// pattern for the text path before the validation was tightened, and
+		// stays legal here by virtue of the auto-generated unique IDs below.
+		for j := range td.Steps {
+			if td.Steps[j].ID == "" {
+				td.Steps[j].ID = fmt.Sprintf("step%d", j)
+			}
+		}
+		td.TaskDir = canonicalDir
 		tasks = append(tasks, td)
 	}
 
@@ -375,6 +396,10 @@ func IsAPIFatalError(err error) bool {
 }
 
 // Validate checks that the experiment config is complete.
+//
+// Step IDs within a task must be non-empty and unique: `evaluateRuntimeOutputs`
+// and other downstream consumers index step results by ID, so empty or
+// duplicate IDs would silently collapse outputs.
 func (c *ExperimentConfig) Validate() error {
 	if len(c.Tasks) == 0 {
 		return fmt.Errorf("experiment requires at least one task")
@@ -385,6 +410,16 @@ func (c *ExperimentConfig) Validate() error {
 	for i, t := range c.Tasks {
 		if len(t.Steps) == 0 {
 			return fmt.Errorf("task %d (%s) has no steps", i, t.ID)
+		}
+		seenStepIDs := make(map[string]bool, len(t.Steps))
+		for j, step := range t.Steps {
+			if step.ID == "" {
+				return fmt.Errorf("task %d (%s) step %d has empty ID", i, t.ID, j)
+			}
+			if seenStepIDs[step.ID] {
+				return fmt.Errorf("task %d (%s) has duplicate step ID %q", i, t.ID, step.ID)
+			}
+			seenStepIDs[step.ID] = true
 		}
 	}
 	if c.RunsPerTask <= 0 {

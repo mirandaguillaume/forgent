@@ -25,7 +25,12 @@ steps:
 	tasks, err := LoadTasks(dir)
 	require.NoError(t, err)
 	require.Len(t, tasks, 1)
-	assert.Equal(t, dir, tasks[0].TaskDir, "TaskDir should be set to the directory containing the task YAML")
+	// LoadTasks canonicalizes via EvalSymlinks (story 10-0 Task 1.2). On macOS
+	// t.TempDir() returns /var/... which is a symlink to /private/var/...,
+	// so compare via EvalSymlinks rather than the raw input.
+	expectedDir, err := filepath.EvalSymlinks(dir)
+	require.NoError(t, err)
+	assert.Equal(t, expectedDir, tasks[0].TaskDir, "TaskDir should be the canonical (symlink-resolved) directory containing the task YAML")
 }
 
 // T3.2 — template_file resolves relative to task dir, not process CWD.
@@ -180,4 +185,40 @@ func TestRuntime_InlineTemplate_Unaffected(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.True(t, results[0].Completed, "inline template should work regardless of TaskDir")
+}
+
+// TestLoadTasks_ResolvesSymlinkedDir — story 10-0 Task 1.2.
+// LoadTasks must store the canonical (symlink-resolved) directory in TaskDir
+// so TemplateFile path resolution always works against the real location even
+// when callers reach the directory through a symlink.
+func TestLoadTasks_ResolvesSymlinkedDir(t *testing.T) {
+	realDir := t.TempDir()
+
+	// Write a task in the real directory.
+	taskYAML := `id: linked-task
+name: Linked
+input: code
+steps:
+  - id: step1
+    prompt: do it
+    produces: [output]
+`
+	require.NoError(t, os.WriteFile(filepath.Join(realDir, "task.yaml"), []byte(taskYAML), 0644))
+
+	// Create a symlink that points to the real dir, then load via the symlink.
+	linkParent := t.TempDir()
+	link := filepath.Join(linkParent, "linked-tasks")
+	if err := os.Symlink(realDir, link); err != nil {
+		t.Skipf("symlinks not supported on this platform: %v", err)
+	}
+
+	tasks, err := LoadTasks(link)
+	require.NoError(t, err)
+	require.Len(t, tasks, 1)
+
+	// EvalSymlinks may add or strip /private prefix on macOS — compare via EvalSymlinks itself.
+	expectedDir, err := filepath.EvalSymlinks(realDir)
+	require.NoError(t, err)
+	assert.Equal(t, expectedDir, tasks[0].TaskDir,
+		"TaskDir must be the canonical (symlink-resolved) directory")
 }

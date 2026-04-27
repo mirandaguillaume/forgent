@@ -20,14 +20,26 @@ import (
 // effectiveGuardrails returns the guardrails to enforce for a given step.
 // Step-level guardrails take precedence when declared; otherwise the task-level
 // guardrails are used, preserving full backward compatibility (NFR40).
+//
+// Returns a defensive copy so callers may sort, append, or otherwise mutate
+// the result without affecting the underlying StepDef or TaskDefinition.
+// Required because effectiveGuardrails is called from per-step closures that
+// run concurrently under DAG execution; aliasing the source slice would risk
+// races if any caller decided to filter or extend it.
 func effectiveGuardrails(step StepDef, task TaskDefinition) []string {
 	if step.DisableTaskGuardrails {
 		return nil
 	}
-	if len(step.Guardrails) > 0 {
-		return step.Guardrails
+	src := step.Guardrails
+	if len(src) == 0 {
+		src = task.Guardrails
 	}
-	return task.Guardrails
+	if len(src) == 0 {
+		return nil
+	}
+	out := make([]string, len(src))
+	copy(out, src)
+	return out
 }
 
 // RunRuntimeExperiment executes all tasks as Forgent DAG agents.
@@ -494,6 +506,12 @@ func buildTaskDAG(task TaskDefinition, provider llm.Provider, sandbox *SandboxFS
 // taskContextContent builds the content of task_context.md from a task definition.
 // This file is always present in the sandbox so any step can access full task context
 // via file_read without it being injected inline into the prompt.
+//
+// Includes both task-level guardrails and any step-level guardrail declarations
+// so the audit file matches what the prompt sees at execution time. Without
+// this, an agent reading task_context.md to understand "what rules apply"
+// would only see the task-level set even when the step it is currently
+// executing has its own overriding step.Guardrails.
 func taskContextContent(task TaskDefinition) []byte {
 	var ctx strings.Builder
 	fmt.Fprintf(&ctx, "# Task: %s\n\n", task.Name)
@@ -502,9 +520,44 @@ func taskContextContent(task TaskDefinition) []byte {
 	}
 	fmt.Fprintf(&ctx, "## Original Input\n%s\n\n", task.Input)
 	if len(task.Guardrails) > 0 {
-		ctx.WriteString("## Guardrails\n")
+		ctx.WriteString("## Guardrails (task-level)\n")
 		for _, g := range task.Guardrails {
 			fmt.Fprintf(&ctx, "- %s\n", g)
+		}
+		ctx.WriteString("\n")
+	}
+	stepLevelHeaderEmitted := false
+	for _, step := range task.Steps {
+		if len(step.Guardrails) == 0 && !step.DisableTaskGuardrails {
+			continue
+		}
+		if !stepLevelHeaderEmitted {
+			ctx.WriteString("## Guardrails (step-level overrides)\n")
+			stepLevelHeaderEmitted = true
+		}
+		stepName := step.ID
+		if step.Name != "" {
+			stepName = step.Name
+		}
+		// effectiveGuardrails short-circuits on DisableTaskGuardrails and returns nil
+		// regardless of step.Guardrails. The audit file must reflect that — rendering
+		// step.Guardrails when DisableTaskGuardrails is set would tell the agent
+		// rules apply when the runtime ignores them. The annotation distinguishes
+		// the two cases (task-level disabled with no step-level vs task-level
+		// disabled WITH step-level declared but suppressed) so a line-by-line
+		// reader does not read the first bullet as the complete picture.
+		if step.DisableTaskGuardrails {
+			if len(step.Guardrails) > 0 {
+				fmt.Fprintf(&ctx, "- %s: (task-level disabled, step-level suppressed)\n", stepName)
+				ctx.WriteString("  (step-level guardrails declared but suppressed by disable_task_guardrails)\n")
+			} else {
+				fmt.Fprintf(&ctx, "- %s: (no guardrails — task-level disabled)\n", stepName)
+			}
+			continue
+		}
+		fmt.Fprintf(&ctx, "- %s:\n", stepName)
+		for _, g := range step.Guardrails {
+			fmt.Fprintf(&ctx, "  - %s\n", g)
 		}
 	}
 	return []byte(ctx.String())
@@ -519,6 +572,14 @@ func buildSandboxFromWorkspace(task TaskDefinition) *SandboxFS {
 	// buildTaskDAG will also Write it (overwrite), but for ReadOnly workspaces
 	// this pre-population is the only way the file gets created.
 	files["task_context.md"] = taskContextContent(task)
+
+	// Pre-populate slots/task_input.md so file_read("slots/task_input.md") resolves.
+	// task_context.md already includes the task input as part of its rendered content,
+	// but agents that probe the slot path directly (a natural guess given other slots
+	// live under slots/) should not see "not found" — they should get the input.
+	if task.Input != "" {
+		files["slots/task_input.md"] = []byte(task.Input)
+	}
 
 	if task.Workspace != nil {
 		for _, f := range task.Workspace.Files {
@@ -545,12 +606,16 @@ func buildSandboxFromWorkspace(task TaskDefinition) *SandboxFS {
 	}
 
 	// When the policy is already restrictive, also allow task context and slot files.
+	// Populate `seen` after each append so the guards are symmetric and a
+	// later contributor extending this block cannot accidentally double-add.
 	if len(allowedGlobs) > 0 {
 		if !seen["task_context.md"] {
 			allowedGlobs = append(allowedGlobs, "task_context.md")
+			seen["task_context.md"] = true
 		}
 		if !seen["slots/**"] {
 			allowedGlobs = append(allowedGlobs, "slots/**")
+			seen["slots/**"] = true
 		}
 	}
 
@@ -617,17 +682,22 @@ func evaluateRuntimeOutputs(task TaskDefinition, outputs map[string]any) TaskRes
 	// GuardrailScore: per-step evaluation using effectiveGuardrails.
 	// Each step's output is checked against its own effective guardrails (step-level
 	// when declared, task-level as fallback). Steps with no effective guardrails are skipped.
+	//
+	// Look up StepResult by step ID rather than by slice index so the correlation
+	// is robust to any future change in DAG execution order or result-ordering
+	// (e.g. parallel-layer scheduling that completes steps out of declaration order).
+	resultByStepID := make(map[string]string, len(result.StepResults))
+	for _, sr := range result.StepResults {
+		resultByStepID[sr.StepID] = sr.Output
+	}
 	totalGuardrails := 0
 	respectedGuardrails := 0
-	for i, step := range task.Steps {
+	for _, step := range task.Steps {
 		gs := effectiveGuardrails(step, task)
 		if len(gs) == 0 {
 			continue
 		}
-		var output string
-		if i < len(result.StepResults) {
-			output = strings.ToLower(result.StepResults[i].Output)
-		}
+		output := strings.ToLower(resultByStepID[step.ID])
 		for _, g := range gs {
 			totalGuardrails++
 			if checkGuardrail(output, g) {
