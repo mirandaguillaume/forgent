@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"runtime/debug"
 	"sort"
 	"strings"
 	"time"
@@ -64,7 +65,7 @@ func wrapWithPanic(n *dag.Node) *dag.Node {
 	n.Run = func(ctx context.Context, inputs map[string]any) (out map[string]any, err error) {
 		defer func() {
 			if r := recover(); r != nil {
-				panicErr := fmt.Errorf("panic: %v", r)
+				panicErr := fmt.Errorf("panic: %v\nstack:\n%s", r, debug.Stack())
 				err = &NodeError{
 					NodeID:    nodeID,
 					InputKeys: sortedKeys(inputs),

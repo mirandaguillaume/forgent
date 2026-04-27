@@ -1,6 +1,7 @@
 package forgent
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,8 +35,12 @@ func (g *forgentGenerator) GenerateAgent(agent model.AgentComposition, skills []
 	modDir := filepath.Join(outputDir, safe)
 	if err := os.MkdirAll(modDir, 0755); err == nil {
 		modContent := GenerateGoMod(agent.Agent)
-		_ = os.WriteFile(filepath.Join(modDir, "go.mod"), []byte(modContent), 0644)
-		_ = os.WriteFile(filepath.Join(modDir, "go.sum"), []byte(""), 0644)
+		if err := os.WriteFile(filepath.Join(modDir, "go.mod"), []byte(modContent), 0644); err != nil {
+			fmt.Fprintf(os.Stderr, "warn: write go.mod for %s: %v\n", safe, err)
+		}
+		if err := os.WriteFile(filepath.Join(modDir, "go.sum"), []byte(""), 0644); err != nil {
+			fmt.Fprintf(os.Stderr, "warn: write go.sum for %s: %v\n", safe, err)
+		}
 	}
 	return GenerateAgentGo(agent, skills)
 }

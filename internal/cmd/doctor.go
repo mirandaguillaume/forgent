@@ -13,7 +13,9 @@ import (
 	"time"
 
 	"github.com/fatih/color"
+	fconfig "github.com/mirandaguillaume/forgent/internal/config"
 	"github.com/mirandaguillaume/forgent/internal/doctor"
+	"github.com/mirandaguillaume/forgent/internal/doctor/export"
 	"github.com/mirandaguillaume/forgent/internal/doctor/analyzer"
 	doctorctx "github.com/mirandaguillaume/forgent/internal/doctor/context"
 	docindex "github.com/mirandaguillaume/forgent/internal/doctor/index"
@@ -36,6 +38,7 @@ func init() {
 	var modelFlag string
 	var debugFlag bool
 	var updateRegistryFlag bool
+	var exportYAMLFlag bool
 	var fixFlag bool
 	var forceFlag bool
 	var noCacheFlag bool
@@ -54,6 +57,18 @@ produce research-backed recommendations to improve it.
 When given a directory, discovers all agent files recursively and
 produces an aggregate summary after individual file results.
 
+Configuration (ADR-7 precedence: flags > env > config file > defaults):
+  Config file : .forgent/config.yaml (searched from CWD up to filesystem root)
+  Env vars    : FORGENT_PROVIDER, FORGENT_MODEL, FORGENT_DEBUG
+
+Sample .forgent/config.yaml:
+  doctor:
+    provider: ollama
+    model: llama4-scout
+    confidence_threshold: moderate
+    backup_retention: 168h
+    debug: false
+
 Examples:
   forgent doctor .claude/agents/code-reviewer.md
   forgent doctor .github/agents/dash.agent.md
@@ -64,8 +79,120 @@ Examples:
   forgent doctor agent.md --fix --force               # skip diff-size check
   forgent doctor --update-registry                    # download latest registry`,
 		Args: cobra.MaximumNArgs(1),
+		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			if len(args) >= 1 {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			return []string{"md", "yaml", "yml"}, cobra.ShellCompDirectiveFilterFileExt
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cwd, _ := os.Getwd()
+
+			// Config resolution: flags > env > config file > defaults (ADR-7).
+			origProvider := providerFlag
+			origModel := modelFlag
+			origDebug := debugFlag
+			debugChanged := cmd.Flags().Changed("debug")
+			cfg, cfgErr := fconfig.Load(cwd)
+			if cfgErr != nil {
+				cfg = &fconfig.Config{}
+			}
+			cfgProvider := cfg.Doctor.Provider
+			cfgModel := cfg.Doctor.Model
+			cfgDebug := cfg.Doctor.Debug
+			fconfig.ApplyEnv(cfg)
+			fconfig.ApplyFlags(cfg, origProvider, origModel, origDebug, debugChanged)
+			providerFlag = cfg.Doctor.Provider
+			modelFlag = cfg.Doctor.Model
+			debugFlag = cfg.Doctor.Debug
+
+			if cfgErr != nil {
+				fmt.Fprintf(os.Stderr, "forgent: warning: config load error (using defaults): %v\n", cfgErr)
+			}
+			if debugFlag {
+				logResolved := func(name, flagVal, envKey, fileVal, resolved string) {
+					source := "default (auto-detect)"
+					switch {
+					case flagVal != "":
+						source = "flag"
+					case os.Getenv(envKey) != "":
+						source = "env"
+					case fileVal != "":
+						source = "config file"
+					}
+					if resolved != "" {
+						fmt.Fprintf(os.Stderr, "[DEBUG] Config: %s=%q (from: %s)\n", name, resolved, source)
+					}
+				}
+				logResolved("provider", origProvider, "FORGENT_PROVIDER", cfgProvider, providerFlag)
+				logResolved("model", origModel, "FORGENT_MODEL", cfgModel, modelFlag)
+
+				// debug source
+				debugSource := "default (false)"
+				switch {
+				case debugChanged:
+					debugSource = "flag"
+				case os.Getenv("FORGENT_DEBUG") != "":
+					debugSource = "env"
+				case cfgDebug:
+					debugSource = "config file"
+				}
+				fmt.Fprintf(os.Stderr, "[DEBUG] Config: debug=%v (from: %s)\n", debugFlag, debugSource)
+
+				// config-file-only fields
+				if cfg.Doctor.ConfidenceThreshold != "" {
+					fmt.Fprintf(os.Stderr, "[DEBUG] Config: confidence_threshold=%q (from: config file)\n", cfg.Doctor.ConfidenceThreshold)
+				}
+				if cfg.Doctor.BackupRetention != 0 {
+					fmt.Fprintf(os.Stderr, "[DEBUG] Config: backup_retention=%v (from: config file)\n", cfg.Doctor.BackupRetention)
+				}
+				if cfg.Doctor.RegistryPath != "" {
+					fmt.Fprintf(os.Stderr, "[DEBUG] Config: registry_path=%q (from: config file)\n", cfg.Doctor.RegistryPath)
+				}
+			}
+
+			// --export-yaml: parse agent file, emit Forgent skill YAML to stdout.
+			if exportYAMLFlag {
+				if fixFlag {
+					return fmt.Errorf("--export-yaml cannot be combined with --fix")
+				}
+				// P3: --update-registry would be silently ignored after export exits; reject explicitly.
+				if updateRegistryFlag {
+					return fmt.Errorf("--export-yaml cannot be combined with --update-registry")
+				}
+				if len(args) == 0 {
+					return fmt.Errorf("--export-yaml requires a file argument")
+				}
+				target := args[0]
+				info, statErr := os.Stat(target)
+				if statErr != nil {
+					return fmt.Errorf("cannot access %s: %w", target, statErr)
+				}
+				if info.IsDir() {
+					return fmt.Errorf("--export-yaml requires a file, not a directory")
+				}
+				content, readErr := os.ReadFile(target)
+				if readErr != nil {
+					return fmt.Errorf("cannot read %s: %w", target, readErr)
+				}
+				p, parseErr := parser.DetectFormat(target, content)
+				if parseErr != nil {
+					return fmt.Errorf("cannot detect format of %s: %w", target, parseErr)
+				}
+				analysis, analysisErr := p.Parse(content)
+				if analysisErr != nil {
+					return fmt.Errorf("parse error in %s: %w", target, analysisErr)
+				}
+				yamlBytes, exportErr := export.ToSkillYAML(analysis, target)
+				if exportErr != nil {
+					return fmt.Errorf("export: %w", exportErr)
+				}
+				// P4: propagate write errors (e.g. broken pipe in CI pipelines)
+				if _, err := cmd.OutOrStdout().Write(yamlBytes); err != nil {
+					return fmt.Errorf("write output: %w", err)
+				}
+				return nil
+			}
 
 			// Load research registry
 			reg, err := registry.Load(cwd)
@@ -153,6 +280,7 @@ Examples:
 	doctorCmd.Flags().StringVar(&modelFlag, "model", "", "LLM model name (provider-specific)")
 	doctorCmd.Flags().BoolVar(&debugFlag, "debug", false, "Show debug output on stderr")
 	doctorCmd.Flags().BoolVar(&updateRegistryFlag, "update-registry", false, "Download the latest research registry and exit")
+	doctorCmd.Flags().BoolVar(&exportYAMLFlag, "export-yaml", false, "Export parsed analysis as Forgent skill YAML to stdout")
 	doctorCmd.Flags().BoolVar(&fixFlag, "fix", false, "Generate AGENTS.md index + specialized files from agent file")
 	doctorCmd.Flags().BoolVar(&forceFlag, "force", false, "Skip diff-size sanity check (use with --fix)")
 	doctorCmd.Flags().BoolVar(&noCacheFlag, "no-cache", false, "Bypass LLM response cache")
@@ -657,10 +785,16 @@ func analyzeFile(ctx context.Context, filePath, providerFlag, modelFlag string, 
 			len(analysis.Sections), len(analysis.Tools), len(analysis.Frontmatter))
 	}
 
-	// Select provider
+	// Select provider. Always surface unavailability so non-debug runs see why
+	// LLM-dependent analysis was skipped (rather than silently producing
+	// static-only results).
 	provider, providerName, provErr := selectProvider(providerFlag, modelFlag, debugFlag)
-	if provErr != nil && debugFlag {
-		fmt.Fprintf(os.Stderr, "[DEBUG] No LLM: %s\n", provErr)
+	if provErr != nil {
+		if debugFlag {
+			fmt.Fprintf(os.Stderr, "[DEBUG] No LLM: %s\n", provErr)
+		} else {
+			fmt.Fprintf(os.Stderr, "warn: LLM unavailable, running static checks only: %s\n", provErr)
+		}
 	}
 
 	// Cache check (only when provider is available)

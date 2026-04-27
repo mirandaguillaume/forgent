@@ -14,6 +14,10 @@ type ReportOpts struct {
 
 // FormatReport produces a Markdown report from experiment results.
 func FormatReport(cr *ComparisonResult, opts ReportOpts) string {
+	if cr == nil {
+		return "# Runtime vs Text Experiment Report\n\n_No results: comparison input was nil._\n"
+	}
+
 	var sb strings.Builder
 
 	sb.WriteString("# Runtime vs Text Experiment Report\n\n")

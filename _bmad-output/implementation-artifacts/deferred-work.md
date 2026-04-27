@@ -1,5 +1,63 @@
 # Deferred Work
 
+## Triage 2026-04-27 (Epic 9 retro action #3)
+
+**Status:** Full triage done. See `deferred-work-triage-2026-04-27.md` for the per-item table.
+
+| Bucket | Count | Meaning |
+|---|---|---|
+| **A** | 33 | Epic 10 prerequisite — fix before/during stories 10-3..10-9 |
+| **B** | 60 | Post-MVP — real but not urgent |
+| **C** | 16 | Won't fix — close (intentional trade-off, resolved, or accepted risk) |
+
+**Top 5 Bucket A items (Epic 10 critical path):**
+1. TOCTOU lock gap in `SandboxFS.Read` (story 6-21) — blocks 10-3 (file-level permissions)
+2. `TaskDir` unset in 15+ test constructions (10-2) — falsifies 10-4 (output contract validation) metrics
+3. `provErr` swallows + `executeLayerBased` single-error drain (4-2) — blocks 10-6 (violation telemetry)
+4. Tool-call loop `toolPrompt` reset + unbounded growth (6-21) — blocks 10-7 (loop bounds)
+5. AC4/AC5 16-task experiment rerun (6-21) — IS story 10-9, fuse not a separate fix
+
+**Items already addressed in Epic 9 retro action #1 (swallow & continue audit, 2026-04-27):**
+- `_ = sandbox.Write(...)` ×3 in `runtime_runner.go` → log to stderr
+- `_ = cpWriter.Append(...)` ×3 in `bench.go` → log to stderr
+- `_ = os.WriteFile(...)` ×3 (flush snapshots) in `bench.go` → log to stderr
+- `_ = os.WriteFile(go.mod/go.sum)` in `forgent.go` generator → log to stderr
+- `_ = json.Unmarshal(report)` in `appendH2HReport` → log on corrupt + rebuild
+
+**Quick wins applied 2026-04-27 (Epic 9 retro post-triage):**
+- ✅ TOCTOU `SandboxFS.Read` (6-21) — single exclusive `Lock` for entire policy check + read in `internal/bench/experiment/sandbox.go`
+- ✅ `executeLayerBased` + `executeEventDriven` only drained first error (4-2) — drain all errors and return `errors.Join(errs...)` in `pkg/dag/execute.go`
+- ✅ `provErr` silently swallows LLM unavailability (4-2) — always log to stderr (warn) outside debug mode in `internal/cmd/doctor.go`
+- ✅ `FormatReport` nil panic (5-2) — added nil guard returning placeholder report in `internal/bench/experiment/report.go`
+- ✅ Bootstrap CI degenerate with n=1 (5-2) — return `[0,0]` when either condition has fewer than 2 results in `internal/bench/experiment/compare.go`
+- ✅ Spinner `started` field data race (6-0) — `atomic.Bool` in `internal/doctor/spinner.go`
+- ✅ Panic wrapper swallows stack trace (4-3) — `runtime/debug.Stack()` captured in `NodeError` in `internal/doctor/diagnostic.go`
+- ✅ `gate.go` `computeMetrics` Severity (6-0) — verified already fixed; effectiveSeverity pattern present (`sev := f.Severity; if sev == "" { sev = f.Confidence }`)
+- ✅ `secrets.go` `inCodeFence` skip (6-0) — verified already fixed; `if inCodeFence { continue }` present
+
+## Closed Bucket C — 2026-04-27 (won't fix)
+
+Sixteen items reviewed and accepted as-is, with the rationale below. They remain in their original sections for traceability but are no longer tracked as actionable.
+
+| Source story | Item | Why closed |
+|---|---|---|
+| 1.1 | No `io.LimitReader` on API responses | Theoretical OOM; trusted endpoints; no exploitation path |
+| 1.1 | `ParseFindings` nil/nil ambiguity | Resolved by Story 1.5 schema validation |
+| 1.1 | No retry on 429 rate limit | Pre-existing pattern; user can retry |
+| 4-0 | Cache key migration: no explicit invalidation | TTL (7 days) handles drift; documented |
+| 4-0 | 32-bit prefix collision in `Purge` | Negligible at realistic cache sizes; documented trade-off |
+| 4-0 | Concurrent `Purge`+`Put` logical race | Architectural; only matters with concurrent analysis |
+| 4-2 | FR50 gap: `BuildDAG` hardcoded | Tracked TODO in code; deliberate Epic-scoped deferral |
+| 5-2 | Unresolved `consumes` silently ignored | Pre-existing `pkg/dag` semantics; intentional |
+| 5-3 | Forgent `Validate()` ignores `original` | Identity validation trivially correct |
+| 6-19 | Empty `consumes[]` on first node skips task_input | Pre-existing DAG guard logic; by design |
+| 6-19 | `ResolveTemplate` never called in runtime path | Resolved by 6-20 / 10-2 |
+| 6-19 | Unknown YAML fields silently ignored | `gopkg.in/yaml.v3` library limitation |
+| 6-21 | Guardrails injected inline alongside file listing | Intentional; payload small; visibility required |
+| 6-21 | Consuming step pre-write attribution in audit | Cosmetic; audit metadata only |
+| 6-21 | `funcProvider` missing compile-time interface guard | Style consistency only |
+| 10-1 | Negative guardrail (`!prefix`) not tested in step-level tests | Pre-existing logic; not regressed by this story |
+
 ## Epic backlog: node-level behavioral contracts (2026-04-27)
 
 **Vision:** Behaviors (guardrails, tool permissions, I/O contracts, loop bounds) are node-level, not agent or task-level. A `StepDef` carries its complete behavioral contract. The task YAML becomes pure topology. The runtime enforces everything at each node boundary.
@@ -196,3 +254,22 @@ Motivation : les guardrails keyword (`!LGTM`, `!safe`) sont des proxies sémanti
 
 - **`RankedRetriever` breaks early without trying smaller chunks** — when no chunk fits within `MaxTokens` budget, returns empty result without retrying with smaller chunk sizing. Optimization opportunity.
 - **`CompareThree` missing ranked deltas; ranked table missing 95% CI** — the 3-condition report omits delta computation for the ranked column and confidence intervals; enhancement beyond story 6-22 scope.
+
+## Deferred from: code review of 10-1-node-level-guardrails (2026-04-27)
+
+- **`taskContextContent` doesn't include step-level guardrails** — `task_context.md` in the sandbox lists only task-level guardrails; step-level ones are injected in the step prompt but absent from the audit file. Out of scope for 10-1.
+- **`effectiveGuardrails` returns reference not copy** — alias risk if slices are mutated in future concurrent contexts. Pre-existing pattern; safe for current single-threaded-per-step model.
+- **Three ad-hoc mock provider types in test package** — `mockExpProvider`, `mockGuardrailProvider`, `callCountingMock` with no shared abstraction. Test organization debt.
+- **`effectiveGuardrails` undocumented return-reference semantics** — should note it returns a slice header, not a defensive copy.
+- **3-retry exhaustion case not tested for step-level guardrails** — `maxAttempts := 3` pre-existing logic; test only covers 2-attempt path.
+- **Negative guardrail (`!prefix`) semantics not tested in new step-level tests** — `checkGuardrail` negation logic is pre-existing; not regressed by this story.
+
+## Deferred from: code review of 10-2-fix-template-file-runtime (2026-04-27)
+
+- **Error message wording: "escapes base directory" ≠ "escapes task directory" (AC2)** — `slotspec.go:61` says "escapes base directory"; AC2 requires "escapes task directory". Pre-existing wording, not caused by this change. Update if error messages become user-facing or tested.
+- **StepResults ordering assumes sequential DAG execution** — `evaluateRuntimeOutputs` correlates `StepResults[i]` with `task.Steps[i]` by position; this assumption breaks under future parallel DAG execution. Deferred until parallelism is introduced.
+- **TOCTOU symlink race in ResolveTemplate** — path validated via `filepath.Rel`, then read via `os.ReadFile`; symlink could be swapped between check and read. Pre-existing in `slotspec.go`.
+- **Concurrent StepDef.Sandbox mutation in per-step closure** — `stepCopy.Sandbox = &StepSandboxPolicy{...}` mutates inside closure; races with concurrent DAG node execution. Pre-existing.
+- **TaskDir not symlink-resolved in LoadTasks** — `td.TaskDir = dir` stores `dir` without `filepath.EvalSymlinks`; symlink-accessed task dirs may resolve TemplateFile paths to unintended locations. Low-risk edge case.
+- **`effectiveGuardrails` returns direct slice reference** — same as deferred in 10-1; alias risk if callers mutate; safe for current sequential model.
+- **TaskDir unset in 15+ programmatic TaskDefinition constructions across tests** — latent risk: any test that adds a `TemplateFile` slot to a directly-constructed `TaskDefinition` will silently skip the quality gate. Not an active bug.

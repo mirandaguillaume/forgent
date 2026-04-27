@@ -42,6 +42,9 @@ type TaskDefinition struct {
 	// Tool-based tasks (Story 5-4)
 	Workspace          *WorkspaceDef `yaml:"workspace,omitempty"`
 	ExpectedViolations []string      `yaml:"expected_violations,omitempty"`
+
+	// Runtime-only: set by LoadTasks, never serialized.
+	TaskDir string `yaml:"-"`
 }
 
 // WorkspaceDef defines the virtual filesystem for tool-based tasks.
@@ -71,16 +74,18 @@ const (
 
 // StepDef defines a single step within a multi-step task.
 type StepDef struct {
-	ID       string   `yaml:"id"`
-	Name     string   `yaml:"name"`
-	Kind     StepKind `yaml:"kind,omitempty"`     // default "" = llm
-	Prompt   string   `yaml:"prompt,omitempty"`   // for kind: llm
-	Template string   `yaml:"template,omitempty"` // for kind: static (Go text/template)
-	Check    string   `yaml:"check,omitempty"`    // for kind: assert (check function name)
-	Consumes []SlotSpec `yaml:"consumes"`
-	Produces []SlotSpec `yaml:"produces"`
+	ID         string     `yaml:"id"`
+	Name       string     `yaml:"name"`
+	Kind       StepKind   `yaml:"kind,omitempty"`       // default "" = llm
+	Prompt     string     `yaml:"prompt,omitempty"`     // for kind: llm
+	Template   string     `yaml:"template,omitempty"`   // for kind: static (Go text/template)
+	Check      string     `yaml:"check,omitempty"`      // for kind: assert (check function name)
+	Guardrails            []string `yaml:"guardrails,omitempty"`              // step-level; overrides task-level guardrails for this step when non-empty
+	DisableTaskGuardrails bool     `yaml:"disable_task_guardrails,omitempty"` // when true, no guardrails enforced for this step (even if task declares some)
+	Consumes   []SlotSpec `yaml:"consumes"`
+	Produces   []SlotSpec `yaml:"produces"`
 	// Tool-based steps (Story 5-4)
-	Tools   []string          `yaml:"tools,omitempty"`   // e.g. ["file_read", "file_write"]
+	Tools   []string           `yaml:"tools,omitempty"`
 	Sandbox *StepSandboxPolicy `yaml:"sandbox,omitempty"`
 }
 
@@ -330,6 +335,7 @@ func LoadTasks(dir string) ([]TaskDefinition, error) {
 		if td.ID == "" {
 			td.ID = e.Name()
 		}
+		td.TaskDir = dir
 		tasks = append(tasks, td)
 	}
 

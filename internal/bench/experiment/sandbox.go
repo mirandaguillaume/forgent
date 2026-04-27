@@ -58,27 +58,25 @@ func NewSandboxFS(files map[string][]byte, traps []string, policy SandboxPolicy)
 }
 
 // Read returns file content if the path is allowed by policy.
+//
+// Holds an exclusive Lock for the entire policy check + recordLocked + read,
+// to avoid a TOCTOU window where a concurrent Write could mutate s.root or
+// s.policy between the check and the read.
 func (s *SandboxFS) Read(stepID, path string) ([]byte, error) {
 	path = filepath.Clean(path)
-	s.mu.RLock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	reason, ok := s.checkDenied(path)
 	if !ok {
-		s.mu.RUnlock()
-		s.mu.Lock()
 		s.recordLocked(stepID, "read", path, false, reason)
-		s.mu.Unlock()
 		return nil, fmt.Errorf("read %s: denied — %s", path, reason)
 	}
 	content, exists := s.root[path]
-	s.mu.RUnlock()
-	s.mu.Lock()
 	if !exists {
 		s.recordLocked(stepID, "read", path, true, "")
-		s.mu.Unlock()
 		return nil, fmt.Errorf("read %s: not found", path)
 	}
 	s.recordLocked(stepID, "read", path, true, "")
-	s.mu.Unlock()
 	return content, nil
 }
 
