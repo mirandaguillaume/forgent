@@ -241,7 +241,7 @@ InstructionBench measures recommendation quality across a corpus of real agent f
 Developers can configure doctor defaults, list available targets, export analysis as YAML, and generate shell completion. Contributors have a documented workflow for adding new format targets.
 **FRs covered:** FR54, FR55, FR56, FR57, FR58
 
-### Epic 7: Node-Level Behavioral Contracts
+### Epic 10: Node-Level Behavioral Contracts
 Le développeur peut déclarer des contrats comportementaux complets (guardrails, tool permissions, schéma I/O via template, loop bounds, sandbox réseau) au niveau de chaque step individuel. Le runtime Forgent les enforce structurellement à chaque boundary de node — intercept-before-execute pour les tools, template validation pour les outputs, HTTP proxy pour le réseau. L'expérience rerun démontre empiriquement que cet enforcement structurel surpasse le baseline keyword-guardrail établi en Epic 6.
 **FRs covered:** FR45 (étendu), FR52 (rerun), FR59, FR60, FR61, FR62, FR63, FR64, FR65, FR66, FR67
 
@@ -258,7 +258,7 @@ Le développeur peut déclarer des contrats comportementaux complets (guardrails
 
 ---
 
-## Epic 7: Node-Level Behavioral Contracts
+## Epic 10: Node-Level Behavioral Contracts
 
 Le développeur peut déclarer des contrats comportementaux complets au niveau de chaque step. Le runtime les enforce structurellement à chaque boundary — intercept-before-execute pour les tools, template validation pour les outputs, HTTP proxy pour le réseau. L'expérience rerun produit la preuve empirique vs le baseline keyword-guardrail.
 

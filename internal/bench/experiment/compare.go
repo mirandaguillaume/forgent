@@ -258,8 +258,12 @@ func meanLLMCalls(results []TaskResult) float64 {
 
 // bootstrapCI computes a 95% confidence interval for the delta between
 // text and runtime conditions using bootstrap resampling.
+//
+// Returns [0, 0] when either condition has fewer than 2 results: with n=1
+// every resample produces the same singleton mean, so the CI degenerates
+// to a point estimate that is not statistically meaningful.
 func bootstrapCI(text, runtime []TaskResult, metric func(TaskResult) float64) [2]float64 {
-	if len(text) == 0 || len(runtime) == 0 {
+	if len(text) < 2 || len(runtime) < 2 {
 		return [2]float64{0, 0}
 	}
 

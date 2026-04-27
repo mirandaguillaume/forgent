@@ -1321,7 +1321,10 @@ type H2HReport struct {
 func appendH2HReport(path string, result *bench.H2HResult) error {
 	var report H2HReport
 	if data, err := os.ReadFile(path); err == nil {
-		_ = json.Unmarshal(data, &report)
+		if jsonErr := json.Unmarshal(data, &report); jsonErr != nil {
+			fmt.Fprintf(os.Stderr, "warn: existing H2H report at %s is corrupt, rebuilding: %v\n", path, jsonErr)
+			report = H2HReport{}
+		}
 	}
 
 	// Upsert contestants by name
@@ -1633,12 +1636,14 @@ func runExperimentBench(cmd *cobra.Command) error {
 			SkipMap:     map[string]int{task.ID: textSkipMap[task.ID]},
 			OnResult: func(r experiment.TaskResult, run int) {
 				if cpWriter != nil {
-					_ = cpWriter.Append(experiment.CheckpointEntry{
+					if err := cpWriter.Append(experiment.CheckpointEntry{
 						TaskID:    r.TaskID,
 						Condition: "text",
 						Run:       run,
 						Result:    experiment.ToResultJSON(r),
-					})
+					}); err != nil {
+						fmt.Fprintf(os.Stderr, "warn: checkpoint append text/%s/run%d: %v\n", r.TaskID, run, err)
+					}
 				}
 			},
 		}
@@ -1661,12 +1666,14 @@ func runExperimentBench(cmd *cobra.Command) error {
 			SkipMap:     map[string]int{task.ID: runtimeSkipMap[task.ID]},
 			OnResult: func(r experiment.TaskResult, run int) {
 				if cpWriter != nil {
-					_ = cpWriter.Append(experiment.CheckpointEntry{
+					if err := cpWriter.Append(experiment.CheckpointEntry{
 						TaskID:    r.TaskID,
 						Condition: "runtime",
 						Run:       run,
 						Result:    experiment.ToResultJSON(r),
-					})
+					}); err != nil {
+						fmt.Fprintf(os.Stderr, "warn: checkpoint append runtime/%s/run%d: %v\n", r.TaskID, run, err)
+					}
 				}
 			},
 		}
@@ -1694,12 +1701,14 @@ func runExperimentBench(cmd *cobra.Command) error {
 				Condition:        condLabel,
 				OnResult: func(r experiment.TaskResult, run int) {
 					if cpWriter != nil {
-						_ = cpWriter.Append(experiment.CheckpointEntry{
+						if err := cpWriter.Append(experiment.CheckpointEntry{
 							TaskID:    r.TaskID,
 							Condition: condLabel,
 							Run:       run,
 							Result:    experiment.ToResultJSON(r),
-						})
+						}); err != nil {
+							fmt.Fprintf(os.Stderr, "warn: checkpoint append %s/%s/run%d: %v\n", condLabel, r.TaskID, run, err)
+						}
 					}
 				},
 			}
@@ -1750,7 +1759,9 @@ func runExperimentBench(cmd *cobra.Command) error {
 		}
 		flushPath := strings.TrimSuffix(outputPath, filepath.Ext(outputPath)) + ".text.json"
 		if data, jsonErr := json.MarshalIndent(textJSON, "", "  "); jsonErr == nil {
-			_ = os.WriteFile(flushPath, data, 0644)
+			if err := os.WriteFile(flushPath, data, 0644); err != nil {
+				fmt.Fprintf(os.Stderr, "warn: flush text snapshot to %s: %v\n", flushPath, err)
+			}
 		}
 
 		rtJSON := make([]experiment.TaskResultJSON, len(runtimeResults))
@@ -1759,7 +1770,9 @@ func runExperimentBench(cmd *cobra.Command) error {
 		}
 		flushPath = strings.TrimSuffix(outputPath, filepath.Ext(outputPath)) + ".runtime.json"
 		if data, jsonErr := json.MarshalIndent(rtJSON, "", "  "); jsonErr == nil {
-			_ = os.WriteFile(flushPath, data, 0644)
+			if err := os.WriteFile(flushPath, data, 0644); err != nil {
+				fmt.Fprintf(os.Stderr, "warn: flush runtime snapshot to %s: %v\n", flushPath, err)
+			}
 		}
 
 		if len(rankedResults) > 0 {
@@ -1769,7 +1782,9 @@ func runExperimentBench(cmd *cobra.Command) error {
 			}
 			flushPath = strings.TrimSuffix(outputPath, filepath.Ext(outputPath)) + fmt.Sprintf(".%s.json", thirdConditionLabel)
 			if data, jsonErr := json.MarshalIndent(rkJSON, "", "  "); jsonErr == nil {
-				_ = os.WriteFile(flushPath, data, 0644)
+				if err := os.WriteFile(flushPath, data, 0644); err != nil {
+					fmt.Fprintf(os.Stderr, "warn: flush %s snapshot to %s: %v\n", thirdConditionLabel, flushPath, err)
+				}
 			}
 		}
 	}

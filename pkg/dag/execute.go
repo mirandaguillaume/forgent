@@ -3,6 +3,7 @@ package dag
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"sync"
@@ -135,8 +136,12 @@ func (d *DAG) executeLayerBased(ctx context.Context, store *dataStore, cfg *exec
 		wg.Wait()
 		close(errCh)
 
-		if err := <-errCh; err != nil {
-			return err
+		var errs []error
+		for e := range errCh {
+			errs = append(errs, e)
+		}
+		if len(errs) > 0 {
+			return errors.Join(errs...)
 		}
 
 		for id := range layerDeactivations {
@@ -275,8 +280,12 @@ func (d *DAG) executeEventDriven(ctx context.Context, store *dataStore, cfg *exe
 		wg.Wait()
 		close(errCh)
 
-		if err := <-errCh; err != nil {
-			return err
+		var errs []error
+		for e := range errCh {
+			errs = append(errs, e)
+		}
+		if len(errs) > 0 {
+			return errors.Join(errs...)
 		}
 	}
 

@@ -17,6 +17,19 @@ import (
 	"github.com/mirandaguillaume/forgent/pkg/qualitygate"
 )
 
+// effectiveGuardrails returns the guardrails to enforce for a given step.
+// Step-level guardrails take precedence when declared; otherwise the task-level
+// guardrails are used, preserving full backward compatibility (NFR40).
+func effectiveGuardrails(step StepDef, task TaskDefinition) []string {
+	if step.DisableTaskGuardrails {
+		return nil
+	}
+	if len(step.Guardrails) > 0 {
+		return step.Guardrails
+	}
+	return task.Guardrails
+}
+
 // RunRuntimeExperiment executes all tasks as Forgent DAG agents.
 // Each task is converted to a DAG where steps are nodes with consumes/produces
 // contracts. The DAG engine handles ordering, parallelism, and retry.
@@ -158,7 +171,9 @@ func buildTaskDAG(task TaskDefinition, provider llm.Provider, sandbox *SandboxFS
 	// For workspace tasks, buildSandboxFromWorkspace pre-populates this file (handles ReadOnly);
 	// for non-workspace tasks this Write creates it fresh.
 	if sandbox != nil {
-		_ = sandbox.Write("dag", "task_context.md", taskContextContent(task))
+		if err := sandbox.Write("dag", "task_context.md", taskContextContent(task)); err != nil {
+			fmt.Fprintf(os.Stderr, "warn: sandbox write task_context.md for %s: %v\n", task.ID, err)
+		}
 	}
 
 	for _, step := range task.Steps {
@@ -211,7 +226,7 @@ func buildTaskDAG(task TaskDefinition, provider llm.Provider, sandbox *SandboxFS
 				// Run the named check
 				switch stepCopy.Check {
 				case "guardrails_respected":
-					for _, g := range task.Guardrails {
+					for _, g := range effectiveGuardrails(stepCopy, task) {
 						if !checkGuardrail(lower, g) {
 							return nil, fmt.Errorf("step %s: guardrail violated: %s", stepCopy.ID, g)
 						}
@@ -255,7 +270,9 @@ func buildTaskDAG(task TaskDefinition, provider llm.Provider, sandbox *SandboxFS
 				if stepSandbox != nil {
 					for k, v := range inputs {
 						if s, ok := v.(string); ok && k != "task_input" {
-							_ = stepSandbox.Write(stepCopy.ID, fmt.Sprintf("slots/%s.md", k), []byte(s))
+							if err := stepSandbox.Write(stepCopy.ID, fmt.Sprintf("slots/%s.md", k), []byte(s)); err != nil {
+								fmt.Fprintf(os.Stderr, "warn: sandbox write input slot %s for step %s: %v\n", k, stepCopy.ID, err)
+							}
 						}
 					}
 				}
@@ -282,9 +299,10 @@ func buildTaskDAG(task TaskDefinition, provider llm.Provider, sandbox *SandboxFS
 				}
 				base.WriteString("\n")
 
-				if len(task.Guardrails) > 0 {
+				stepGuardrails := effectiveGuardrails(stepCopy, task)
+				if len(stepGuardrails) > 0 {
 					base.WriteString("## Constraints (MUST respect)\n\n")
-					for _, g := range task.Guardrails {
+					for _, g := range stepGuardrails {
 						base.WriteString(fmt.Sprintf("- %s\n", g))
 					}
 					base.WriteString("\n")
@@ -358,11 +376,11 @@ func buildTaskDAG(task TaskDefinition, provider llm.Provider, sandbox *SandboxFS
 
 					lastResponse = response
 
-					// Check guardrails by code.
-					if len(task.Guardrails) > 0 {
+					// Check guardrails by code — use step-level when declared, task-level otherwise.
+					if len(stepGuardrails) > 0 {
 						lower := strings.ToLower(response)
 						allPassed := true
-						for _, g := range task.Guardrails {
+						for _, g := range stepGuardrails {
 							if !checkGuardrail(lower, g) {
 								allPassed = false
 								break
@@ -379,7 +397,9 @@ func buildTaskDAG(task TaskDefinition, provider llm.Provider, sandbox *SandboxFS
 				// Write step output to sandbox so downstream steps can file_read it.
 				if stepSandbox != nil {
 					for _, p := range stepCopy.Produces {
-						_ = stepSandbox.Write(stepCopy.ID, fmt.Sprintf("slots/%s.md", p.Key), []byte(lastResponse))
+						if err := stepSandbox.Write(stepCopy.ID, fmt.Sprintf("slots/%s.md", p.Key), []byte(lastResponse)); err != nil {
+							fmt.Fprintf(os.Stderr, "warn: sandbox write produces slot %s for step %s: %v\n", p.Key, stepCopy.ID, err)
+						}
 					}
 				}
 
@@ -423,13 +443,27 @@ func buildTaskDAG(task TaskDefinition, provider llm.Provider, sandbox *SandboxFS
 			// expected_keywords is kept on StepDef for evaluation metrics only, not enforcement.
 			var producesTemplate, consumesTemplate string
 			for _, slot := range stepCopy.Produces {
-				if tmpl, _ := slot.ResolveTemplate(""); tmpl != "" {
+				if slot.TemplateFile != "" && task.TaskDir == "" {
+					return nil, nil, fmt.Errorf("step %s: template_file %q requires TaskDir (load task via LoadTasks)", stepCopy.ID, slot.TemplateFile)
+				}
+				tmpl, err := slot.ResolveTemplate(task.TaskDir)
+				if err != nil {
+					return nil, nil, fmt.Errorf("step %s produces: %w", stepCopy.ID, err)
+				}
+				if tmpl != "" {
 					producesTemplate = tmpl
 					break
 				}
 			}
 			for _, slot := range stepCopy.Consumes {
-				if tmpl, _ := slot.ResolveTemplate(""); tmpl != "" {
+				if slot.TemplateFile != "" && task.TaskDir == "" {
+					return nil, nil, fmt.Errorf("step %s: template_file %q requires TaskDir (load task via LoadTasks)", stepCopy.ID, slot.TemplateFile)
+				}
+				tmpl, err := slot.ResolveTemplate(task.TaskDir)
+				if err != nil {
+					return nil, nil, fmt.Errorf("step %s consumes: %w", stepCopy.ID, err)
+				}
+				if tmpl != "" {
 					consumesTemplate = tmpl
 					break
 				}
@@ -580,16 +614,29 @@ func evaluateRuntimeOutputs(task TaskDefinition, outputs map[string]any) TaskRes
 		result.OrderingScore = float64(completed) / float64(len(task.Steps))
 	}
 
-	// Guardrails
-	lowerAll := strings.ToLower(allOutput.String())
-	respected := 0
-	for _, g := range task.Guardrails {
-		if checkGuardrail(lowerAll, g) {
-			respected++
+	// GuardrailScore: per-step evaluation using effectiveGuardrails.
+	// Each step's output is checked against its own effective guardrails (step-level
+	// when declared, task-level as fallback). Steps with no effective guardrails are skipped.
+	totalGuardrails := 0
+	respectedGuardrails := 0
+	for i, step := range task.Steps {
+		gs := effectiveGuardrails(step, task)
+		if len(gs) == 0 {
+			continue
+		}
+		var output string
+		if i < len(result.StepResults) {
+			output = strings.ToLower(result.StepResults[i].Output)
+		}
+		for _, g := range gs {
+			totalGuardrails++
+			if checkGuardrail(output, g) {
+				respectedGuardrails++
+			}
 		}
 	}
-	if len(task.Guardrails) > 0 {
-		result.GuardrailScore = float64(respected) / float64(len(task.Guardrails))
+	if totalGuardrails > 0 {
+		result.GuardrailScore = float64(respectedGuardrails) / float64(totalGuardrails)
 	} else {
 		result.GuardrailScore = 1.0
 	}

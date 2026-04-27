@@ -57,10 +57,10 @@
 # Party mode consensus — all agents agreed.
 
 generated: 2026-03-30
-last_updated: 2026-04-17
-last_story_created: 6-21-file-based-slot-passing
-last_story_modified: 6-22-context-retriever  # done + review done
-last_epic_completed: epic-4  # KEYSTONE — retro done 2026-04-10
+last_updated: 2026-04-27  # epic-9 retro done
+last_story_created: 10-2-fix-template-file-runtime
+last_story_modified: 9-3-shell-completion-and-cli-polish  # done
+last_epic_completed: epic-9  # retro done 2026-04-27
 project: Forgent
 project_key: NOKEY
 tracking_system: file-system
@@ -143,11 +143,11 @@ development_status:
   epic-6-retrospective: optional
 
   # Epic 9: Ecosystem & Developer Experience (deferred from original Epic 6)
-  epic-9: backlog
-  9-1-doctor-configuration: ready-for-dev
-  9-2-target-listing-and-export: ready-for-dev
-  9-3-shell-completion-and-cli-polish: ready-for-dev
-  epic-9-retrospective: optional
+  epic-9: done
+  9-1-doctor-configuration: done
+  9-2-target-listing-and-export: done
+  9-3-shell-completion-and-cli-polish: done
+  epic-9-retrospective: done
 
   # Epic 7: Static Analysis + Quality Pipeline (Sprint 3 — Week 3-4) ✅ [opportunistic pull-forward]
   epic-7: done
@@ -165,3 +165,18 @@ development_status:
   8-2-index-aware-scoring: done
   8-3-complete-templates: done
   epic-8-retrospective: done
+
+  # Epic 10: Node-Level Behavioral Contracts (Sprint 9) ← NEXT
+  # Baseline captured 2026-04-27: 0% guardrail detection, 3% scope creep.
+  # Stories prove structural enforcement > keyword guardrails.
+  epic-10: in-progress
+  10-1-node-level-guardrails: done
+  10-2-fix-template-file-runtime: done
+  10-3-file-level-permissions: backlog
+  10-4-output-contract-validation: backlog
+  10-5-http-proxy-network-sandbox: backlog
+  10-6-violation-telemetry: backlog
+  10-7-loop-bounds-exit-criteria: backlog
+  10-8-per-node-experiment-metrics: backlog
+  10-9-experiment-rerun: backlog
+  epic-10-retrospective: optional

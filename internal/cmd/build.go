@@ -59,7 +59,19 @@ func init() {
 	buildCmd := &cobra.Command{
 		Use:   "build",
 		Short: "Generate skills and agents for a target framework",
-		Run: func(cmd *cobra.Command, args []string) {
+		Long: `Compile Forgent skill YAML specs into framework-native files.
+
+Supported targets:
+  claude    — Claude Code (.claude/skills/, .claude/agents/)
+  copilot   — GitHub Copilot (.github/skills/, .github/agents/)
+  forgent   — Standalone Go runtime binary
+
+Examples:
+  forgent build --target claude
+  forgent build --target copilot --compact
+  forgent build --target forgent --output ./out
+  forgent build --target claude --watch`,
+		RunE: func(cmd *cobra.Command, args []string) error {
 			available := spec.Available()
 			found := false
 			for _, a := range available {
@@ -69,8 +81,7 @@ func init() {
 				}
 			}
 			if !found {
-				fmt.Println(color.RedString("Unknown target %q. Available: %s", target, strings.Join(available, ", ")))
-				os.Exit(1)
+				return fmt.Errorf("unknown target %q. Available: %s", target, strings.Join(available, ", "))
 			}
 
 			enrichMode := scanner.EnrichMode(enrichFlag)
@@ -89,14 +100,15 @@ func init() {
 				sigCh := make(chan os.Signal, 1)
 				signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 				<-sigCh
-				return
+				return nil
 			}
 
 			result := RunBuildWithOptions(skillsDir, agentsDir, outputDir, target, enrichMode, compactFlag)
-			PrintBuildResult(result)
 			if !result.Success {
-				os.Exit(1)
+				return fmt.Errorf("build failed: %s", result.Error)
 			}
+			PrintBuildResult(result)
+			return nil
 		},
 	}
 
@@ -108,6 +120,12 @@ func init() {
 	buildCmd.Flags().BoolVar(&compactFlag, "compact", false, "inline skills into agent file for lower token overhead")
 	buildCmd.Flags().StringVar(&enrichFlag, "enrich", "", "enrich skills with codebase context (index|full)")
 	buildCmd.Flag("enrich").NoOptDefVal = "index"
+
+	if err := buildCmd.RegisterFlagCompletionFunc("target", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return spec.Available(), cobra.ShellCompDirectiveNoFileComp
+	}); err != nil {
+		panic("build --target completion registration failed: " + err.Error())
+	}
 
 	rootCmd.AddCommand(buildCmd)
 }

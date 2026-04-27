@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -16,7 +17,7 @@ type Spinner struct {
 	stop    chan struct{}
 	done    chan struct{}
 	once    sync.Once
-	started bool
+	started atomic.Bool
 }
 
 // NewSpinner creates a spinner that displays the given message.
@@ -31,7 +32,7 @@ func NewSpinner(message string) *Spinner {
 
 // Start begins the spinner animation in a background goroutine.
 func (s *Spinner) Start() {
-	s.started = true
+	s.started.Store(true)
 	go func() {
 		defer close(s.done)
 		i := 0
@@ -56,7 +57,7 @@ func (s *Spinner) Start() {
 func (s *Spinner) Stop() {
 	s.once.Do(func() {
 		close(s.stop)
-		if s.started {
+		if s.started.Load() {
 			<-s.done
 		}
 	})
