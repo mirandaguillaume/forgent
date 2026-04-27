@@ -1,0 +1,590 @@
+[
+  {
+    "task_id": "code-review",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 269
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 269
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 269
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 808,
+    "wall_clock_ms": 5171,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "code-review",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 254
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 254
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 254
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 763,
+    "wall_clock_ms": 5233,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "code-review",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 282
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 4,
+        "TokensUsed": 282
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 282
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 847,
+    "wall_clock_ms": 6062,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "doc-generation",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "analyze-api",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 433
+      },
+      {
+        "StepID": "write-overview",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 433
+      },
+      {
+        "StepID": "write-examples",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 433
+      },
+      {
+        "StepID": "assemble-doc",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 433
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 1733,
+    "wall_clock_ms": 11872,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "doc-generation",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "analyze-api",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 493
+      },
+      {
+        "StepID": "write-overview",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 493
+      },
+      {
+        "StepID": "write-examples",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 493
+      },
+      {
+        "StepID": "assemble-doc",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 493
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 1975,
+    "wall_clock_ms": 13429,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "doc-generation",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "analyze-api",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 413
+      },
+      {
+        "StepID": "write-overview",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 413
+      },
+      {
+        "StepID": "write-examples",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 413
+      },
+      {
+        "StepID": "assemble-doc",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 413
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 1652,
+    "wall_clock_ms": 11794,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "refactoring",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "identify-responsibilities",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 311
+      },
+      {
+        "StepID": "design-interfaces",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 311
+      },
+      {
+        "StepID": "extract-functions",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 311
+      },
+      {
+        "StepID": "compose-pipeline",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 311
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 1245,
+    "wall_clock_ms": 6272,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "refactoring",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "identify-responsibilities",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 325
+      },
+      {
+        "StepID": "design-interfaces",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 325
+      },
+      {
+        "StepID": "extract-functions",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 325
+      },
+      {
+        "StepID": "compose-pipeline",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 325
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 0.6666666666666666,
+    "tokens_used": 1300,
+    "wall_clock_ms": 6731,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "refactoring",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "identify-responsibilities",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 347
+      },
+      {
+        "StepID": "design-interfaces",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 347
+      },
+      {
+        "StepID": "extract-functions",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 347
+      },
+      {
+        "StepID": "compose-pipeline",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 347
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 1389,
+    "wall_clock_ms": 6382,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "security-audit",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "threat-model",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 4,
+        "TokensUsed": 485
+      },
+      {
+        "StepID": "vulnerability-scan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 485
+      },
+      {
+        "StepID": "remediation",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 4,
+        "TokensUsed": 485
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 0.75,
+    "tokens_used": 1455,
+    "wall_clock_ms": 10798,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "security-audit",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "threat-model",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 443
+      },
+      {
+        "StepID": "vulnerability-scan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 443
+      },
+      {
+        "StepID": "remediation",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 443
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 0.75,
+    "tokens_used": 1331,
+    "wall_clock_ms": 10314,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "security-audit",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "threat-model",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 483
+      },
+      {
+        "StepID": "vulnerability-scan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 483
+      },
+      {
+        "StepID": "remediation",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 4,
+        "TokensUsed": 483
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 0.75,
+    "tokens_used": 1451,
+    "wall_clock_ms": 10561,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "test-generation",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "identify-cases",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 664
+      },
+      {
+        "StepID": "write-table-tests",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 664
+      },
+      {
+        "StepID": "add-property-tests",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 664
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 1992,
+    "wall_clock_ms": 15704,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "test-generation",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "identify-cases",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 546
+      },
+      {
+        "StepID": "write-table-tests",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 4,
+        "TokensUsed": 546
+      },
+      {
+        "StepID": "add-property-tests",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 546
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 1640,
+    "wall_clock_ms": 12035,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "test-generation",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "identify-cases",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 521
+      },
+      {
+        "StepID": "write-table-tests",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 4,
+        "TokensUsed": 521
+      },
+      {
+        "StepID": "add-property-tests",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 521
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 1563,
+    "wall_clock_ms": 10805,
+    "llm_calls": 1
+  }
+]

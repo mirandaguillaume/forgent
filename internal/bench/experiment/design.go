@@ -18,13 +18,15 @@ import (
 
 // ExperimentConfig defines a complete experiment run.
 type ExperimentConfig struct {
-	Tasks       []TaskDefinition // multi-step tasks to execute
-	Provider    llm.Provider     // LLM provider (same for both conditions)
-	Model       string           // model name for reporting
-	RunsPerTask int              // repetitions per task for confidence intervals (default 1)
-	Seed        int64            // seed for reproducibility
-	OnResult    func(result TaskResult, run int) // called after each run completes; nil = no-op
-	SkipMap     map[string]int                   // taskID → runs already completed (for resume)
+	Tasks          []TaskDefinition // multi-step tasks to execute
+	Provider       llm.Provider     // LLM provider (same for both conditions)
+	Model          string           // model name for reporting
+	RunsPerTask    int              // repetitions per task for confidence intervals (default 1)
+	Seed           int64            // seed for reproducibility
+	OnResult func(result TaskResult, run int) // called after each run completes; nil = no-op
+	SkipMap        map[string]int                   // taskID → runs already completed (for resume)
+	ContextRetriever ContextRetriever               // nil = NilRetriever (file listing only, no injection)
+	Condition        string                         // result condition label; empty = "runtime"
 }
 
 // TaskDefinition describes a multi-step task for the experiment.
@@ -75,10 +77,8 @@ type StepDef struct {
 	Prompt   string   `yaml:"prompt,omitempty"`   // for kind: llm
 	Template string   `yaml:"template,omitempty"` // for kind: static (Go text/template)
 	Check    string   `yaml:"check,omitempty"`    // for kind: assert (check function name)
-	Consumes []string `yaml:"consumes"`
-	Produces []string `yaml:"produces"`
-	ExpectedKeywords []string `yaml:"expected_keywords"`
-
+	Consumes []SlotSpec `yaml:"consumes"`
+	Produces []SlotSpec `yaml:"produces"`
 	// Tool-based steps (Story 5-4)
 	Tools   []string          `yaml:"tools,omitempty"`   // e.g. ["file_read", "file_write"]
 	Sandbox *StepSandboxPolicy `yaml:"sandbox,omitempty"`
@@ -127,12 +127,10 @@ type ActionMetrics struct {
 
 // StepResult captures the outcome of a single step.
 type StepResult struct {
-	StepID       string
-	Completed    bool
-	Output       string
-	KeywordsHit  int // how many expected keywords appeared in output
-	KeywordsTotal int
-	TokensUsed   int
+	StepID     string
+	Completed  bool
+	Output     string
+	TokensUsed int
 }
 
 // ComparisonResult holds the deltas between text and runtime conditions.
@@ -141,6 +139,7 @@ type ComparisonResult struct {
 	Runs               int
 	TextResults        []TaskResult
 	RuntimeResults     []TaskResult
+	RankedResults      []TaskResult // populated by CompareThree (runtime + RankedRetriever)
 
 	// Accuracy metrics (null result expected on strong models)
 	CompletionDelta    float64 // runtime - text (positive = runtime better)
@@ -227,13 +226,11 @@ type EfficiencyMetrics struct {
 	CostPerDetection  float64 // extra tokens spent per failure detected
 }
 
-// StepBreakdown provides per-step completion and keyword rates across runs.
+// StepBreakdown provides per-step completion rates across runs.
 type StepBreakdown struct {
 	StepID            string
 	TextCompletionPct float64 // % of runs where step completed (text)
 	RTCompletionPct   float64 // % of runs where step completed (runtime)
-	TextKeywordPct    float64 // mean(keywords_hit/keywords_total) (text)
-	RTKeywordPct      float64 // mean(keywords_hit/keywords_total) (runtime)
 	Runs              int     // number of runs sampled
 }
 

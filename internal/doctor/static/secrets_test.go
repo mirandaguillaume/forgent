@@ -7,15 +7,37 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSecrets_DetectsOpenAIKey(t *testing.T) {
+func TestSecrets_DetectsOpenAIProjectKey(t *testing.T) {
+	// sk-proj- prefix + 20+ chars (new project-scoped keys)
 	analysis := &parser.AgentAnalysis{
-		RawContent: []byte("Use this key: sk-abcdefghijklmnopqrstuvwx"),
+		RawContent: []byte("Use this key: sk-proj-abcdefghijklmnopqrstuvwx"),
 	}
 	check := &secretsCheck{}
 	findings := check.Run(analysis)
 	assert.Len(t, findings, 1)
 	assert.Contains(t, findings[0].Issue, "OpenAI")
 	assert.Equal(t, "high", findings[0].Confidence)
+}
+
+func TestSecrets_DetectsOpenAILegacyKey(t *testing.T) {
+	// sk- prefix + 48+ chars (legacy format)
+	analysis := &parser.AgentAnalysis{
+		RawContent: []byte("Use this key: sk-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx"),
+	}
+	check := &secretsCheck{}
+	findings := check.Run(analysis)
+	assert.Len(t, findings, 1)
+	assert.Contains(t, findings[0].Issue, "OpenAI")
+}
+
+func TestSecrets_IgnoresShortSkPrefix(t *testing.T) {
+	// Short sk- prefix should NOT match (e.g., "sk-learn" references)
+	analysis := &parser.AgentAnalysis{
+		RawContent: []byte("Use sk-learn for machine learning"),
+	}
+	check := &secretsCheck{}
+	findings := check.Run(analysis)
+	assert.Empty(t, findings, "short sk- prefix should not be detected as OpenAI key")
 }
 
 func TestSecrets_DetectsAWSKey(t *testing.T) {
@@ -75,6 +97,21 @@ func TestSecrets_NoSecrets(t *testing.T) {
 	}
 	check := &secretsCheck{}
 	assert.Empty(t, check.Run(analysis))
+}
+
+func TestSecrets_SkipsConfigContext(t *testing.T) {
+	// Lines about configuring secrets should not trigger generic pattern findings
+	cases := []string{
+		"Set the environment variable PASSWORD=your_password",
+		"Configure your SECRET_KEY environment variable",
+		"Set your API_KEY env var before running",
+	}
+	check := &secretsCheck{}
+	for _, line := range cases {
+		analysis := &parser.AgentAnalysis{RawContent: []byte(line)}
+		findings := check.Run(analysis)
+		assert.Empty(t, findings, "config context line should be suppressed: %s", line)
+	}
 }
 
 func TestSecrets_NilAnalysis(t *testing.T) {

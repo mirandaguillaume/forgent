@@ -772,25 +772,6 @@ func loadSkillsAlphabetically(skillsDir string) ([]SWESkillStep, int, error) {
 	return chain, totalWords, nil
 }
 
-// RunSWEBenchH2H loads contestants from fixture directories and evaluates them.
-// It is a convenience wrapper around RunSWEBenchH2HWithContestants.
-func RunSWEBenchH2H(tasksPath, agentsDir, importedDir string, provider llm.Provider, progress SWEH2HProgressFn) (*SWEH2HResult, error) {
-	handWritten, err := LoadSWEContestants(agentsDir)
-	if err != nil {
-		return nil, fmt.Errorf("load swe agents: %w", err)
-	}
-
-	var forgent []SWEContestant
-	if importedDir != "" {
-		forgent, err = LoadSWEForgentContestants(importedDir)
-		if err != nil {
-			return nil, fmt.Errorf("load swe forgent: %w", err)
-		}
-	}
-
-	return RunSWEBenchH2HWithContestants(append(handWritten, forgent...), tasksPath, provider, progress)
-}
-
 // RunSWEBenchH2HWithContestants evaluates pre-loaded contestants against SWE-bench tasks.
 // Tasks for each contestant run concurrently (up to 4 at a time — lower than H2H because
 // each task clones a repo).

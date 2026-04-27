@@ -408,8 +408,7 @@ func TestRunRuntimeExperiment_ToolBasedTask(t *testing.T) {
 				Sandbox: &StepSandboxPolicy{
 					AllowedPaths: []string{"src/**"},
 				},
-				Produces:         []string{"analysis"},
-				ExpectedKeywords: []string{"main"},
+				Produces:         []SlotSpec{{Key: "analysis"}},
 			},
 		},
 		Guardrails: []string{"!sk-secret"},

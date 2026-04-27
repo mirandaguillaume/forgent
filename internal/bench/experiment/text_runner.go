@@ -173,36 +173,10 @@ func evaluateTextResponse(task TaskDefinition, response string, totalTokens int)
 }
 
 func evaluateStep(step StepDef, lowerResponse string) StepResult {
-	sr := StepResult{
-		StepID:        step.ID,
-		KeywordsTotal: len(step.ExpectedKeywords),
-	}
-
-	// Check if step name appears in response
-	namePresent := strings.Contains(lowerResponse, strings.ToLower(step.Name))
-
-	// Check expected keywords
-	for _, kw := range step.ExpectedKeywords {
-		if strings.Contains(lowerResponse, strings.ToLower(kw)) {
-			sr.KeywordsHit++
-		}
-	}
-
-	// Step is complete if:
-	// - its name appears in the response, OR
-	// - at least half of its expected keywords are present (lenient mode)
-	if namePresent {
-		sr.Completed = true
-	} else if sr.KeywordsTotal > 0 && sr.KeywordsHit*2 >= sr.KeywordsTotal {
+	sr := StepResult{StepID: step.ID}
+	if strings.Contains(lowerResponse, strings.ToLower(step.Name)) {
 		sr.Completed = true
 	}
-
-	// If no keywords defined, step is completed if its name appears
-	if sr.KeywordsTotal == 0 && namePresent {
-		sr.KeywordsHit = 1
-		sr.KeywordsTotal = 1
-	}
-
 	return sr
 }
 

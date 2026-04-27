@@ -7,11 +7,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Finding represents a single analysis finding from the LLM.
+// Finding represents a single analysis finding from the LLM or static checks.
 type Finding struct {
 	Category             string `yaml:"category"`
 	Issue                string `yaml:"issue"`
 	Confidence           string `yaml:"confidence"`
+	Severity             string `yaml:"severity,omitempty"`
 	CitationID           string `yaml:"citation_id,omitempty"`
 	CurrentState         string `yaml:"current_state"`
 	SuggestedImprovement string `yaml:"suggested_improvement"`

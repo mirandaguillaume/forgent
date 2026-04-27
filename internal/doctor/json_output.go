@@ -74,10 +74,14 @@ func ToJSON(report *Report, filePath string) ([]byte, error) {
 	}
 
 	for _, f := range report.AllFindings {
+		sev := f.Severity
+		if sev == "" {
+			sev = f.Confidence
+		}
 		jr.Findings = append(jr.Findings, JSONFinding{
 			Category:   f.Category,
 			Issue:      f.Issue,
-			Severity:   f.Confidence,
+			Severity:   sev,
 			Suggestion: f.SuggestedImprovement,
 		})
 	}

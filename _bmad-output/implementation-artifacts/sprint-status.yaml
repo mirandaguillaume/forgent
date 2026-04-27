@@ -1,0 +1,167 @@
+# generated: 2026-03-30
+# last_updated: 2026-04-07
+# project: Forgent
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+#
+# SPRINT TIMELINE (revised 2026-04-07 — see sprint-change-proposal-2026-04-07.md):
+# ================================================================================
+# Sprint 1 (Week 1-2): Epic 1 — Core Doctor Analysis ✅ DONE
+# Sprint 2 (Week 2-3): Epic 2 — Enriched Analysis + Epic 3 — Safe Rewrite ✅ DONE
+# Sprint 3 (Week 3-4): Epic 7 — Static Analysis Pipeline ✅ DONE  [opportunistic pull-forward]
+# Sprint 4 (Week 4-5): Epic 8 — Scaffold + Index Architecture ✅ DONE  [emerged from bench work]
+# Sprint 5 (Week 5-6): Epic 4 — Doctor as Forgent Runtime Agent (KEYSTONE) ✅ DONE
+# Sprint 6 (Week 6-7): Epic 5 — Benchmark & Evidence (InstructionBench) ✅ DONE
+# Sprint 7 (Week 7-8): Epic 6 — Runtime Harness (PIVOT from DX Polish) ← NEXT
+# Sprint 8 (Week 8-9): Epic 9 — Ecosystem + DX Polish (deferred original Epic 6)
+#
+# CORRECTION-OF-COURSE 2026-04-07: Epic 7 and Epic 8 were executed in Sprints 3-4
+# instead of Epic 4 and Epic 5. Vision (PRD) intact; sequencing slipped. Snap-back
+# returns Epic 4 (KEYSTONE) to Sprint 5 priority. See sprint-change-proposal-2026-04-07.md
+# for full impact analysis and rationale.
+#
+# PIVOT 2026-04-16: Epic 6 replaced. Original DX Polish stories moved to Epic 9.
+# New Epic 6 = Runtime Harness (middleware pipeline, file access control, budget guards,
+# quality gate, PII filter). Rationale: experiment results show text beats runtime on
+# guardrails without programmatic enforcement. Can't prove thesis without harness layers.
+# Party mode consensus — all agents agreed.
+
+generated: 2026-03-30
+last_updated: 2026-04-17
+last_story_created: 6-21-file-based-slot-passing
+last_story_modified: 6-22-context-retriever  # done + review done
+last_epic_completed: epic-4  # KEYSTONE — retro done 2026-04-10
+project: Forgent
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  # Epic 1: Core Doctor Analysis (Sprint 1 — Week 1-2) ✅
+  epic-1: done
+  1-1-engineering-spike: done
+  1-2-ollama-provider-adapter: done
+  1-3-format-parser-registry-and-claude-parser: done
+  1-4-copilot-and-forgent-yaml-parsers: done
+  1-5-analyzer-skill-and-llm-utilities: done
+  1-6-doctor-cli-command: done
+  epic-1-retrospective: done
+
+  # Epic 2: Enriched Research-Backed Analysis (Sprint 2 — Week 2-3) ✅
+  epic-2: done
+  2-0-epic1-retro-fixes: done
+  2-1-research-registry: done
+  2-2-codebase-context-enrichment: done
+  2-3-directory-analysis-and-text-instruction-diagnosis: done
+  2-4-registry-notification-and-update: done
+  epic-2-retrospective: done
+
+  # Epic 3: Safe Agent Rewrite (Sprint 2-3 — Week 3) ✅
+  epic-3: done
+  3-1-defensive-file-operations: done
+  3-2-quality-gate-validation: done
+  3-3-interactive-rewrite-experience: done
+  epic-3-retrospective: done
+
+  # Epic 4: Doctor as Forgent Runtime Agent — KEYSTONE (Sprint 5 — Week 5-6) ✅
+  epic-4: done
+  4-0-epic7-debt-cleanup: done
+  4-1-doctor-skill-and-agent-yaml: done
+  4-2-embedded-yaml-and-runtime-dag: done
+  4-3-runtime-error-handling: done
+  epic-4-retrospective: done
+
+  # Epic 5: Benchmark & Evidence — InstructionBench (Sprint 6 — Week 6-7) ← NEXT
+  epic-5: done
+  5-0-test-coverage-and-corpus: done
+  5-1-instructionbench: done
+  5-2-runtime-vs-text-experiment: done
+  5-3-format-fidelity-test-suite: done
+  5-4-tool-based-harness-benchmark: done
+  epic-5-retrospective: done
+
+  # Epic 6: Runtime Harness — Enforcement by Construction (Sprint 7 — Week 7-8)
+  # PIVOT: replaces Ecosystem & DX epic (moved to Epic 9). Party mode decision 2026-04-16.
+  # Rationale: can't prove thesis without programmatic enforcement layers.
+  epic-6: in-progress
+  6-0-hotfix-dx-polish: done  # was old epic-6 6-0, 3 HIGH bugs fixed 2026-04-16
+  6-1-middleware-pipeline: done
+  6-2-file-access-control: done
+  6-3-budget-guards: done
+  6-4-quality-gate-inline: done
+  6-5-pii-output-filter: backlog
+  6-6-output-schema-and-produces-contract: backlog
+  6-7-regex-and-length-enforcement: backlog
+  6-8-idempotency-detection: backlog
+  6-9-rate-limiter: backlog
+  6-10-code-syntax-validation: backlog
+  6-11-diff-applicability: backlog
+  # -- CI/CD gates (usinage) --
+  6-12-build-gate: backlog
+  6-13-lint-gate: backlog
+  6-14-test-gate: backlog
+  6-15-format-gate: backlog
+  # -- Essentiels enterprise --
+  6-16-circuit-breaker: backlog
+  6-17-audit-trail: backlog
+  # -- Expérience finale --
+  6-18-harness-experiment: review
+  6-19-slotspec-template-contracts: done
+  6-20-qualitygate-format-validation: done
+  6-21-file-based-slot-passing: done
+  6-22-context-retriever: done
+  epic-6-retrospective: optional
+
+  # Epic 9: Ecosystem & Developer Experience (deferred from original Epic 6)
+  epic-9: backlog
+  9-1-doctor-configuration: ready-for-dev
+  9-2-target-listing-and-export: ready-for-dev
+  9-3-shell-completion-and-cli-polish: ready-for-dev
+  epic-9-retrospective: optional
+
+  # Epic 7: Static Analysis + Quality Pipeline (Sprint 3 — Week 3-4) ✅ [opportunistic pull-forward]
+  epic-7: done
+  7-0-quick-wins: done
+  7-1-static-check-foundation: done
+  7-2-full-static-suite: done
+  7-3-pipeline-and-quality-gate: done
+  7-4-cross-file-and-drift: done
+  7-5-agent-smells: done
+  epic-7-retrospective: done
+
+  # Epic 8: Scaffold + Index Architecture (Sprint 4 — Week 4-5) ✅ [bench reproducibility prerequisite, recognized retroactively]
+  epic-8: done
+  8-1-scaffold-and-index-resolution: done
+  8-2-index-aware-scoring: done
+  8-3-complete-templates: done
+  epic-8-retrospective: done

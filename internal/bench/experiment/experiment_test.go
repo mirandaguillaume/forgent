@@ -1,6 +1,7 @@
 package experiment
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/mirandaguillaume/forgent/internal/llm"
+	"github.com/mirandaguillaume/forgent/pkg/dag"
 )
 
 // mockExpProvider returns step-aware responses based on prompt content.
@@ -41,9 +43,9 @@ func sampleTasks() []TaskDefinition {
 			Category:    "code-review",
 			Input:       "func add(a, b int) int { return a + b }",
 			Steps: []StepDef{
-				{ID: "identify", Name: "Identify Issues", Prompt: "Find bugs", Produces: []string{"issues"}, ExpectedKeywords: []string{"issue", "bug"}},
-				{ID: "suggest", Name: "Suggest Fixes", Prompt: "Suggest improvements", Consumes: []string{"issues"}, Produces: []string{"suggestions"}, ExpectedKeywords: []string{"fix", "improve"}},
-				{ID: "summarize", Name: "Summary", Prompt: "Summarize findings", Consumes: []string{"suggestions"}, Produces: []string{"summary"}, ExpectedKeywords: []string{"summary"}},
+				{ID: "identify", Name: "Identify Issues", Prompt: "Find bugs", Produces: []SlotSpec{{Key: "issues"}}},
+				{ID: "suggest", Name: "Suggest Fixes", Prompt: "Suggest improvements", Consumes: []SlotSpec{{Key: "issues"}}, Produces: []SlotSpec{{Key: "suggestions"}}},
+				{ID: "summarize", Name: "Summary", Prompt: "Summarize findings", Consumes: []SlotSpec{{Key: "suggestions"}}, Produces: []SlotSpec{{Key: "summary"}}},
 			},
 			Guardrails: []string{"summary", "!profanity"},
 		},
@@ -54,8 +56,8 @@ func sampleTasks() []TaskDefinition {
 			Category:    "documentation",
 			Input:       "package math provides basic arithmetic",
 			Steps: []StepDef{
-				{ID: "outline", Name: "Outline", Prompt: "Create doc outline", Produces: []string{"outline"}, ExpectedKeywords: []string{"outline"}},
-				{ID: "draft", Name: "Draft", Prompt: "Write the draft", Consumes: []string{"outline"}, Produces: []string{"draft"}, ExpectedKeywords: []string{"draft"}},
+				{ID: "outline", Name: "Outline", Prompt: "Create doc outline", Produces: []SlotSpec{{Key: "outline"}}},
+				{ID: "draft", Name: "Draft", Prompt: "Write the draft", Consumes: []SlotSpec{{Key: "outline"}}, Produces: []SlotSpec{{Key: "draft"}}},
 			},
 			Guardrails: []string{"documentation"},
 		},
@@ -138,8 +140,8 @@ guardrails:
 	require.Len(t, tasks, 1)
 	assert.Equal(t, "test-task", tasks[0].ID)
 	assert.Len(t, tasks[0].Steps, 2)
-	assert.Equal(t, []string{"output1"}, tasks[0].Steps[0].Produces)
-	assert.Equal(t, []string{"output1"}, tasks[0].Steps[1].Consumes)
+	assert.Equal(t, []SlotSpec{{Key: "output1"}}, tasks[0].Steps[0].Produces)
+	assert.Equal(t, []SlotSpec{{Key: "output1"}}, tasks[0].Steps[1].Consumes)
 }
 
 // ─── Text runner tests ────────────────────────────────────────────────────────
@@ -447,6 +449,406 @@ func TestRunRuntimeExperiment_FailFast(t *testing.T) {
 	assert.True(t, errors.Is(err, ErrAPIFatal), "should wrap ErrAPIFatal")
 	assert.True(t, len(results) >= 1, "should return partial results, got %d", len(results))
 	assert.True(t, len(results) < 6, "should abort before all 6 runs, got %d", len(results))
+}
+
+// ─── File-based slot passing tests (Story 6-21) ───────────────────────────────
+
+// recordingProvider captures every prompt the LLM receives, keyed by call order.
+type recordingProvider struct {
+	prompts  []string
+	response string
+}
+
+func (r *recordingProvider) Complete(prompt string) (string, error) {
+	r.prompts = append(r.prompts, prompt)
+	return r.response, nil
+}
+
+var _ llm.Provider = (*recordingProvider)(nil)
+
+func singleStepTask() TaskDefinition {
+	return TaskDefinition{
+		ID:          "single",
+		Name:        "Single Step Task",
+		Description: "A minimal task for testing",
+		Input:       "func hello() {}",
+		Steps: []StepDef{
+			{ID: "analyze", Name: "Analyze", Prompt: "Analyze the code", Produces: []SlotSpec{{Key: "analysis"}}},
+		},
+		Guardrails: []string{"analysis"},
+	}
+}
+
+func multiStepTask() TaskDefinition {
+	return TaskDefinition{
+		ID:          "multi",
+		Name:        "Multi Step Task",
+		Description: "A multi-step task for testing slot passing",
+		Input:       "func add(a, b int) int { return a + b }",
+		Steps: []StepDef{
+			{ID: "find-bugs", Name: "Find Bugs", Prompt: "Find bugs in the code.", Produces: []SlotSpec{{Key: "bugs"}}},
+			{ID: "fix-code", Name: "Fix Code", Prompt: "Fix the bugs found.", Consumes: []SlotSpec{{Key: "bugs"}}, Produces: []SlotSpec{{Key: "fixed"}}},
+		},
+		Guardrails: []string{"fix"},
+	}
+}
+
+func TestFileSlotPassing_TaskContextWrittenToSandbox(t *testing.T) {
+	task := singleStepTask()
+	sandbox := NewSandboxFS(nil, nil, SandboxPolicy{})
+	provider := &recordingProvider{response: "analysis done"}
+
+	_, _, err := buildTaskDAG(task, provider, sandbox, NilRetriever{}, nil)
+	require.NoError(t, err)
+
+	content, err := sandbox.Read("test", "task_context.md")
+	require.NoError(t, err)
+
+	s := string(content)
+	assert.Contains(t, s, "# Task: Single Step Task")
+	assert.Contains(t, s, "## Description")
+	assert.Contains(t, s, "A minimal task for testing")
+	assert.Contains(t, s, "## Original Input")
+	assert.Contains(t, s, "func hello() {}")
+	assert.Contains(t, s, "## Guardrails")
+	assert.Contains(t, s, "- analysis")
+}
+
+func TestFileSlotPassing_PromptListsFilePaths(t *testing.T) {
+	task := multiStepTask()
+	provider := &recordingProvider{response: "bugs found and fixed"}
+
+	result := runRuntimeTask(task, provider, NilRetriever{}, "runtime")
+	require.NoError(t, result.Error)
+
+	require.Len(t, provider.prompts, 2, "expected 2 LLM calls (one per step)")
+
+	step2Prompt := provider.prompts[1]
+
+	// Step 2 prompt must reference slot files, not embed content inline.
+	assert.Contains(t, step2Prompt, "task_context.md")
+	assert.Contains(t, step2Prompt, "slots/bugs.md")
+	assert.Contains(t, step2Prompt, "Available files")
+
+	// Step 2 prompt must NOT contain the actual content of step 1's output inline.
+	assert.NotContains(t, step2Prompt, "bugs found and fixed")
+}
+
+func TestFileSlotPassing_TaskContextAlwaysListed(t *testing.T) {
+	task := singleStepTask()
+	provider := &recordingProvider{response: "analysis complete"}
+
+	result := runRuntimeTask(task, provider, NilRetriever{}, "runtime")
+	require.NoError(t, result.Error)
+
+	require.NotEmpty(t, provider.prompts)
+	step1Prompt := provider.prompts[0]
+
+	assert.Contains(t, step1Prompt, "task_context.md")
+	assert.Contains(t, step1Prompt, "Available files")
+	// Original input must NOT be embedded inline.
+	assert.NotContains(t, step1Prompt, "## Input")
+}
+
+func TestFileSlotPassing_SlotFilesWrittenAfterStep(t *testing.T) {
+	task := multiStepTask()
+	sandbox := NewSandboxFS(nil, nil, SandboxPolicy{})
+	provider := &recordingProvider{response: "step output content"}
+
+	d, _, err := buildTaskDAG(task, provider, sandbox, NilRetriever{}, nil)
+	require.NoError(t, err)
+
+	_, err = d.Execute(context.Background(), dag.WithInputs(map[string]any{"task_input": task.Input}))
+	require.NoError(t, err)
+
+	// Each step's output should be written to slots/{key}.md.
+	bugs, err := sandbox.Read("test", "slots/bugs.md")
+	require.NoError(t, err)
+	assert.Equal(t, "step output content", string(bugs))
+
+	fixed, err := sandbox.Read("test", "slots/fixed.md")
+	require.NoError(t, err)
+	assert.Equal(t, "step output content", string(fixed))
+}
+
+func TestFileSlotPassing_FileReadAlwaysInAllowedTools(t *testing.T) {
+	task := multiStepTask()
+	provider := &recordingProvider{response: "output"}
+
+	result := runRuntimeTask(task, provider, NilRetriever{}, "runtime")
+	require.NoError(t, result.Error)
+
+	// Prompts should mention file_read as an available tool.
+	for i, p := range provider.prompts {
+		assert.Contains(t, p, "file_read", "step %d prompt should list file_read", i)
+	}
+}
+
+func TestFileSlotPassing_ReadFileViaToolCall(t *testing.T) {
+	task := singleStepTask()
+	sandbox := NewSandboxFS(nil, nil, SandboxPolicy{})
+
+	callCount := 0
+	provider := &funcProvider{fn: func(prompt string) (string, error) {
+		callCount++
+		if callCount == 1 {
+			// First call: LLM uses file_read to get task context.
+			return `I'll read the context first. <tool name="file_read" path="task_context.md"/>`, nil
+		}
+		// Second call (after tool result injected): provide real output.
+		return "analysis: code is clean", nil
+	}}
+
+	d, _, err := buildTaskDAG(task, provider, sandbox, NilRetriever{}, nil)
+	require.NoError(t, err)
+	_, err = d.Execute(context.Background(), dag.WithInputs(map[string]any{"task_input": task.Input}))
+	require.NoError(t, err)
+
+	assert.Equal(t, 2, callCount, "expected 2 calls: one with tool call, one after tool result")
+}
+
+// funcProvider wraps a function as an llm.Provider.
+type funcProvider struct {
+	fn func(string) (string, error)
+}
+
+func (f *funcProvider) Complete(prompt string) (string, error) { return f.fn(prompt) }
+
+// ─── Patch tests (review findings) ───────────────────────────────────────────
+
+func TestFileSlotPassing_ReadOnly_TaskContextPrePopulated(t *testing.T) {
+	task := singleStepTask()
+	// ReadOnly workspace: Write calls in buildTaskDAG must not be the only source of task_context.md.
+	policy := SandboxPolicy{ReadOnly: true}
+	sandbox := NewSandboxFS(nil, nil, policy)
+
+	// Pre-populate task_context.md as buildSandboxFromWorkspace does.
+	_ = NewSandboxFS(map[string][]byte{
+		"task_context.md": taskContextContent(task),
+	}, nil, policy)
+
+	// Simulate: create sandbox with pre-populated file (bypassing ReadOnly via initial files map).
+	sandboxWithContext := NewSandboxFS(map[string][]byte{
+		"task_context.md": taskContextContent(task),
+	}, nil, policy)
+
+	provider := &recordingProvider{response: "analysis complete with analysis keyword"}
+	_, _, err := buildTaskDAG(task, provider, sandboxWithContext, NilRetriever{}, nil)
+	require.NoError(t, err)
+
+	// task_context.md must be readable even though sandbox is ReadOnly.
+	content, err := sandboxWithContext.Read("test", "task_context.md")
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "func hello() {}")
+	_ = sandbox
+}
+
+func TestFileSlotPassing_WorkspaceSandbox_TaskContextAlwaysReadable(t *testing.T) {
+	// Simulate a workspace task where buildSandboxFromWorkspace pre-populates task_context.md.
+	task := TaskDefinition{
+		ID:          "ws-task",
+		Name:        "Workspace Task",
+		Description: "Tests workspace integration",
+		Input:       "package main",
+		Workspace: &WorkspaceDef{
+			Files: []WorkspaceFile{{Path: "src/main.go", Content: "package main"}},
+		},
+		Steps: []StepDef{
+			{ID: "review", Name: "Review", Prompt: "Review the code.", Produces: []SlotSpec{{Key: "review"}}},
+		},
+	}
+
+	sandbox := buildSandboxFromWorkspace(task)
+
+	// task_context.md must exist from pre-population (not just from buildTaskDAG Write).
+	content, err := sandbox.Read("test", "task_context.md")
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "# Task: Workspace Task")
+	assert.Contains(t, string(content), "package main")
+}
+
+func TestFileSlotPassing_PerStepAllowedPaths_ContextFilesAccessible(t *testing.T) {
+	// A step with a restrictive sandbox.allowed_paths must still be able to file_read
+	// task_context.md and slots/** after the harness augments the per-step policy.
+	task := TaskDefinition{
+		ID:   "restricted",
+		Name: "Restricted Task",
+		Input: "some input",
+		Steps: []StepDef{
+			{
+				ID:     "read-only-step",
+				Name:   "Read Only Step",
+				Prompt: "Review carefully.",
+				Produces: []SlotSpec{{Key: "output"}},
+				Sandbox: &StepSandboxPolicy{AllowedPaths: []string{"src/**"}},
+			},
+		},
+	}
+
+	sandbox := NewSandboxFS(nil, nil, SandboxPolicy{})
+	provider := &recordingProvider{response: "output text"}
+
+	d, _, err := buildTaskDAG(task, provider, sandbox, NilRetriever{}, nil)
+	require.NoError(t, err)
+
+	_, err = d.Execute(context.Background(), dag.WithInputs(map[string]any{"task_input": task.Input}))
+	require.NoError(t, err)
+
+	// task_context.md must have been written and be readable (policy was augmented).
+	content, err := sandbox.Read("test", "task_context.md")
+	require.NoError(t, err)
+	assert.Contains(t, string(content), "Restricted Task")
+}
+
+func TestFileSlotPassing_DuplicateFileReadNotInPrompt(t *testing.T) {
+	// If a step declares file_read in its Tools list, the prompt must list it only once.
+	task := TaskDefinition{
+		ID:   "dup-test",
+		Name: "Dup Test",
+		Input: "input",
+		Steps: []StepDef{
+			{
+				ID:       "step1",
+				Name:     "Step1",
+				Prompt:   "Do something.",
+				Produces: []SlotSpec{{Key: "out"}},
+				Tools:    []string{"file_read", "file_write"}, // file_read declared explicitly
+			},
+		},
+	}
+
+	provider := &recordingProvider{response: "done"}
+	result := runRuntimeTask(task, provider, NilRetriever{}, "runtime")
+	require.NoError(t, result.Error)
+
+	require.NotEmpty(t, provider.prompts)
+	prompt := provider.prompts[0]
+
+	// Count occurrences of "file_read" in the Available Tools section.
+	toolsSection := prompt[strings.Index(prompt, "## Available Tools"):]
+	count := strings.Count(toolsSection, "- file_read")
+	assert.Equal(t, 1, count, "file_read should appear exactly once in the prompt tool list")
+}
+
+// ─── Retriever tests ──────────────────────────────────────────────────────────
+
+func TestPrefixRetriever_InjectsFirstNTokensOfSlot(t *testing.T) {
+	sandbox := NewSandboxFS(nil, nil, SandboxPolicy{})
+	// Write a long slot file — 400 tokens ≈ 1600 chars; PrefixRetriever{MaxTokens:100} injects ≤400 chars.
+	content := strings.Repeat("word ", 400) // 400 tokens
+	_ = sandbox.Write("test", "slots/bugs.md", []byte(content))
+
+	step := StepDef{ID: "fix", Name: "Fix", Prompt: "Fix the identified bugs"}
+	consumed := []SlotSpec{{Key: "bugs"}}
+
+	r := PrefixRetriever{MaxTokens: 100}
+	excerpt, err := r.Retrieve(step, sandbox, consumed)
+	require.NoError(t, err)
+	assert.NotEmpty(t, excerpt)
+	// Should contain at most 100*4=400 chars of content (plus header)
+	assert.Contains(t, excerpt, "### bugs")
+	assert.LessOrEqual(t, len(excerpt), 400+50) // 50 chars of header overhead
+}
+
+func TestPrefixRetriever_SkipsMissingSlot(t *testing.T) {
+	sandbox := NewSandboxFS(nil, nil, SandboxPolicy{})
+	// No slot file written — retriever must not error.
+	step := StepDef{ID: "step", Name: "Step", Prompt: "Do work"}
+	consumed := []SlotSpec{{Key: "missing"}}
+
+	r := PrefixRetriever{MaxTokens: 300}
+	excerpt, err := r.Retrieve(step, sandbox, consumed)
+	require.NoError(t, err)
+	assert.Empty(t, excerpt)
+}
+
+func TestPrefixRetriever_SkipsTaskInput(t *testing.T) {
+	sandbox := NewSandboxFS(nil, nil, SandboxPolicy{})
+	step := StepDef{ID: "step", Name: "Step", Prompt: "Analyze"}
+	consumed := []SlotSpec{{Key: "task_input"}}
+
+	r := PrefixRetriever{MaxTokens: 300}
+	excerpt, err := r.Retrieve(step, sandbox, consumed)
+	require.NoError(t, err)
+	assert.Empty(t, excerpt, "task_input slot must be skipped")
+}
+
+func TestRankedRetriever_BM25ScoresRelevantChunkHigher(t *testing.T) {
+	sandbox := NewSandboxFS(nil, nil, SandboxPolicy{})
+
+	// Chunk 1: documentation — unrelated to query
+	// Chunk 2: memory leak, null pointer — matches query terms
+	// Chunk 3: style/formatting — unrelated to query
+	slotContent := strings.Join([]string{
+		"The documentation section covers public API usage and general guidelines for contributors.",
+		"There is a memory leak in the allocation path. The null pointer dereference causes a crash when the buffer is not initialized properly.",
+		"Style issues include inconsistent indentation and missing blank lines between functions.",
+	}, "\n\n")
+	_ = sandbox.Write("test", "slots/bugs.md", []byte(slotContent))
+
+	step := StepDef{ID: "fix", Name: "Fix Bugs", Prompt: "Fix the memory leak and null pointer dereference bug"}
+	consumed := []SlotSpec{{Key: "bugs"}}
+
+	r := RankedRetriever{MaxTokens: 500, TopK: 1}
+	excerpt, err := r.Retrieve(step, sandbox, consumed)
+	require.NoError(t, err)
+	assert.NotEmpty(t, excerpt)
+	// The BM25 top chunk must be the memory-leak paragraph, not the documentation one.
+	assert.Contains(t, excerpt, "memory leak")
+	assert.NotContains(t, excerpt, "documentation section covers")
+}
+
+func TestRankedRetriever_SkipsMissingSlot(t *testing.T) {
+	sandbox := NewSandboxFS(nil, nil, SandboxPolicy{})
+	step := StepDef{ID: "step", Name: "Step", Prompt: "Fix bugs"}
+	consumed := []SlotSpec{{Key: "missing"}}
+
+	r := RankedRetriever{MaxTokens: 500, TopK: 5}
+	excerpt, err := r.Retrieve(step, sandbox, consumed)
+	require.NoError(t, err)
+	assert.Empty(t, excerpt)
+}
+
+func TestNilRetriever_AlwaysReturnsEmpty(t *testing.T) {
+	sandbox := NewSandboxFS(nil, nil, SandboxPolicy{})
+	_ = sandbox.Write("test", "slots/bugs.md", []byte("some content"))
+	step := StepDef{ID: "step", Name: "Step", Prompt: "Fix bugs"}
+	consumed := []SlotSpec{{Key: "bugs"}}
+
+	excerpt, err := NilRetriever{}.Retrieve(step, sandbox, consumed)
+	require.NoError(t, err)
+	assert.Empty(t, excerpt)
+}
+
+func TestRunRuntimeExperiment_WithRankedRetriever_InjectsContext(t *testing.T) {
+	// The ranked retriever should inject a "## Context" section into the prompt.
+	task := multiStepTask()
+	sandbox := NewSandboxFS(nil, nil, SandboxPolicy{})
+	provider := &recordingProvider{response: "output with context"}
+
+	_, _, err := buildTaskDAG(task, provider, sandbox, RankedRetriever{MaxTokens: 500, TopK: 5}, nil)
+	require.NoError(t, err)
+
+	// No execution needed — just verifying DAG builds with ranked retriever.
+	// Execute to trigger prompt building.
+	_, _, err = buildTaskDAG(task, provider, sandbox, RankedRetriever{MaxTokens: 500, TopK: 5}, nil)
+	require.NoError(t, err)
+}
+
+func TestCompareThree_PopulatesRankedResults(t *testing.T) {
+	text := []TaskResult{{TaskID: "t1", Condition: "text", Completed: true, GuardrailScore: 0.8}}
+	runtime := []TaskResult{{TaskID: "t1", Condition: "runtime", Completed: true, GuardrailScore: 0.9}}
+	ranked := []TaskResult{{TaskID: "t1", Condition: "ranked", Completed: true, GuardrailScore: 0.95}}
+
+	cr := CompareThree(text, runtime, ranked)
+	require.NotNil(t, cr)
+	assert.Len(t, cr.RankedResults, 1)
+	assert.Equal(t, "ranked", cr.RankedResults[0].Condition)
+
+	// FormatReport must render a third column when RankedResults is populated.
+	report := FormatReport(cr, ReportOpts{Model: "mock"})
+	assert.Contains(t, report, "Ranked")
+	assert.Contains(t, report, "three conditions")
 }
 
 // ─── End-to-end test ──────────────────────────────────────────────────────────

@@ -1,0 +1,89 @@
+id: gsd-implementation
+name: GSD Feature Implementation Pipeline
+description: |
+  GSD (Get Stuff Done) workflow: analyze requirements, plan implementation,
+  generate code, write tests, then review your own output — a 7-step pipeline
+  where each step builds on the previous. The DAG enforces that planning
+  happens before coding, and testing happens before self-review.
+
+  In text mode, LLMs tend to skip the planning step and jump straight to code,
+  or generate tests that don't match the actual implementation.
+category: gsd
+input: |
+  Feature request: Add a rate limiter to the API gateway.
+  Requirements:
+  - Token bucket algorithm with configurable rate and burst
+  - Per-client limiting (by API key)
+  - Return 429 with Retry-After header when limited
+  - Expose metrics: total requests, limited requests, current bucket level
+  - Must be thread-safe
+  - Must not use external dependencies
+steps:
+  - id: analyze-requirements
+    name: Analyze Requirements
+    prompt: |
+      Break down the requirements into functional and non-functional categories.
+      Identify ambiguities, missing requirements, and assumptions you need to make.
+      List the public API surface this feature needs.
+    produces: [requirements_analysis]
+  - id: plan-architecture
+    name: Plan Architecture
+    prompt: |
+      Design the architecture for this feature. Define:
+      - Package structure
+      - Key types and interfaces
+      - Concurrency strategy
+      - How metrics will be exposed
+      Do NOT write implementation code yet — only the design.
+    consumes: [requirements_analysis]
+    produces: [architecture_plan]
+  - id: implement-core
+    name: Implement Core Logic
+    prompt: |
+      Implement the token bucket rate limiter based on the architecture plan.
+      Include the Limiter struct, Allow() method, and token refill logic.
+      Use sync.Mutex or atomic operations for thread safety.
+    consumes: [architecture_plan]
+    produces: [core_implementation]
+  - id: implement-middleware
+    name: Implement HTTP Middleware
+    prompt: |
+      Implement the HTTP middleware that uses the rate limiter.
+      Extract the client key from the request (API key header).
+      Return 429 with Retry-After header when rate limited.
+    consumes: [core_implementation]
+    produces: [middleware_implementation]
+  - id: implement-metrics
+    name: Implement Metrics
+    prompt: |
+      Add metrics collection to the rate limiter.
+      Expose: total requests, limited requests, current bucket levels.
+      Use atomic counters for thread safety.
+    consumes: [core_implementation]
+    produces: [metrics_implementation]
+  - id: write-tests
+    name: Write Tests
+    prompt: |
+      Write comprehensive tests for the rate limiter:
+      - Basic allow/deny behavior
+      - Token refill over time
+      - Concurrent access (use goroutines)
+      - Metrics accuracy
+      Use only standard library testing.
+    consumes: [core_implementation, middleware_implementation, metrics_implementation]
+    produces: [test_suite]
+  - id: self-review
+    name: Self-Review
+    prompt: |
+      Review all the code you generated. Check for:
+      - Does it meet ALL requirements?
+      - Are there race conditions?
+      - Does the token refill logic handle edge cases (system clock, overflow)?
+      - Are the tests actually testing the right things?
+      List any issues found and suggest fixes.
+    consumes: [core_implementation, middleware_implementation, metrics_implementation, test_suite]
+    produces: [review_findings]
+guardrails:
+  - 429
+  - Retry-After
+  - "!import github.com"

@@ -25,6 +25,8 @@ jobs:
           go-version: '1.24'
       - name: Vet
         run: go vet ./...
+      - name: Dead-code lint (Story 4-0 - Epic 7 retro action 1)
+        run: scripts/check-dead-code.sh
       - name: Test
         run: go test ./... -count=1 -race
       - name: Build binary

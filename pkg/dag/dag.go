@@ -18,14 +18,15 @@ const (
 
 // Node is a unit of work in the DAG.
 type Node struct {
-	ID         string
-	Kind       NodeKind
-	Consumes   []string
-	Produces   []string
-	Run        func(ctx context.Context, inputs map[string]any) (map[string]any, error)
-	MaxRetries int
-	Timeout    time.Duration
-	Config     *NodeConfig
+	ID          string
+	Kind        NodeKind
+	Consumes    []string
+	Produces    []string
+	Run         func(ctx context.Context, inputs map[string]any) (map[string]any, error)
+	MaxRetries  int
+	Timeout     time.Duration
+	Config      *NodeConfig
+	Middlewares []Middleware
 }
 
 // DAG is a directed graph auto-wired by type-matching edges.

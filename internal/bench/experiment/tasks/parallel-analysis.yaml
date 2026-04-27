@@ -1,0 +1,59 @@
+id: parallel-analysis
+name: Multi-Dimensional Code Analysis
+description: Analyze a codebase change from 4 independent perspectives, then synthesize. The 4 analysis steps have NO data dependencies on each other — a DAG can run them in parallel while text must serialize.
+category: analysis
+input: |
+  Pull request diff:
+  ```go
+  // auth/middleware.go
+  +func RateLimitMiddleware(limit int, window time.Duration) func(http.Handler) http.Handler {
+  +    var mu sync.Mutex
+  +    counters := make(map[string]int)
+  +    return func(next http.Handler) http.Handler {
+  +        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+  +            ip := r.RemoteAddr
+  +            mu.Lock()
+  +            counters[ip]++
+  +            count := counters[ip]
+  +            mu.Unlock()
+  +            if count > limit {
+  +                http.Error(w, "rate limited", http.StatusTooManyRequests)
+  +                return
+  +            }
+  +            next.ServeHTTP(w, r)
+  +        })
+  +    }
+  +}
+  ```
+steps:
+  - id: security-analysis
+    name: Security Analysis
+    prompt: Analyze this code for security vulnerabilities. Check for IP spoofing, race conditions, resource exhaustion, header injection.
+    consumes: [task_input]
+    produces: [security_findings]
+  - id: performance-analysis
+    name: Performance Analysis
+    prompt: Analyze performance characteristics. Check lock contention, memory growth, garbage collection pressure, O(n) concerns.
+    consumes: [task_input]
+    produces: [performance_findings]
+  - id: correctness-analysis
+    name: Correctness Analysis
+    prompt: Analyze correctness. Check the rate limiting logic — does the window actually reset? Is the counter per-window or cumulative? Edge cases with concurrent requests.
+    consumes: [task_input]
+    produces: [correctness_findings]
+  - id: api-design-analysis
+    name: API Design Analysis
+    prompt: Analyze the API design. Is the middleware composable? Does it follow Go conventions? Should it use context? Should limit be configurable per-route?
+    consumes: [task_input]
+    produces: [api_findings]
+  - id: synthesize
+    name: Synthesize Findings
+    prompt: Combine all analysis perspectives into a prioritized action plan. Rank by severity, group related findings, identify which issues block merge.
+    consumes: [security_findings, performance_findings, correctness_findings, api_findings]
+    produces: [synthesis]
+  - id: write-review
+    name: Write PR Review Comment
+    prompt: Write a single GitHub PR review comment that presents the synthesized findings. Use severity labels, specific line references, and concrete fix suggestions.
+    consumes: [synthesis]
+    produces: [review_comment]
+guardrails: []

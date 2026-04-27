@@ -4,6 +4,7 @@ package analyzer
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/mirandaguillaume/forgent/internal/doctor/llmutil"
 	"github.com/mirandaguillaume/forgent/internal/doctor/parser"
@@ -171,9 +172,21 @@ func buildPrompt(analysis *parser.AgentAnalysis, reg *registry.Registry) string 
 		b.WriteString("\n")
 	}
 
-	// Full content
+	// Full content (truncate to ~32K tokens to prevent OOM on very large files)
 	b.WriteString("\nFull content:\n---\n")
-	b.Write(analysis.RawContent)
+	content := analysis.RawContent
+	const maxPromptBytes = 128_000 // ~32K tokens at ~4 bytes/token
+	if len(content) > maxPromptBytes {
+		content = content[:maxPromptBytes]
+		// Backtrack to the last complete UTF-8 rune boundary to avoid corruption.
+		for len(content) > 0 && !utf8.Valid(content) {
+			content = content[:len(content)-1]
+		}
+		b.Write(content)
+		b.WriteString("\n[TRUNCATED — original file exceeds 32K token limit]\n")
+	} else {
+		b.Write(content)
+	}
 	b.WriteString("\n---\n\n")
 
 	// Only include categories that require semantic LLM analysis.

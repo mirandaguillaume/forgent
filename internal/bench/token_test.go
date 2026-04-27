@@ -13,8 +13,8 @@ func TestTokenOverhead_CIReviewer(t *testing.T) {
 	assert.Greater(t, result.OverheadPct, 0.0, "overhead should be positive")
 	assert.Less(t, result.OverheadPct, 300.0, "overhead should be < 300% (sanity bound)")
 	assert.Greater(t, result.ComposedFiles, 0, "should generate at least one file")
-	// 18 skills + 3 agent files = 21 files
-	assert.Equal(t, 21, result.ComposedFiles, "should generate 21 files")
+	// 18 skills + 4 agent files = 22 files
+	assert.Equal(t, 22, result.ComposedFiles, "should generate 22 files")
 	assert.Greater(t, result.MonolithicWords, 0, "monolithic should have content")
 	t.Logf("Composed: %d words (%d files), Monolithic: %d words, Overhead: %.1f%%",
 		result.ComposedWords, result.ComposedFiles, result.MonolithicWords, result.OverheadPct)
@@ -75,8 +75,8 @@ func TestTokenOverhead_FileTraversal(t *testing.T) {
 	// Verify that the number of composed files matches expected count.
 	result, err := RunTokenOverhead("../../skills", "../../agents", "claude")
 	require.NoError(t, err)
-	// claude target: 18 skills + 3 agent files = 21 files
-	assert.Equal(t, 21, result.ComposedFiles)
+	// claude target: 18 skills + 4 agent files = 22 files
+	assert.Equal(t, 22, result.ComposedFiles)
 }
 
 func TestTokenOverhead_CopilotFileCount(t *testing.T) {
@@ -113,7 +113,7 @@ func TestTokenOverhead_Compact_Claude(t *testing.T) {
 
 	assert.Less(t, compact.OverheadPct, standard.OverheadPct,
 		"compact should have lower overhead than standard")
-	assert.Equal(t, 3, compact.ComposedFiles,
+	assert.Equal(t, 4, compact.ComposedFiles,
 		"compact should produce agent files")
 	assert.Less(t, compact.ComposedWords, standard.ComposedWords,
 		"compact should have fewer words than standard")

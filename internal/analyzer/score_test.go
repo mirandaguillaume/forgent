@@ -1836,8 +1836,8 @@ func TestScoreOrchestration_ExactValues(t *testing.T) {
 				makeFullSkill(func(s *model.SkillBehavior) { s.Skill = "a" }),
 				makeFullSkill(func(s *model.SkillBehavior) { s.Skill = "b" }),
 			},
-			// 20*(0.5 + 0.2) = 14
-			expected: 14,
+			// 20*(0.5 + 0.3 + 0.2) = 20 (parallel with 2+ resolved skills earns the pipeline bonus)
+			expected: 20,
 		},
 		{
 			name: "parallel + no description",

@@ -1,0 +1,43 @@
+id: refactoring
+name: Refactoring Plan
+description: Plan and execute a refactoring of a monolithic function
+category: refactoring
+input: |
+  func handleRequest(req Request) Response {
+    // validate
+    if req.Name == "" { return Response{Error: "name required"} }
+    if req.Age < 0 { return Response{Error: "invalid age"} }
+    if req.Email == "" { return Response{Error: "email required"} }
+    // normalize
+    req.Name = strings.TrimSpace(req.Name)
+    req.Email = strings.ToLower(req.Email)
+    // process
+    user := db.FindOrCreate(req.Name, req.Email)
+    user.Age = req.Age
+    db.Save(user)
+    // notify
+    mailer.Send(user.Email, "Welcome", "Hello "+user.Name)
+    analytics.Track("user_created", user.ID)
+    return Response{UserID: user.ID}
+  }
+steps:
+  - id: identify-responsibilities
+    name: Identify Responsibilities
+    prompt: Identify the distinct responsibilities in this function.
+    produces: [responsibilities]
+  - id: design-interfaces
+    name: Design Interfaces
+    prompt: Design clean interfaces for each responsibility.
+    consumes: [responsibilities]
+    produces: [interfaces]
+  - id: extract-functions
+    name: Extract Functions
+    prompt: Write the extracted functions implementing each interface.
+    consumes: [interfaces]
+    produces: [extracted_code]
+  - id: compose-pipeline
+    name: Compose Pipeline
+    prompt: Rewrite handleRequest to compose the extracted functions.
+    consumes: [extracted_code]
+    produces: [refactored_code]
+guardrails: []

@@ -83,7 +83,7 @@ func extractProse(content string) string {
 	inCodeFence := false
 	for _, line := range strings.Split(NormalizeContent(content), "\n") {
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "```") {
+		if IsCodeFenceLine(trimmed) {
 			inCodeFence = !inCodeFence
 			continue
 		}

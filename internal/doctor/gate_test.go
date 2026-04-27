@@ -70,3 +70,36 @@ func TestGate_CustomConditions(t *testing.T) {
 	assert.False(t, result.Pass)
 	assert.Contains(t, result.Failures[0], "total_findings")
 }
+
+// TestGate_EmptyConditions_Warns verifies AC #4 (Story 4-0) — a quality gate
+// with zero conditions must NOT silently pass. Silent pass is dangerous because
+// it implies "all checks satisfied" when in reality no checks ran. Instead the
+// gate must surface a warning so the user knows the configuration is empty.
+func TestGate_EmptyConditions_Warns(t *testing.T) {
+	gate := &QualityGate{Conditions: []GateCondition{}}
+	structural := StructuralResult{Passed: 10, Total: 16}
+	findings := []llmutil.Finding{}
+
+	result := gate.Evaluate(structural, findings)
+	// Pass remains true (no failed conditions), but warning surfaces the empty config
+	assert.True(t, result.Pass, "empty gate should still pass — there are no failing conditions")
+	assert.NotEmpty(t, result.Warnings, "empty gate must produce a warning, not a silent pass")
+	assert.Contains(t, result.Warnings[0], "no conditions")
+}
+
+// TestIsSecretFinding verifies AC #3 (Story 4-0) — the shared helper that
+// classifies a finding as a "detected secret". Used by both gate.Evaluate
+// (via computeMetrics) and ComputeStructural — must stay consistent across
+// both call sites.
+func TestIsSecretFinding(t *testing.T) {
+	// Positive cases
+	assert.True(t, isSecretFinding(llmutil.Finding{Category: "security", Issue: "OpenAI key detected on line 5"}))
+	assert.True(t, isSecretFinding(llmutil.Finding{Category: "security", Issue: "AWS secret detected"}))
+
+	// Negative: wrong category
+	assert.False(t, isSecretFinding(llmutil.Finding{Category: "ordering", Issue: "key detected"}))
+	// Negative: security category but no "detected" word
+	assert.False(t, isSecretFinding(llmutil.Finding{Category: "security", Issue: "Possible exposure"}))
+	// Negative: empty
+	assert.False(t, isSecretFinding(llmutil.Finding{}))
+}

@@ -33,41 +33,93 @@ func FormatReport(cr *ComparisonResult, opts ReportOpts) string {
 	sb.WriteString("\n")
 
 	// Methodology reference
+	hasRanked := len(cr.RankedResults) > 0
 	sb.WriteString("## Methodology\n\n")
-	sb.WriteString("Each task is executed under two conditions:\n\n")
+	if hasRanked {
+		sb.WriteString("Each task is executed under three conditions:\n\n")
+	} else {
+		sb.WriteString("Each task is executed under two conditions:\n\n")
+	}
 	sb.WriteString("1. **Text instruction**: All steps given as a single monolithic prompt. ")
 	sb.WriteString("The LLM must follow the step sequence, respect guardrails, and produce all outputs in one response.\n")
 	sb.WriteString("2. **Runtime (DAG)**: Steps are encoded as DAG nodes with consumes/produces contracts. ")
-	sb.WriteString("The Forgent engine enforces ordering, parallelizes independent steps, and provides per-step isolation.\n\n")
-	sb.WriteString("The only variable is orchestration method. Same LLM, same model, same task definitions.\n\n")
+	sb.WriteString("The Forgent engine enforces ordering, parallelizes independent steps, and provides per-step isolation.\n")
+	if hasRanked {
+		sb.WriteString("3. **Ranked (DAG + BM25)**: Runtime condition with BM25-ranked context excerpts pre-injected into each step prompt. ")
+		sb.WriteString("Reduces file_read round-trips while keeping the full file available on demand.\n")
+	}
+	sb.WriteString("\nThe only variable is orchestration method. Same LLM, same model, same task definitions.\n\n")
 
 	// Aggregate results
 	sb.WriteString("## Aggregate Results\n\n")
-	sb.WriteString("| Metric | Text | Runtime | Delta | 95% CI |\n")
-	sb.WriteString("|--------|------|---------|-------|--------|\n")
+	if hasRanked {
+		sb.WriteString("| Metric | Text | Runtime | Ranked | RT Delta | Ranked Delta |\n")
+		sb.WriteString("|--------|------|---------|--------|----------|-------------|\n")
 
-	textComp := completionRate(cr.TextResults)
-	rtComp := completionRate(cr.RuntimeResults)
-	sb.WriteString(fmt.Sprintf("| Completion rate | %.0f%% | %.0f%% | %+.0f%% | [%+.1f%%, %+.1f%%] |\n",
-		textComp*100, rtComp*100, cr.CompletionDelta*100, cr.CompletionCI[0]*100, cr.CompletionCI[1]*100))
+		textComp := completionRate(cr.TextResults)
+		rtComp := completionRate(cr.RuntimeResults)
+		rkComp := completionRate(cr.RankedResults)
+		sb.WriteString(fmt.Sprintf("| Completion rate | %.0f%% | %.0f%% | %.0f%% | %+.0f%% | %+.0f%% |\n",
+			textComp*100, rtComp*100, rkComp*100,
+			cr.CompletionDelta*100, (rkComp-textComp)*100))
 
-	textOrd := meanOrdering(cr.TextResults)
-	rtOrd := meanOrdering(cr.RuntimeResults)
-	sb.WriteString(fmt.Sprintf("| Step ordering | %.0f%% | %.0f%% | %+.0f%% | [%+.1f%%, %+.1f%%] |\n",
-		textOrd*100, rtOrd*100, cr.OrderingDelta*100, cr.OrderingCI[0]*100, cr.OrderingCI[1]*100))
+		textOrd := meanOrdering(cr.TextResults)
+		rtOrd := meanOrdering(cr.RuntimeResults)
+		rkOrd := meanOrdering(cr.RankedResults)
+		sb.WriteString(fmt.Sprintf("| Step ordering | %.0f%% | %.0f%% | %.0f%% | %+.0f%% | %+.0f%% |\n",
+			textOrd*100, rtOrd*100, rkOrd*100,
+			cr.OrderingDelta*100, (rkOrd-textOrd)*100))
 
-	textGR := meanGuardrail(cr.TextResults)
-	rtGR := meanGuardrail(cr.RuntimeResults)
-	sb.WriteString(fmt.Sprintf("| Guardrail adherence | %.0f%% | %.0f%% | %+.0f%% | [%+.1f%%, %+.1f%%] |\n",
-		textGR*100, rtGR*100, cr.GuardrailDelta*100, cr.GuardrailCI[0]*100, cr.GuardrailCI[1]*100))
+		textGR := meanGuardrail(cr.TextResults)
+		rtGR := meanGuardrail(cr.RuntimeResults)
+		rkGR := meanGuardrail(cr.RankedResults)
+		sb.WriteString(fmt.Sprintf("| Guardrail adherence | %.0f%% | %.0f%% | %.0f%% | %+.0f%% | %+.0f%% |\n",
+			textGR*100, rtGR*100, rkGR*100,
+			cr.GuardrailDelta*100, (rkGR-textGR)*100))
 
-	textTok := meanTokens(cr.TextResults)
-	rtTok := meanTokens(cr.RuntimeResults)
-	sb.WriteString(fmt.Sprintf("| Token usage | %.0f | %.0f | %+.0f | [%+.0f, %+.0f] |\n",
-		textTok, rtTok, cr.TokenDelta, cr.TokenCI[0], cr.TokenCI[1]))
+		textTok := meanTokens(cr.TextResults)
+		rtTok := meanTokens(cr.RuntimeResults)
+		rkTok := meanTokens(cr.RankedResults)
+		sb.WriteString(fmt.Sprintf("| Token usage | %.0f | %.0f | %.0f | %+.0f | %+.0f |\n",
+			textTok, rtTok, rkTok,
+			cr.TokenDelta, rkTok-textTok))
 
-	sb.WriteString("\n")
-	sb.WriteString("*Positive delta = runtime outperforms text. Negative token delta = runtime is more efficient.*\n\n")
+		textCalls := meanLLMCalls(cr.TextResults)
+		rtCalls := meanLLMCalls(cr.RuntimeResults)
+		rkCalls := meanLLMCalls(cr.RankedResults)
+		sb.WriteString(fmt.Sprintf("| LLM calls | %.0f | %.0f | %.0f | %+.0f | %+.0f |\n",
+			textCalls, rtCalls, rkCalls,
+			cr.LLMCallsDelta, rkCalls-textCalls))
+
+		sb.WriteString("\n")
+		sb.WriteString("*RT Delta = runtime − text. Ranked Delta = ranked − text. Negative token delta = more efficient.*\n\n")
+	} else {
+		sb.WriteString("| Metric | Text | Runtime | Delta | 95% CI |\n")
+		sb.WriteString("|--------|------|---------|-------|--------|\n")
+
+		textComp := completionRate(cr.TextResults)
+		rtComp := completionRate(cr.RuntimeResults)
+		sb.WriteString(fmt.Sprintf("| Completion rate | %.0f%% | %.0f%% | %+.0f%% | [%+.1f%%, %+.1f%%] |\n",
+			textComp*100, rtComp*100, cr.CompletionDelta*100, cr.CompletionCI[0]*100, cr.CompletionCI[1]*100))
+
+		textOrd := meanOrdering(cr.TextResults)
+		rtOrd := meanOrdering(cr.RuntimeResults)
+		sb.WriteString(fmt.Sprintf("| Step ordering | %.0f%% | %.0f%% | %+.0f%% | [%+.1f%%, %+.1f%%] |\n",
+			textOrd*100, rtOrd*100, cr.OrderingDelta*100, cr.OrderingCI[0]*100, cr.OrderingCI[1]*100))
+
+		textGR := meanGuardrail(cr.TextResults)
+		rtGR := meanGuardrail(cr.RuntimeResults)
+		sb.WriteString(fmt.Sprintf("| Guardrail adherence | %.0f%% | %.0f%% | %+.0f%% | [%+.1f%%, %+.1f%%] |\n",
+			textGR*100, rtGR*100, cr.GuardrailDelta*100, cr.GuardrailCI[0]*100, cr.GuardrailCI[1]*100))
+
+		textTok := meanTokens(cr.TextResults)
+		rtTok := meanTokens(cr.RuntimeResults)
+		sb.WriteString(fmt.Sprintf("| Token usage | %.0f | %.0f | %+.0f | [%+.0f, %+.0f] |\n",
+			textTok, rtTok, cr.TokenDelta, cr.TokenCI[0], cr.TokenCI[1]))
+
+		sb.WriteString("\n")
+		sb.WriteString("*Positive delta = runtime outperforms text. Negative token delta = runtime is more efficient.*\n\n")
+	}
 
 	// Engineering properties
 	sb.WriteString("## Engineering Properties\n\n")
@@ -168,11 +220,11 @@ func FormatReport(cr *ComparisonResult, opts ReportOpts) string {
 	// Step breakdown
 	if len(cr.StepBreakdowns) > 0 {
 		sb.WriteString("## Per-Step Breakdown\n\n")
-		sb.WriteString("| Step | Text Complete | Runtime Complete | Text Keywords | Runtime Keywords |\n")
-		sb.WriteString("|------|-------------|-----------------|--------------|----------------|\n")
+		sb.WriteString("| Step | Text Complete | Runtime Complete |\n")
+		sb.WriteString("|------|-------------|------------------|\n")
 		for _, s := range cr.StepBreakdowns {
-			sb.WriteString(fmt.Sprintf("| %s | %.0f%% | %.0f%% | %.0f%% | %.0f%% |\n",
-				s.StepID, s.TextCompletionPct, s.RTCompletionPct, s.TextKeywordPct, s.RTKeywordPct))
+			sb.WriteString(fmt.Sprintf("| %s | %.0f%% | %.0f%% |\n",
+				s.StepID, s.TextCompletionPct, s.RTCompletionPct))
 		}
 		sb.WriteString("\n")
 		sb.WriteString("*Sorted by text completion rate (lowest first = most fragile steps).*\n\n")

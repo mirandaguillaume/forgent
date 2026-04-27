@@ -12,8 +12,8 @@ import (
 
 func sampleStepResults() []StepResult {
 	return []StepResult{
-		{StepID: "step1", Completed: true, Output: "output1", KeywordsHit: 2, KeywordsTotal: 3, TokensUsed: 50},
-		{StepID: "step2", Completed: true, Output: "output2", KeywordsHit: 1, KeywordsTotal: 1, TokensUsed: 30},
+		{StepID: "step1", Completed: true, Output: "output1", TokensUsed: 50},
+		{StepID: "step2", Completed: true, Output: "output2", TokensUsed: 30},
 	}
 }
 
