@@ -14,7 +14,7 @@ import (
 const (
 	defaultBaseURL           = "https://api.anthropic.com/v1/messages"
 	anthropicVersion         = "2023-06-01"
-	anthropicModel           = "claude-sonnet-4-20250514"
+	anthropicDefaultModel    = "claude-sonnet-4-20250514"
 	anthropicMaxTok          = 8192
 	anthropicDefaultTimeout  = 120 * time.Second
 )
@@ -22,8 +22,22 @@ const (
 // AnthropicProvider calls the Anthropic Messages API.
 type AnthropicProvider struct {
 	apiKey  string
+	model   string
 	baseURL string
 	timeout time.Duration
+}
+
+// resolveAnthropicModel maps short model names to full API model IDs.
+func resolveAnthropicModel(name string) string {
+	aliases := map[string]string{
+		"haiku":   "claude-haiku-4-5-20251001",
+		"sonnet":  "claude-sonnet-4-20250514",
+		"opus":    "claude-opus-4-20250514",
+	}
+	if full, ok := aliases[name]; ok {
+		return full
+	}
+	return name // assume it's already a full model ID
 }
 
 type anthropicRequest struct {
@@ -49,10 +63,21 @@ type anthropicContent struct {
 	Text string `json:"text"`
 }
 
+// SetModel sets the model to use for API calls. Accepts short aliases (haiku, sonnet, opus)
+// or full model IDs (claude-haiku-4-5-20251001).
+func (p *AnthropicProvider) SetModel(model string) {
+	p.model = resolveAnthropicModel(model)
+}
+
 // Complete sends a prompt to the Anthropic Messages API and returns the text response.
 func (p *AnthropicProvider) Complete(prompt string) (string, error) {
+	model := p.model
+	if model == "" {
+		model = anthropicDefaultModel
+	}
+
 	reqBody := anthropicRequest{
-		Model:     anthropicModel,
+		Model:     model,
 		MaxTokens: anthropicMaxTok,
 		Messages: []anthropicMessage{
 			{Role: "user", Content: prompt},

@@ -309,8 +309,3 @@ func RunTokenOverheadCompact(skillsDir, agentsDir, target string) (*TokenResult,
 	}, nil
 }
 
-type benchError struct {
-	msg string
-}
-
-func (e *benchError) Error() string { return e.msg }

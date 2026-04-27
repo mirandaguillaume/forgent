@@ -54,7 +54,7 @@ func (d *driftCheck) Run(analysis *parser.AgentAnalysis) []llmutil.Finding {
 
 	for lineNum, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "```") {
+		if IsCodeFenceLine(trimmed) {
 			inCodeFence = !inCodeFence
 			continue
 		}

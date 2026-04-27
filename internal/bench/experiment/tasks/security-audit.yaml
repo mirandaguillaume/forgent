@@ -1,0 +1,30 @@
+id: security-audit
+name: Security Audit
+description: Audit a web handler for security vulnerabilities
+category: security-audit
+input: |
+  func handleUpload(w http.ResponseWriter, r *http.Request) {
+    file, header, _ := r.FormFile("document")
+    defer file.Close()
+    path := filepath.Join("/uploads", header.Filename)
+    out, _ := os.Create(path)
+    defer out.Close()
+    io.Copy(out, file)
+    fmt.Fprintf(w, "Uploaded to %s", path)
+  }
+steps:
+  - id: threat-model
+    name: Threat Model
+    prompt: Identify the attack surface and potential threat vectors in this handler.
+    produces: [threats]
+  - id: vulnerability-scan
+    name: Vulnerability Scan
+    prompt: List specific vulnerabilities with CWE references if possible.
+    consumes: [threats]
+    produces: [vulnerabilities]
+  - id: remediation
+    name: Remediation
+    prompt: Provide specific code fixes for each vulnerability found.
+    consumes: [vulnerabilities]
+    produces: [fixes]
+guardrails: []

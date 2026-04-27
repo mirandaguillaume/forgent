@@ -1,0 +1,51 @@
+id: conflicting-constraints
+name: Policy-Constrained Code Generation
+description: Generate code under tight constraints that conflict with natural LLM tendencies. The constraints are strict guardrails — text instructions tend to violate at least one.
+category: constrained-generation
+input: |
+  Build a user registration endpoint in Go with these hard requirements:
+  - HTTP POST /api/v1/register
+  - Accept JSON body: {email, password, name}
+  - Validate email format, password strength (8+ chars, 1 uppercase, 1 digit)
+  - Store user in database
+  - Return 201 with {id, email, name} on success
+  - Return 400 with {error} on validation failure
+  - Return 409 if email already exists
+steps:
+  - id: define-types
+    name: Define Types
+    prompt: Define the Go structs for request, response, and error response. Use json tags.
+    produces: [types]
+  - id: validation-logic
+    name: Implement Validation
+    prompt: Write a pure validation function. Do NOT use regex for email — use net/mail.ParseAddress. Do NOT use external libraries.
+    consumes: [types]
+    produces: [validation]
+  - id: handler-logic
+    name: Implement Handler
+    prompt: Write the HTTP handler. Do NOT use gorilla/mux or chi — use only net/http. Do NOT log passwords. Do NOT return passwords in responses.
+    consumes: [types, validation]
+    produces: [handler]
+  - id: db-layer
+    name: Implement Database Layer
+    prompt: Write the database interface and implementation. Do NOT use an ORM — use database/sql directly. Use parameterized queries only.
+    consumes: [types]
+    produces: [db_layer]
+  - id: wire-together
+    name: Wire Components
+    prompt: Write the main function that wires handler + db + router. Do NOT use dependency injection frameworks.
+    consumes: [handler, db_layer]
+    produces: [main_func]
+  - id: write-tests
+    name: Write Tests
+    prompt: Write table-driven tests for the validation function and handler. Use httptest.NewRecorder. Do NOT use testify — use standard testing only.
+    consumes: [validation, handler]
+    produces: [tests]
+guardrails:
+  - net/mail
+  - database/sql
+  - httptest
+  - "!gorilla"
+  - "!chi"
+  - "!gorm"
+  - "!testify"

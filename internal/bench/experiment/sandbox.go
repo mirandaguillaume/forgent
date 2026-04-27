@@ -6,6 +6,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/mirandaguillaume/forgent/pkg/sandbox"
 )
 
 // SandboxPolicy defines access control rules for a VirtualFS sandbox.
@@ -248,58 +250,7 @@ func ComputeActionMetrics(log []AccessEntry) *ActionMetrics {
 	return m
 }
 
-// globMatch checks if a path matches a glob pattern.
-// Supports ** for recursive directory matching in any position.
+// globMatch delegates to the shared sandbox package.
 func globMatch(pattern, path string) bool {
-	if !strings.Contains(pattern, "**") {
-		// Simple pattern — use filepath.Match directly
-		matched, err := filepath.Match(pattern, path)
-		if err == nil && matched {
-			return true
-		}
-		return pattern == path
-	}
-
-	// Split pattern on "**" and match segments recursively.
-	// e.g. "src/**/test/*.go" → parts=["src/", "/test/*.go"]
-	parts := strings.SplitN(pattern, "**", 2)
-	prefix := parts[0] // e.g. "src/"
-	suffix := parts[1] // e.g. "/test/*.go"
-
-	// Strip trailing/leading separators from prefix/suffix for matching
-	prefixClean := strings.TrimSuffix(prefix, "/")
-	suffixClean := strings.TrimPrefix(suffix, "/")
-
-	// Check prefix matches (or is empty)
-	if prefixClean != "" {
-		if !strings.HasPrefix(path, prefixClean+"/") && path != prefixClean {
-			return false
-		}
-	}
-
-	// If no suffix after **, any path with the prefix matches
-	if suffixClean == "" {
-		return true
-	}
-
-	// Check suffix: try matching suffixClean against every possible tail of path
-	// e.g. for path "src/pkg/test/foo.go" and suffix "test/*.go",
-	// try "src/pkg/test/foo.go", "pkg/test/foo.go", "test/foo.go", "foo.go"
-	remaining := path
-	if prefixClean != "" {
-		remaining = strings.TrimPrefix(path, prefixClean+"/")
-	}
-	pathParts := strings.Split(remaining, "/")
-	for i := 0; i < len(pathParts); i++ {
-		candidate := strings.Join(pathParts[i:], "/")
-		if matched, err := filepath.Match(suffixClean, candidate); err == nil && matched {
-			return true
-		}
-		// Also try recursive match if suffix itself contains **
-		if strings.Contains(suffixClean, "**") && globMatch(suffixClean, candidate) {
-			return true
-		}
-	}
-
-	return false
+	return sandbox.GlobMatch(pattern, path)
 }

@@ -410,8 +410,10 @@ func scoreOrchestration(agent model.AgentComposition, resolvedSkills []model.Ski
 	max := weightOrchestration
 	score := float64(max) * 0.5 // Base score for having an orchestration strategy
 
-	// Sequential with proper data flow = well-designed pipeline
-	if agent.Orchestration == model.OrchestrationSequential && len(resolvedSkills) >= 2 {
+	// Sequential or parallel with resolved skills = well-designed pipeline
+	if (agent.Orchestration == model.OrchestrationSequential ||
+		agent.Orchestration == model.OrchestrationParallel ||
+		agent.Orchestration == model.OrchestrationParallelThenMerge) && len(resolvedSkills) >= 2 {
 		score += float64(max) * 0.3
 	}
 

@@ -53,6 +53,7 @@ func init() {
 	benchCmd.Flags().String("tasks-dir", "", "Task definitions directory (experiment level)")
 	benchCmd.Flags().Int("runs", 1, "Runs per task for experiment level")
 	benchCmd.Flags().String("resume", "", "Resume from checkpoint file (empty with --output = auto-detect)")
+	benchCmd.Flags().String("retriever", "none", "Context retriever strategy for experiment level: none|prefix|ranked")
 	rootCmd.AddCommand(benchCmd)
 }
 
@@ -648,15 +649,25 @@ func resolveSWETasksPath(cmd *cobra.Command, repoPath string) string {
 	}
 }
 
+// resolveEnvKey returns the first non-empty value among the given env var names.
+func resolveEnvKey(names ...string) string {
+	for _, name := range names {
+		if v := os.Getenv(name); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
 // resolveLLMProvider picks the LLM provider from --provider flag or env vars.
 func resolveLLMProvider(cmd *cobra.Command) (llm.Provider, error) {
 	providerName, _ := cmd.Flags().GetString("provider")
 
 	// Auto-detect from env if not explicitly set
 	if providerName == "" {
-		if os.Getenv("ANTHROPIC_API_KEY") != "" {
+		if resolveEnvKey("ANTHROPIC_API_KEY", "ANTHROPIC_FORGENT_API_KEY") != "" {
 			providerName = "anthropic"
-		} else if os.Getenv("OPENROUTER_API_KEY") != "" {
+		} else if resolveEnvKey("OPENROUTER_API_KEY", "OPENROUTER_FORGENT_API_KEY") != "" {
 			providerName = "openrouter"
 		} else {
 			return nil, fmt.Errorf("no LLM API key found — set ANTHROPIC_API_KEY or OPENROUTER_API_KEY")
@@ -666,12 +677,12 @@ func resolveLLMProvider(cmd *cobra.Command) (llm.Provider, error) {
 	var apiKey string
 	switch providerName {
 	case "anthropic":
-		apiKey = os.Getenv("ANTHROPIC_API_KEY")
+		apiKey = resolveEnvKey("ANTHROPIC_API_KEY", "ANTHROPIC_FORGENT_API_KEY")
 		if apiKey == "" {
 			return nil, fmt.Errorf("ANTHROPIC_API_KEY required for provider %q", providerName)
 		}
 	case "openrouter":
-		apiKey = os.Getenv("OPENROUTER_API_KEY")
+		apiKey = resolveEnvKey("OPENROUTER_API_KEY", "OPENROUTER_FORGENT_API_KEY")
 		if apiKey == "" {
 			return nil, fmt.Errorf("OPENROUTER_API_KEY required for provider %q", providerName)
 		}
@@ -1496,6 +1507,20 @@ func runExperimentBench(cmd *cobra.Command) error {
 	runs, _ := cmd.Flags().GetInt("runs")
 	outputPath, _ := cmd.Flags().GetString("output")
 	resumePath, _ := cmd.Flags().GetString("resume")
+	harnessEnabled, _ := cmd.Flags().GetBool("harness")
+	retrieverFlag, _ := cmd.Flags().GetString("retriever")
+
+	// Build third-condition retriever (nil = no third condition)
+	var thirdRetriever experiment.ContextRetriever
+	var thirdConditionLabel string
+	switch retrieverFlag {
+	case "prefix":
+		thirdRetriever = experiment.PrefixRetriever{MaxTokens: 300}
+		thirdConditionLabel = "prefix"
+	case "ranked":
+		thirdRetriever = experiment.RankedRetriever{MaxTokens: 500, TopK: 5}
+		thirdConditionLabel = "ranked"
+	}
 
 	provider, err := resolveLLMProvider(cmd)
 	if err != nil {
@@ -1574,13 +1599,27 @@ func runExperimentBench(cmd *cobra.Command) error {
 
 	textSkipMap := experiment.BuildSkipMap(existingEntries, "text")
 	runtimeSkipMap := experiment.BuildSkipMap(existingEntries, "runtime")
+	var rankedSkipMap map[string]int
+	if thirdConditionLabel != "" {
+		rankedSkipMap = experiment.BuildSkipMap(existingEntries, thirdConditionLabel)
+	}
 
-	fmt.Fprintf(os.Stderr, "Running experiment: %d tasks, %d runs per task (per-task pairing)...\n", len(tasks), runs)
+	if harnessEnabled {
+		fmt.Fprintf(os.Stderr, "Running experiment: %d tasks, %d runs per task (per-task pairing, harness enabled)...\n", len(tasks), runs)
+	} else {
+		fmt.Fprintf(os.Stderr, "Running experiment: %d tasks, %d runs per task (per-task pairing)...\n", len(tasks), runs)
+	}
+	if thirdRetriever != nil {
+		fmt.Fprintf(os.Stderr, "Third condition: %s retriever\n", thirdConditionLabel)
+	}
 
-	// Per-task execution: text + runtime for each task before moving to next.
-	// This ensures each task has both conditions complete — a crash at task N
-	// leaves tasks 1..N-1 fully paired for comparison.
-	var newTextResults, newRuntimeResults []experiment.TaskResult
+	var priorRankedResults []experiment.TaskResult
+	if thirdConditionLabel != "" {
+		priorRankedResults = experiment.ExtractResults(existingEntries, thirdConditionLabel)
+	}
+
+	// Per-task execution: text + runtime [+ ranked] for each task before moving to next.
+	var newTextResults, newRuntimeResults, newRankedResults []experiment.TaskResult
 
 	for i, task := range tasks {
 		fmt.Fprintf(os.Stderr, "\n── Task %d/%d: %s ──\n", i+1, len(tasks), task.ID)
@@ -1604,7 +1643,7 @@ func runExperimentBench(cmd *cobra.Command) error {
 			},
 		}
 		textRes, err := experiment.RunTextExperiment(singleTextConfig)
-		newTextResults = append(newTextResults, textRes...) // always collect partial results
+		newTextResults = append(newTextResults, textRes...)
 		if err != nil {
 			if errors.Is(err, experiment.ErrAPIFatal) {
 				fmt.Fprintf(os.Stderr, "  ✗ API credits/auth exhausted during text condition — saving partial results\n")
@@ -1632,7 +1671,7 @@ func runExperimentBench(cmd *cobra.Command) error {
 			},
 		}
 		rtRes, err := experiment.RunRuntimeExperiment(singleRTConfig)
-		newRuntimeResults = append(newRuntimeResults, rtRes...) // always collect partial results
+		newRuntimeResults = append(newRuntimeResults, rtRes...)
 		if err != nil {
 			if errors.Is(err, experiment.ErrAPIFatal) {
 				fmt.Fprintf(os.Stderr, "  ✗ API credits/auth exhausted during runtime condition — saving partial results\n")
@@ -1641,9 +1680,48 @@ func runExperimentBench(cmd *cobra.Command) error {
 			return fmt.Errorf("runtime experiment task %s: %w", task.ID, err)
 		}
 
-		fmt.Fprintf(os.Stderr, "  ✓ %s complete: %d text + %d runtime runs\n", task.ID, len(textRes), len(rtRes))
+		// Third condition (ranked/prefix) if requested
+		var rkRes []experiment.TaskResult
+		if thirdRetriever != nil {
+			condLabel := thirdConditionLabel
+			singleRankedConfig := experiment.ExperimentConfig{
+				Tasks:            []experiment.TaskDefinition{task},
+				Provider:         provider,
+				Model:            modelName,
+				RunsPerTask:      runs,
+				SkipMap:          map[string]int{task.ID: rankedSkipMap[task.ID]},
+				ContextRetriever: thirdRetriever,
+				Condition:        condLabel,
+				OnResult: func(r experiment.TaskResult, run int) {
+					if cpWriter != nil {
+						_ = cpWriter.Append(experiment.CheckpointEntry{
+							TaskID:    r.TaskID,
+							Condition: condLabel,
+							Run:       run,
+							Result:    experiment.ToResultJSON(r),
+						})
+					}
+				},
+			}
+			var rkErr error
+			rkRes, rkErr = experiment.RunRuntimeExperiment(singleRankedConfig)
+			newRankedResults = append(newRankedResults, rkRes...)
+			if rkErr != nil {
+				if errors.Is(rkErr, experiment.ErrAPIFatal) {
+					fmt.Fprintf(os.Stderr, "  ✗ API credits/auth exhausted during %s condition — saving partial results\n", condLabel)
+					break
+				}
+				return fmt.Errorf("%s experiment task %s: %w", condLabel, task.ID, rkErr)
+			}
+		}
 
-		// Intermediate results: compare accumulated results so far
+		completedMsg := fmt.Sprintf("  ✓ %s complete: %d text + %d runtime runs", task.ID, len(textRes), len(rtRes))
+		if thirdRetriever != nil {
+			completedMsg += fmt.Sprintf(" + %d %s runs", len(rkRes), thirdConditionLabel)
+		}
+		fmt.Fprintf(os.Stderr, "%s\n", completedMsg)
+
+		// Intermediate results
 		accumText := append(priorTextResults, newTextResults...)
 		accumRT := append(priorRuntimeResults, newRuntimeResults...)
 		if len(accumText) > 0 && len(accumRT) > 0 {
@@ -1662,8 +1740,9 @@ func runExperimentBench(cmd *cobra.Command) error {
 
 	textResults := append(priorTextResults, newTextResults...)
 	runtimeResults := append(priorRuntimeResults, newRuntimeResults...)
+	rankedResults := append(priorRankedResults, newRankedResults...)
 
-	// Flush condition snapshots (using TaskResultJSON for proper error serialization)
+	// Flush condition snapshots
 	if outputPath != "" {
 		textJSON := make([]experiment.TaskResultJSON, len(textResults))
 		for i, r := range textResults {
@@ -1682,11 +1761,27 @@ func runExperimentBench(cmd *cobra.Command) error {
 		if data, jsonErr := json.MarshalIndent(rtJSON, "", "  "); jsonErr == nil {
 			_ = os.WriteFile(flushPath, data, 0644)
 		}
+
+		if len(rankedResults) > 0 {
+			rkJSON := make([]experiment.TaskResultJSON, len(rankedResults))
+			for i, r := range rankedResults {
+				rkJSON[i] = experiment.ToResultJSON(r)
+			}
+			flushPath = strings.TrimSuffix(outputPath, filepath.Ext(outputPath)) + fmt.Sprintf(".%s.json", thirdConditionLabel)
+			if data, jsonErr := json.MarshalIndent(rkJSON, "", "  "); jsonErr == nil {
+				_ = os.WriteFile(flushPath, data, 0644)
+			}
+		}
 	}
 
 	// Compare + report
 	fmt.Fprintf(os.Stderr, "Comparing results...\n")
-	comparison := experiment.Compare(textResults, runtimeResults)
+	var comparison *experiment.ComparisonResult
+	if len(rankedResults) > 0 {
+		comparison = experiment.CompareThree(textResults, runtimeResults, rankedResults)
+	} else {
+		comparison = experiment.Compare(textResults, runtimeResults)
+	}
 
 	report := experiment.FormatReport(comparison, experiment.ReportOpts{
 		Model: modelName,

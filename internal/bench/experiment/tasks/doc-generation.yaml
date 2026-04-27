@@ -1,0 +1,33 @@
+id: doc-generation
+name: Documentation Generation
+description: Generate API documentation for a Go package
+category: documentation
+input: |
+  // Package cache provides a thread-safe in-memory cache with TTL expiration.
+  type Cache struct { mu sync.RWMutex; items map[string]*entry; ttl time.Duration }
+  func New(ttl time.Duration) *Cache
+  func (c *Cache) Get(key string) (any, bool)
+  func (c *Cache) Set(key string, value any)
+  func (c *Cache) Delete(key string)
+  func (c *Cache) Purge()
+steps:
+  - id: analyze-api
+    name: Analyze API
+    prompt: Extract the public API surface — types, functions, methods, parameters, return values.
+    produces: [api_surface]
+  - id: write-overview
+    name: Write Overview
+    prompt: Write a package overview explaining purpose, thread-safety guarantees, and usage patterns.
+    consumes: [api_surface]
+    produces: [overview]
+  - id: write-examples
+    name: Write Examples
+    prompt: Write Go example code showing common usage patterns.
+    consumes: [api_surface, overview]
+    produces: [examples]
+  - id: assemble-doc
+    name: Assemble Documentation
+    prompt: Combine the overview, API reference, and examples into a complete package documentation.
+    consumes: [overview, examples]
+    produces: [documentation]
+guardrails: []

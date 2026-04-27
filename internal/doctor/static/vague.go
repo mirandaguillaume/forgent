@@ -53,7 +53,7 @@ func (v *vagueCheck) Run(analysis *parser.AgentAnalysis) []llmutil.Finding {
 		trimmed := strings.TrimSpace(line)
 
 		// Track code fence state
-		if strings.HasPrefix(trimmed, "```") {
+		if IsCodeFenceLine(trimmed) {
 			inCodeFence = !inCodeFence
 			continue
 		}

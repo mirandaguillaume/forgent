@@ -1,0 +1,57 @@
+id: complex-migration
+name: Complex Database Migration Plan
+description: Plan a multi-table schema migration with data transformation, rollback strategy, and zero-downtime constraints
+category: migration
+input: |
+  Current schema:
+    users(id, name, email, role ENUM('admin','user','viewer'), created_at)
+    orders(id, user_id FK, product_name VARCHAR, amount DECIMAL, status VARCHAR, created_at)
+    audit_log(id, action TEXT, timestamp DATETIME)
+
+  Target schema:
+    accounts(id UUID, display_name, email UNIQUE, created_at, updated_at)
+    account_roles(account_id FK, role VARCHAR, granted_at, granted_by)
+    products(id UUID, name VARCHAR UNIQUE, category VARCHAR)
+    orders(id UUID, account_id FK, product_id FK, amount_cents BIGINT, currency VARCHAR DEFAULT 'USD', status ENUM('pending','paid','shipped','delivered','cancelled'), created_at, updated_at)
+    order_events(id UUID, order_id FK, event_type VARCHAR, payload JSONB, created_at)
+    audit_log(id UUID, actor_id FK, resource_type VARCHAR, resource_id UUID, action VARCHAR, metadata JSONB, created_at)
+steps:
+  - id: analyze-breaking
+    name: Analyze Breaking Changes
+    prompt: List every breaking change between current and target schema. Categorize as column rename, type change, split, merge, or new table.
+    produces: [breaking_changes]
+  - id: dependency-order
+    name: Determine Migration Order
+    prompt: Determine the correct order to create/modify tables based on foreign key dependencies. Tables with no FK deps first.
+    consumes: [breaking_changes]
+    produces: [migration_order]
+  - id: data-transform
+    name: Design Data Transformations
+    prompt: Write the data transformation logic for each table. Handle the users→accounts split, amount→amount_cents conversion (multiply by 100), product extraction from orders.
+    consumes: [breaking_changes, migration_order]
+    produces: [transformations]
+  - id: rollback-plan
+    name: Design Rollback Strategy
+    prompt: Design a rollback plan for each migration step. Must preserve data integrity — no data loss on rollback.
+    consumes: [migration_order, transformations]
+    produces: [rollback_plan]
+  - id: zero-downtime
+    name: Zero-Downtime Execution Plan
+    prompt: Design the deployment sequence for zero-downtime migration. Use dual-write, backfill, then cutover pattern.
+    consumes: [migration_order, rollback_plan]
+    produces: [deployment_plan]
+  - id: validation-queries
+    name: Write Validation Queries
+    prompt: Write SQL queries to validate data integrity after migration. Check row counts, referential integrity, amount conversion accuracy.
+    consumes: [transformations, deployment_plan]
+    produces: [validation_sql]
+  - id: runbook
+    name: Assemble Migration Runbook
+    prompt: Combine all steps into a numbered runbook with pre-checks, execution steps, validation checkpoints, and rollback triggers.
+    consumes: [deployment_plan, validation_sql, rollback_plan]
+    produces: [runbook]
+guardrails:
+  - amount_cents
+  - "!DROP TABLE"
+  - "!DELETE FROM"
+  - "!TRUNCATE"

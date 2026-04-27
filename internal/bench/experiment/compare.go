@@ -357,15 +357,11 @@ func ComputeEfficiency(text, runtime []TaskResult, dm DetectionMetrics) Efficien
 	return em
 }
 
-// ComputeStepBreakdowns aggregates per-step completion and keyword rates.
+// ComputeStepBreakdowns aggregates per-step completion rates.
 func ComputeStepBreakdowns(text, runtime []TaskResult) []StepBreakdown {
 	type stepAcc struct {
-		textCompleted, textRuns   int
-		rtCompleted, rtRuns       int
-		textKwSum                 float64
-		textKwCount               int
-		rtKwSum                   float64
-		rtKwCount                 int
+		textCompleted, textRuns int
+		rtCompleted, rtRuns     int
 	}
 
 	acc := make(map[string]*stepAcc)
@@ -383,18 +379,10 @@ func ComputeStepBreakdowns(text, runtime []TaskResult) []StepBreakdown {
 					if sr.Completed {
 						a.rtCompleted++
 					}
-					if sr.KeywordsTotal > 0 {
-						a.rtKwSum += float64(sr.KeywordsHit) / float64(sr.KeywordsTotal)
-						a.rtKwCount++
-					}
 				} else {
 					a.textRuns++
 					if sr.Completed {
 						a.textCompleted++
-					}
-					if sr.KeywordsTotal > 0 {
-						a.textKwSum += float64(sr.KeywordsHit) / float64(sr.KeywordsTotal)
-						a.textKwCount++
 					}
 				}
 			}
@@ -412,12 +400,6 @@ func ComputeStepBreakdowns(text, runtime []TaskResult) []StepBreakdown {
 		}
 		if a.rtRuns > 0 {
 			sb.RTCompletionPct = float64(a.rtCompleted) / float64(a.rtRuns) * 100
-		}
-		if a.textKwCount > 0 {
-			sb.TextKeywordPct = a.textKwSum / float64(a.textKwCount) * 100
-		}
-		if a.rtKwCount > 0 {
-			sb.RTKeywordPct = a.rtKwSum / float64(a.rtKwCount) * 100
 		}
 		breakdowns = append(breakdowns, sb)
 	}
@@ -496,4 +478,14 @@ func stddev(results []TaskResult, metric func(TaskResult) float64) float64 {
 	variance /= float64(len(results) - 1) // sample variance
 
 	return math.Sqrt(variance)
+}
+
+// CompareThree computes a comparison across text, runtime, and ranked conditions.
+// The ranked condition is a runtime experiment using a RankedRetriever.
+// Existing text vs runtime deltas are preserved; RankedResults is added for
+// report rendering to produce a third column.
+func CompareThree(textResults, runtimeResults, rankedResults []TaskResult) *ComparisonResult {
+	cr := Compare(textResults, runtimeResults)
+	cr.RankedResults = rankedResults
+	return cr
 }

@@ -45,7 +45,7 @@ func renderTTY(findings []llmutil.Finding, filePath string, reg *registry.Regist
 	bold.Printf("\n%d recommendations for %s:\n\n", len(findings), filePath)
 
 	for _, f := range findings {
-		badge := confidenceBadgeTTY(f.Confidence)
+		badge := confidenceBadgeTTY(effectiveSeverity(f))
 		fmt.Printf("%s %s\n", badge, color.New(color.Bold).Sprint(f.Issue))
 
 		if f.CurrentState != "" {
@@ -65,7 +65,7 @@ func renderPlain(findings []llmutil.Finding, filePath string, reg *registry.Regi
 	fmt.Printf("%d recommendations for %s:\n", len(findings), filePath)
 
 	for _, f := range findings {
-		badge := confidenceBadgePlain(f.Confidence)
+		badge := confidenceBadgePlain(effectiveSeverity(f))
 		fmt.Printf("%s %s\n", badge, f.Issue)
 
 		if f.CurrentState != "" {
@@ -95,6 +95,14 @@ func resolveCitation(f llmutil.Finding, reg *registry.Registry) string {
 		return ""
 	}
 	return fmt.Sprintf("%s — %s (%s)", rec.Citation, rec.Paper, rec.URL)
+}
+
+// effectiveSeverity returns Severity if set (static checks), else Confidence (LLM findings).
+func effectiveSeverity(f llmutil.Finding) string {
+	if f.Severity != "" {
+		return f.Severity
+	}
+	return f.Confidence
 }
 
 func confidenceBadgeTTY(confidence string) string {
@@ -132,6 +140,10 @@ type StructuralResult struct {
 
 // ComputeStructural counts pass/fail from static findings.
 // Includes section-presence checks (Missing) and secret scanning (any security finding = fail).
+//
+// Secret detection delegates to isSecretFinding (gate.go) so this routine and
+// gate.Evaluate stay in sync. Story 4-0 AC #3 — single source of truth for
+// secret classification.
 func ComputeStructural(findings []llmutil.Finding, totalSections int) StructuralResult {
 	missing := make(map[string]bool)
 	secretsFound := 0
@@ -139,7 +151,7 @@ func ComputeStructural(findings []llmutil.Finding, totalSections int) Structural
 		if strings.Contains(f.Issue, "Missing") {
 			missing[f.Category] = true
 		}
-		if f.Category == "security" && strings.Contains(f.Issue, "detected") {
+		if isSecretFinding(f) {
 			secretsFound++
 		}
 	}
@@ -232,9 +244,10 @@ func RenderConsistency(findings []llmutil.Finding, tty bool, reg *registry.Regis
 		fmt.Printf("\n-- Cross-File Consistency --\n")
 	}
 	for _, f := range findings {
-		badge := confidenceBadgePlain(f.Confidence)
+		sev := effectiveSeverity(f)
+		badge := confidenceBadgePlain(sev)
 		if tty {
-			badge = confidenceBadgeTTY(f.Confidence)
+			badge = confidenceBadgeTTY(sev)
 		}
 		fmt.Printf("%s %s\n", badge, f.Issue)
 		if f.CurrentState != "" {
@@ -248,24 +261,6 @@ func RenderConsistency(findings []llmutil.Finding, tty bool, reg *registry.Regis
 			}
 		}
 		fmt.Println()
-	}
-}
-
-// RenderIndicators prints continuous metrics between structural and quality findings.
-func RenderIndicators(indicators []struct{ Name, Value, Guidance string }, tty bool) {
-	if len(indicators) == 0 {
-		return
-	}
-	if tty {
-		fmt.Printf("\nIndicators:\n")
-		for _, ind := range indicators {
-			fmt.Printf("  %s: %s (%s)\n", ind.Name, color.CyanString(ind.Value), ind.Guidance)
-		}
-	} else {
-		fmt.Printf("Indicators:\n")
-		for _, ind := range indicators {
-			fmt.Printf("  %s: %s (%s)\n", ind.Name, ind.Value, ind.Guidance)
-		}
 	}
 }
 

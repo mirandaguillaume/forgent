@@ -1,0 +1,7142 @@
+[
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 278
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 278
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 278
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 836,
+    "WallClockMs": 5722,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 253
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 4,
+        "TokensUsed": 253
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 253
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 759,
+    "WallClockMs": 5019,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 262
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 262
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 262
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 787,
+    "WallClockMs": 5519,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 263
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 4,
+        "TokensUsed": 263
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 263
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 789,
+    "WallClockMs": 5210,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 266
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 4,
+        "TokensUsed": 266
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 266
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 798,
+    "WallClockMs": 4990,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 280
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 4,
+        "TokensUsed": 280
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 280
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 841,
+    "WallClockMs": 5387,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 309
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 309
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 309
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 927,
+    "WallClockMs": 6391,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 260
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 260
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 260
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 780,
+    "WallClockMs": 5399,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 264
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 264
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 264
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 792,
+    "WallClockMs": 4907,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 280
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 4,
+        "TokensUsed": 280
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 280
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 841,
+    "WallClockMs": 6377,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 265
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 265
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 265
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 796,
+    "WallClockMs": 5366,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 269
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 4,
+        "TokensUsed": 269
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 269
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 809,
+    "WallClockMs": 5186,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 260
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 260
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 260
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 780,
+    "WallClockMs": 5277,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 262
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 262
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 262
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 787,
+    "WallClockMs": 6393,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 264
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 264
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 264
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 794,
+    "WallClockMs": 5537,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 257
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 257
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 257
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 771,
+    "WallClockMs": 5258,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 264
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 4,
+        "TokensUsed": 264
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 264
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 792,
+    "WallClockMs": 5526,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 261
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 4,
+        "TokensUsed": 261
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 261
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 784,
+    "WallClockMs": 4909,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 277
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 277
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 277
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 831,
+    "WallClockMs": 5639,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 267
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 267
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 267
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 802,
+    "WallClockMs": 5267,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 230
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 230
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 230
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 690,
+    "WallClockMs": 4552,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 256
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 256
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 256
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 768,
+    "WallClockMs": 5146,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 261
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 4,
+        "TokensUsed": 261
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 261
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 784,
+    "WallClockMs": 5028,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 247
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 4,
+        "TokensUsed": 247
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 247
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 741,
+    "WallClockMs": 4785,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 268
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 4,
+        "TokensUsed": 268
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 268
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 806,
+    "WallClockMs": 5643,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 247
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 247
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 247
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 741,
+    "WallClockMs": 5168,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 266
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 266
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 266
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 799,
+    "WallClockMs": 5046,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 250
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 250
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 250
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 752,
+    "WallClockMs": 4755,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 261
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 4,
+        "TokensUsed": 261
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 261
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 784,
+    "WallClockMs": 5344,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "code-review",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 253
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 4,
+        "TokensUsed": 253
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 3,
+        "TokensUsed": 253
+      }
+    ],
+    "OrderingScore": 1,
+    "GuardrailScore": 1,
+    "TokensUsed": 761,
+    "WallClockMs": 4731,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1064
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1064
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 7,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1064
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1064
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1064
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1064
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1064
+      }
+    ],
+    "OrderingScore": 0.7142857142857143,
+    "GuardrailScore": 0.7142857142857143,
+    "TokensUsed": 7449,
+    "WallClockMs": 60076,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1143
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1143
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 7,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1143
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 2,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1143
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1143
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1143
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1143
+      }
+    ],
+    "OrderingScore": 0.8571428571428571,
+    "GuardrailScore": 0.5714285714285714,
+    "TokensUsed": 8007,
+    "WallClockMs": 52697,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1047
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1047
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 7,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1047
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1047
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1047
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1047
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1047
+      }
+    ],
+    "OrderingScore": 0.8571428571428571,
+    "GuardrailScore": 0.5714285714285714,
+    "TokensUsed": 7330,
+    "WallClockMs": 56287,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1070
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1070
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 7,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1070
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1070
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1070
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1070
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1070
+      }
+    ],
+    "OrderingScore": 0.7142857142857143,
+    "GuardrailScore": 0.7142857142857143,
+    "TokensUsed": 7495,
+    "WallClockMs": 54295,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1054
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1054
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 7,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1054
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1054
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1054
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1054
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1054
+      }
+    ],
+    "OrderingScore": 0.7142857142857143,
+    "GuardrailScore": 0.5714285714285714,
+    "TokensUsed": 7380,
+    "WallClockMs": 56145,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1184
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1184
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1184
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1184
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1184
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1184
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1184
+      }
+    ],
+    "OrderingScore": 0.7142857142857143,
+    "GuardrailScore": 0.7142857142857143,
+    "TokensUsed": 8289,
+    "WallClockMs": 58138,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1049
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1049
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 7,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1049
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1049
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1049
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1049
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1049
+      }
+    ],
+    "OrderingScore": 0.7142857142857143,
+    "GuardrailScore": 0.7142857142857143,
+    "TokensUsed": 7343,
+    "WallClockMs": 59699,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1048
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1048
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 7,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1048
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1048
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1048
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1048
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1048
+      }
+    ],
+    "OrderingScore": 0.8571428571428571,
+    "GuardrailScore": 0.8571428571428571,
+    "TokensUsed": 7336,
+    "WallClockMs": 53569,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1054
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1054
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1054
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1054
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1054
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1054
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1054
+      }
+    ],
+    "OrderingScore": 0.8571428571428571,
+    "GuardrailScore": 0.7142857142857143,
+    "TokensUsed": 7384,
+    "WallClockMs": 61059,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1037
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1037
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1037
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1037
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1037
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1037
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1037
+      }
+    ],
+    "OrderingScore": 0.8571428571428571,
+    "GuardrailScore": 0.8571428571428571,
+    "TokensUsed": 7259,
+    "WallClockMs": 58504,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1060
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1060
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 7,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1060
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1060
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1060
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1060
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1060
+      }
+    ],
+    "OrderingScore": 0.7142857142857143,
+    "GuardrailScore": 0.5714285714285714,
+    "TokensUsed": 7422,
+    "WallClockMs": 55047,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1029
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1029
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 7,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1029
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1029
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1029
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1029
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1029
+      }
+    ],
+    "OrderingScore": 0.8571428571428571,
+    "GuardrailScore": 0.5714285714285714,
+    "TokensUsed": 7203,
+    "WallClockMs": 54664,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1091
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1091
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1091
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1091
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1091
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1091
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1091
+      }
+    ],
+    "OrderingScore": 0.8571428571428571,
+    "GuardrailScore": 0.8571428571428571,
+    "TokensUsed": 7640,
+    "WallClockMs": 56517,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1065
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1065
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 7,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1065
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 2,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1065
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1065
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1065
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1065
+      }
+    ],
+    "OrderingScore": 0.8571428571428571,
+    "GuardrailScore": 0.8571428571428571,
+    "TokensUsed": 7459,
+    "WallClockMs": 54317,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1103
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1103
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1103
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1103
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1103
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1103
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1103
+      }
+    ],
+    "OrderingScore": 0.7142857142857143,
+    "GuardrailScore": 0.7142857142857143,
+    "TokensUsed": 7722,
+    "WallClockMs": 57617,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1044
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1044
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 7,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1044
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1044
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1044
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1044
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1044
+      }
+    ],
+    "OrderingScore": 0.7142857142857143,
+    "GuardrailScore": 0.7142857142857143,
+    "TokensUsed": 7311,
+    "WallClockMs": 53315,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1121
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1121
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1121
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1121
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1121
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1121
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1121
+      }
+    ],
+    "OrderingScore": 0.7142857142857143,
+    "GuardrailScore": 0.8571428571428571,
+    "TokensUsed": 7852,
+    "WallClockMs": 56881,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1037
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1037
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 7,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1037
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1037
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1037
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1037
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1037
+      }
+    ],
+    "OrderingScore": 0.7142857142857143,
+    "GuardrailScore": 0.7142857142857143,
+    "TokensUsed": 7263,
+    "WallClockMs": 56863,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1050
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1050
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 7,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1050
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1050
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1050
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1050
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1050
+      }
+    ],
+    "OrderingScore": 0.7142857142857143,
+    "GuardrailScore": 0.7142857142857143,
+    "TokensUsed": 7353,
+    "WallClockMs": 55994,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1026
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1026
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 7,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1026
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1026
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1026
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1026
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1026
+      }
+    ],
+    "OrderingScore": 0.8571428571428571,
+    "GuardrailScore": 0.5714285714285714,
+    "TokensUsed": 7183,
+    "WallClockMs": 56712,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1043
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1043
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 7,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1043
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1043
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1043
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1043
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1043
+      }
+    ],
+    "OrderingScore": 0.7142857142857143,
+    "GuardrailScore": 0.7142857142857143,
+    "TokensUsed": 7302,
+    "WallClockMs": 54550,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1076
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1076
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1076
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1076
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1076
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1076
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1076
+      }
+    ],
+    "OrderingScore": 0.8571428571428571,
+    "GuardrailScore": 0.5714285714285714,
+    "TokensUsed": 7533,
+    "WallClockMs": 57944,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1073
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1073
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1073
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1073
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1073
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1073
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1073
+      }
+    ],
+    "OrderingScore": 0.8571428571428571,
+    "GuardrailScore": 0.5714285714285714,
+    "TokensUsed": 7515,
+    "WallClockMs": 53863,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1052
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1052
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1052
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1052
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1052
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1052
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1052
+      }
+    ],
+    "OrderingScore": 0.8571428571428571,
+    "GuardrailScore": 0.5714285714285714,
+    "TokensUsed": 7370,
+    "WallClockMs": 57745,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1129
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1129
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 7,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1129
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1129
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1129
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1129
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1129
+      }
+    ],
+    "OrderingScore": 0.7142857142857143,
+    "GuardrailScore": 0.5714285714285714,
+    "TokensUsed": 7904,
+    "WallClockMs": 58754,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1067
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1067
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 7,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1067
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1067
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1067
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1067
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1067
+      }
+    ],
+    "OrderingScore": 0.8571428571428571,
+    "GuardrailScore": 0.5714285714285714,
+    "TokensUsed": 7471,
+    "WallClockMs": 57449,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1049
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1049
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1049
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1049
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1049
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1049
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1049
+      }
+    ],
+    "OrderingScore": 0.8571428571428571,
+    "GuardrailScore": 0.5714285714285714,
+    "TokensUsed": 7345,
+    "WallClockMs": 59742,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1048
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1048
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 7,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1048
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1048
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1048
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1048
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1048
+      }
+    ],
+    "OrderingScore": 0.8571428571428571,
+    "GuardrailScore": 0.5714285714285714,
+    "TokensUsed": 7336,
+    "WallClockMs": 55781,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1060
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1060
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 7,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1060
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1060
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 4,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1060
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1060
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1060
+      }
+    ],
+    "OrderingScore": 0.7142857142857143,
+    "GuardrailScore": 0.7142857142857143,
+    "TokensUsed": 7425,
+    "WallClockMs": 54550,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "complex-migration",
+    "Condition": "text",
+    "Completed": true,
+    "StepResults": [
+      {
+        "StepID": "analyze-breaking",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 6,
+        "KeywordsTotal": 6,
+        "TokensUsed": 1010
+      },
+      {
+        "StepID": "dependency-order",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1010
+      },
+      {
+        "StepID": "data-transform",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 7,
+        "KeywordsTotal": 7,
+        "TokensUsed": 1010
+      },
+      {
+        "StepID": "rollback-plan",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 3,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1010
+      },
+      {
+        "StepID": "zero-downtime",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1010
+      },
+      {
+        "StepID": "validation-queries",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1010
+      },
+      {
+        "StepID": "runbook",
+        "Completed": true,
+        "Output": "",
+        "KeywordsHit": 5,
+        "KeywordsTotal": 5,
+        "TokensUsed": 1010
+      }
+    ],
+    "OrderingScore": 0.7142857142857143,
+    "GuardrailScore": 0.5714285714285714,
+    "TokensUsed": 7074,
+    "WallClockMs": 56452,
+    "LLMCalls": 1,
+    "Error": null
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 212,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 158,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 170,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 273,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 237,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 362,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 235,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 124,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 356,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 126,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 223,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 237,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 235,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 248,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 234,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 236,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 237,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 240,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 236,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 237,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 236,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 153,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 199,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "conflicting-constraints",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 246,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 204,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 245,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 236,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 363,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 236,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 236,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 134,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 343,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 295,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 180,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 235,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 241,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 246,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 365,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 243,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 247,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 232,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 144,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 209,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 366,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 240,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 241,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 613,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "constraint-overload",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 236,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 193,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 245,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 236,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 237,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 245,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 236,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 245,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 230,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 237,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 489,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 124,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 228,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 240,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 240,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 361,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 243,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 237,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 122,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 226,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 241,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 240,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "doc-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 242,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 554,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 485,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 235,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 236,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 175,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 180,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 128,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 232,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 130,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 220,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 241,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 242,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 243,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 233,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 237,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 247,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 236,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 237,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 237,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 241,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 425,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 295,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 236,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 240,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 235,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "gsd-implementation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 174,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 237,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 156,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 195,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 237,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 244,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 237,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 236,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 237,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 246,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 235,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 237,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 216,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 261,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 237,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 241,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 237,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 235,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 235,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 242,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 233,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 237,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 241,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "iterative-refinement",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 245,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 227,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 231,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 363,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 366,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 229,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 237,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 181,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 302,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 235,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 241,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 242,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 167,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 305,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 236,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 243,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 145,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 332,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 243,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 362,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 235,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 241,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 245,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 233,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 483,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 365,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "long-input-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 171,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 338,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 234,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 245,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 234,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 240,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 246,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 130,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 221,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 368,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 137,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 181,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 140,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 371,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 235,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 235,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 240,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 235,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 612,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 361,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 234,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 244,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 236,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "multi-agent-review",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 273,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 235,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 297,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 131,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 130,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 155,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 241,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 169,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 153,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 148,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 241,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 244,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 243,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 363,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 243,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 235,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 240,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 235,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 240,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 240,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 248,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 235,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 243,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 370,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "parallel-analysis",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 231,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 135,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 245,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 129,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 155,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 201,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 242,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 245,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 242,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 246,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 242,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 244,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 241,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 247,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 242,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 242,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 244,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 242,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 241,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 243,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 241,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 245,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 248,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 237,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 246,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 735,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 138,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 215,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 240,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "refactoring",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 150,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 258,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 232,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 158,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 316,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 245,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 229,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 246,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 355,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 196,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 157,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 127,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 355,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 231,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 240,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 244,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 229,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 237,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 237,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 240,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 242,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 240,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 230,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "security-audit",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 237,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 242,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 357,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 235,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 248,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 358,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 235,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 237,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 235,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 242,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 243,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 233,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 243,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 140,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 217,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 232,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 179,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 297,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 238,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 236,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 240,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 236,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 240,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 234,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 143,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 210,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 239,
+    "LLMCalls": 1,
+    "Error": {}
+  },
+  {
+    "TaskID": "test-generation",
+    "Condition": "text",
+    "Completed": false,
+    "StepResults": null,
+    "OrderingScore": 0,
+    "GuardrailScore": 0,
+    "TokensUsed": 0,
+    "WallClockMs": 237,
+    "LLMCalls": 1,
+    "Error": {}
+  }
+]

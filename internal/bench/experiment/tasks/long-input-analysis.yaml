@@ -1,0 +1,210 @@
+id: long-input-analysis
+name: Large Codebase Analysis with Lost-in-the-Middle
+description: |
+  Analyze a large code input (~200 lines) with bugs planted at the beginning,
+  middle, and end. Research shows LLMs exhibit "lost in the middle" — they
+  attend well to the start and end of long inputs but miss details in the
+  middle. Decomposed analysis (per-section) catches middle-section bugs
+  that single-shot misses.
+category: long-input
+input: |
+  // Package auth implements authentication and session management.
+  // BUG 1 (top): Session token uses math/rand, not crypto/rand
+  package auth
+
+  import (
+      "math/rand"
+      "time"
+      "sync"
+      "net/http"
+      "encoding/hex"
+      "encoding/json"
+      "strings"
+      "fmt"
+      "os"
+      "log"
+  )
+
+  // ---- SECTION A: Token generation ----
+
+  const tokenLength = 32
+
+  func GenerateToken() string {
+      b := make([]byte, tokenLength)
+      rand.Read(b)  // BUG: uses math/rand.Read, not crypto/rand.Read
+      return hex.EncodeToString(b)
+  }
+
+  func init() {
+      rand.Seed(time.Now().UnixNano())  // predictable seed
+  }
+
+  // ---- SECTION B: Session store (lines 30-80) ----
+
+  type Session struct {
+      Token     string
+      UserID    string
+      ExpiresAt time.Time
+      Data      map[string]interface{}
+  }
+
+  type SessionStore struct {
+      mu       sync.RWMutex
+      sessions map[string]*Session
+      maxAge   time.Duration
+  }
+
+  func NewSessionStore(maxAge time.Duration) *SessionStore {
+      return &SessionStore{
+          sessions: make(map[string]*Session),
+          maxAge:   maxAge,
+      }
+  }
+
+  func (s *SessionStore) Create(userID string) *Session {
+      s.mu.Lock()
+      defer s.mu.Unlock()
+      session := &Session{
+          Token:     GenerateToken(),
+          UserID:    userID,
+          ExpiresAt: time.Now().Add(s.maxAge),
+          Data:      make(map[string]interface{}),
+      }
+      s.sessions[session.Token] = session
+      return session
+  }
+
+  // BUG 2 (middle): Get doesn't check expiration
+  func (s *SessionStore) Get(token string) *Session {
+      s.mu.RLock()
+      defer s.mu.RUnlock()
+      return s.sessions[token]  // returns expired sessions!
+  }
+
+  func (s *SessionStore) Delete(token string) {
+      s.mu.Lock()
+      defer s.mu.Unlock()
+      delete(s.sessions, token)
+  }
+
+  // BUG 3 (middle): no cleanup of expired sessions — memory leak
+  func (s *SessionStore) Count() int {
+      s.mu.RLock()
+      defer s.mu.RUnlock()
+      return len(s.sessions)
+  }
+
+  // ---- SECTION C: Middleware (lines 80-130) ----
+
+  func (s *SessionStore) AuthMiddleware(next http.Handler) http.Handler {
+      return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+          cookie, err := r.Cookie("session")
+          if err != nil {
+              http.Error(w, "unauthorized", 401)
+              return
+          }
+          // BUG 4 (middle): no CSRF protection
+          // BUG 5 (middle): cookie value not sanitized
+          session := s.Get(cookie.Value)
+          if session == nil {
+              http.Error(w, "invalid session", 401)
+              return
+          }
+          r.Header.Set("X-User-ID", session.UserID)
+          next.ServeHTTP(w, r)
+      })
+  }
+
+  // BUG 6 (middle): login endpoint logs password
+  func (s *SessionStore) LoginHandler(w http.ResponseWriter, r *http.Request) {
+      var creds struct {
+          Username string `json:"username"`
+          Password string `json:"password"`
+      }
+      json.NewDecoder(r.Body).Decode(&creds)
+      log.Printf("Login attempt: user=%s pass=%s", creds.Username, creds.Password)
+
+      // BUG 7 (middle): hardcoded credentials
+      if creds.Username == "admin" && creds.Password == "admin123" {
+          session := s.Create(creds.Username)
+          http.SetCookie(w, &http.Cookie{
+              Name:  "session",
+              Value: session.Token,
+              // BUG 8 (middle): missing Secure, HttpOnly, SameSite flags
+          })
+          w.WriteHeader(200)
+          return
+      }
+      http.Error(w, "invalid credentials", 401)
+  }
+
+  // ---- SECTION D: API handlers (lines 130-170) ----
+
+  func (s *SessionStore) ProfileHandler(w http.ResponseWriter, r *http.Request) {
+      userID := r.Header.Get("X-User-ID")
+      // BUG 9 (near end): no authorization check — any authenticated user
+      // can access any profile by setting X-User-ID header directly
+      profile := map[string]string{
+          "user_id": userID,
+          "role":    "user",
+      }
+      json.NewEncoder(w).Encode(profile)
+  }
+
+  // BUG 10 (end): admin endpoint has no role check
+  func (s *SessionStore) AdminHandler(w http.ResponseWriter, r *http.Request) {
+      sessions := s.Count()
+      stats := map[string]interface{}{
+          "active_sessions": sessions,
+          "server_version": os.Getenv("APP_VERSION"),
+          "go_version":     fmt.Sprintf("%s", "go1.22"),
+          "env_vars":       os.Environ(),  // BUG 11 (end): leaks all env vars including secrets
+      }
+      json.NewEncoder(w).Encode(stats)
+  }
+steps:
+  - id: scan-section-a
+    name: Scan Section A (Token Generation)
+    prompt: |
+      Analyze ONLY the token generation code (Section A, first ~30 lines).
+      Find ALL security and correctness bugs in this section.
+      For each bug: title, severity, specific line, fix.
+    consumes: [task_input]
+    produces: [section_a_bugs]
+  - id: scan-section-b
+    name: Scan Section B (Session Store)
+    prompt: |
+      Analyze ONLY the session store code (Section B, lines ~30-80).
+      Find ALL bugs. Pay special attention to expiration handling and memory management.
+      For each bug: title, severity, specific line, fix.
+    consumes: [task_input]
+    produces: [section_b_bugs]
+  - id: scan-section-c
+    name: Scan Section C (Middleware + Login)
+    prompt: |
+      Analyze ONLY the middleware and login code (Section C, lines ~80-130).
+      Find ALL security bugs. Check: CSRF, cookie flags, logging, credentials.
+      For each bug: title, severity, specific line, fix.
+    consumes: [task_input]
+    produces: [section_c_bugs]
+  - id: scan-section-d
+    name: Scan Section D (API Handlers)
+    prompt: |
+      Analyze ONLY the API handler code (Section D, lines ~130-170).
+      Find ALL security bugs. Check: authorization, information disclosure, header trust.
+      For each bug: title, severity, specific line, fix.
+    consumes: [task_input]
+    produces: [section_d_bugs]
+  - id: aggregate
+    name: Aggregate All Bugs
+    prompt: |
+      Combine bugs from all 4 sections. There should be at least 10 bugs total.
+      Deduplicate and rank by severity. Group by category (crypto, auth, data, info disclosure).
+      Verify the total count — the code has exactly 11 planted bugs.
+    consumes: [section_a_bugs, section_b_bugs, section_c_bugs, section_d_bugs]
+    produces: [all_bugs]
+guardrails:
+  - math/rand
+  - CSRF
+  - HttpOnly
+  - Environ

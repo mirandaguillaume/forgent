@@ -291,6 +291,13 @@ func runWithRetry(ctx context.Context, n *Node, inputs map[string]any) (map[stri
 		return map[string]any{}, nil
 	}
 
+	// Build the callable: wrap Run with middlewares if configured.
+	// Chain is built ONCE before the retry loop (stateless).
+	handler := MiddlewareFunc(n.Run)
+	if len(n.Middlewares) > 0 {
+		handler = buildChain(handler, n.Middlewares)
+	}
+
 	attempt := func() (map[string]any, error) {
 		runCtx := ctx
 		var cancel context.CancelFunc
@@ -298,7 +305,7 @@ func runWithRetry(ctx context.Context, n *Node, inputs map[string]any) (map[stri
 			runCtx, cancel = context.WithTimeout(ctx, n.Timeout)
 			defer cancel()
 		}
-		return n.Run(runCtx, inputs)
+		return handler(runCtx, inputs)
 	}
 
 	out, err := attempt()

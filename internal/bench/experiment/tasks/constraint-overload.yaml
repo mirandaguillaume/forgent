@@ -1,0 +1,66 @@
+id: constraint-overload
+name: Constraint-Heavy API Design
+description: |
+  Design an API endpoint with 18 specific constraints. Research shows that
+  single-prompt LLMs drop constraints proportionally to constraint count —
+  at 15+ constraints, violation rate exceeds 30% in single-shot but stays
+  under 10% when decomposed into constraint-focused steps.
+category: constraint-satisfaction
+input: |
+  Design a Go HTTP endpoint: POST /api/v1/documents/upload
+  that handles multi-part file upload with metadata.
+steps:
+  - id: type-constraints
+    name: Apply Type Constraints
+    prompt: |
+      Define the Go types for the upload endpoint. You MUST satisfy ALL of these constraints:
+      1. Request struct uses multipart form, NOT JSON body
+      2. File field named "file", max 10MB
+      3. Metadata fields: title (string, 1-200 chars), tags ([]string, max 10 tags), visibility (enum: public/private/internal)
+      4. Response struct: id (UUID), title, file_size (int64, bytes), upload_url (string), created_at (RFC3339)
+      5. Error response: code (int), message (string), field (string, which field failed)
+      6. All struct fields have json tags with omitempty where appropriate
+    produces: [types]
+  - id: validation-constraints
+    name: Apply Validation Constraints
+    prompt: |
+      Write the validation function. You MUST satisfy ALL of these constraints:
+      7. Title: required, 1-200 chars, no HTML tags, trim whitespace
+      8. Tags: optional, each tag 1-50 chars, alphanumeric + hyphens only, deduplicate
+      9. Visibility: required, must be exactly "public", "private", or "internal"
+      10. File: required, max 10MB, allowed MIME types: application/pdf, image/png, image/jpeg
+      11. File name: no path traversal (reject ../ and absolute paths)
+      12. Return ALL validation errors at once, not just the first
+    consumes: [types]
+    produces: [validation]
+  - id: handler-constraints
+    name: Apply Handler Constraints
+    prompt: |
+      Write the HTTP handler. You MUST satisfy ALL of these constraints:
+      13. Parse multipart form with 10MB max memory
+      14. Authenticate via Bearer token in Authorization header
+      15. Rate limit: 10 uploads per minute per user (use context value)
+      16. Generate UUID v4 for document ID (use crypto/rand, NOT math/rand)
+      17. Store file to disk at /data/uploads/{user_id}/{doc_id}/{original_filename}
+      18. Return 201 on success, 400 on validation error, 401 on auth failure, 413 if file too large, 429 if rate limited
+    consumes: [types, validation]
+    produces: [handler]
+  - id: verify-all
+    name: Verify All 18 Constraints
+    prompt: |
+      Review the complete implementation and verify EACH of the 18 numbered constraints is satisfied.
+      For each constraint, state: number, satisfied (yes/no), evidence (which line/code satisfies it).
+      If any constraint is violated, show the fix.
+    consumes: [types, validation, handler]
+    produces: [verification]
+guardrails:
+  - crypto/rand
+  - multipart
+  - 201
+  - 401
+  - 429
+  - Bearer
+  - omitempty
+  - "!math/rand"
+  - "!json.Decode"
+  - "!ioutil"

@@ -22,7 +22,7 @@ type secretPattern struct {
 // The first match per line wins, so specific tokens must precede generic "token=" patterns.
 var secretPatterns = []secretPattern{
 	{"Anthropic API key", regexp.MustCompile(`sk-ant-[a-zA-Z0-9\-]{90,}`)},
-	{"OpenAI API key", regexp.MustCompile(`sk-[a-zA-Z0-9]{20,}`)},
+	{"OpenAI API key", regexp.MustCompile(`sk-proj-[a-zA-Z0-9]{20,}|sk-[a-zA-Z0-9]{48,}`)},
 	{"AWS access key", regexp.MustCompile(`AKIA[0-9A-Z]{16}`)},
 	{"GitHub PAT", regexp.MustCompile(`ghp_[a-zA-Z0-9]{36}`)},
 	{"GitHub OAuth token", regexp.MustCompile(`gho_[a-zA-Z0-9]{36}`)},
@@ -61,8 +61,11 @@ func (s *secretsCheck) Run(analysis *parser.AgentAnalysis) []llmutil.Finding {
 
 	for lineNum, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "```") {
+		if IsCodeFenceLine(trimmed) {
 			inCodeFence = !inCodeFence
+			continue
+		}
+		if inCodeFence {
 			continue
 		}
 
@@ -70,6 +73,11 @@ func (s *secretsCheck) Run(analysis *parser.AgentAnalysis) []llmutil.Finding {
 			if sp.pattern.MatchString(line) {
 				// Check if this looks like a placeholder/example
 				if isPlaceholder(line) {
+					continue
+				}
+				// Skip generic patterns (password/secret/token/api_key assignments)
+				// when the line is about configuring secrets, not containing them.
+				if strings.Contains(sp.name, "assignment") && isConfigContext(line) {
 					continue
 				}
 				findings = append(findings, llmutil.Finding{
@@ -88,9 +96,23 @@ func (s *secretsCheck) Run(analysis *parser.AgentAnalysis) []llmutil.Finding {
 	return findings
 }
 
+// configContextIndicators are words near a match that suggest the line is
+// documentation about configuring a secret, not an actual secret value.
+var configContextIndicators = []string{"configure", "set ", "env var", "variable", "environment"}
+
 func isPlaceholder(line string) bool {
 	lower := strings.ToLower(line)
 	for _, indicator := range placeholderIndicators {
+		if strings.Contains(lower, indicator) {
+			return true
+		}
+	}
+	return false
+}
+
+func isConfigContext(line string) bool {
+	lower := strings.ToLower(line)
+	for _, indicator := range configContextIndicators {
 		if strings.Contains(lower, indicator) {
 			return true
 		}

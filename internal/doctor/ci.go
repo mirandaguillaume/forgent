@@ -14,8 +14,12 @@ var lineNumberRe = regexp.MustCompile(`line (\d+)`)
 // RenderGitHubAnnotations outputs findings as GitHub Actions annotations.
 func RenderGitHubAnnotations(findings []llmutil.Finding, filePath string) {
 	for _, f := range findings {
+		sev := f.Severity
+		if sev == "" {
+			sev = f.Confidence
+		}
 		level := "warning"
-		if strings.ToLower(f.Confidence) == "high" {
+		if strings.ToLower(sev) == "high" {
 			level = "error"
 		}
 
@@ -44,11 +48,11 @@ func RenderGateAnnotation(result GateResult) {
 		fmt.Println("::notice::Doctor quality gate passed")
 	} else {
 		for _, f := range result.Failures {
-			fmt.Printf("::error::Quality gate failed: %s\n", f)
+			fmt.Printf("::error::Quality gate failed: %s\n", escapeAnnotation(f))
 		}
 	}
 	for _, w := range result.Warnings {
-		fmt.Printf("::warning::Quality gate warning: %s\n", w)
+		fmt.Printf("::warning::Quality gate warning: %s\n", escapeAnnotation(w))
 	}
 }
 

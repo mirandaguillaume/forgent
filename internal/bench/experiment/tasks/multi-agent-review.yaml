@@ -1,0 +1,83 @@
+id: multi-agent-review
+name: Multi-Agent Code Review Pipeline
+description: |
+  BMad-inspired workflow: analyze a code change from 3 independent perspectives
+  IN PARALLEL, then triage findings, deduplicate, and produce a structured report.
+
+  The key: in DAG mode, the 3 analysis perspectives run as parallel nodes.
+  In text mode, the LLM must serialize all 3 analyses in a single response,
+  which typically leads to cross-contamination (perspective B referencing
+  findings from perspective A) and incomplete coverage of later perspectives.
+category: multi-agent
+input: |
+  Code change to review:
+  ```go
+  func TransferFunds(ctx context.Context, from, to string, amount float64) error {
+      fromAccount, err := db.GetAccount(ctx, from)
+      if err != nil { return err }
+      toAccount, err := db.GetAccount(ctx, to)
+      if err != nil { return err }
+      if fromAccount.Balance < amount {
+          return ErrInsufficientFunds
+      }
+      fromAccount.Balance -= amount
+      toAccount.Balance += amount
+      if err := db.SaveAccount(ctx, fromAccount); err != nil { return err }
+      if err := db.SaveAccount(ctx, toAccount); err != nil { return err }
+      log.Printf("Transferred %.2f from %s to %s", amount, from, to)
+      return nil
+  }
+  ```
+steps:
+  - id: blind-review
+    name: Blind Bug Hunter
+    prompt: |
+      You are a Blind Bug Hunter. Review ONLY for bugs, logic errors, and correctness issues.
+      Do NOT consider performance, style, or design.
+      Do NOT reference any other review perspective.
+      List each finding with: title, severity (critical/major/minor), evidence.
+    consumes: [task_input]
+    produces: [blind_findings]
+  - id: security-review
+    name: Security Reviewer
+    prompt: |
+      You are a Security Reviewer. Review ONLY for security vulnerabilities.
+      Do NOT consider bugs, performance, or style.
+      Do NOT reference any other review perspective.
+      Check for: injection, authorization, logging sensitive data, TOCTOU.
+      List each finding with: title, CWE if applicable, evidence.
+    consumes: [task_input]
+    produces: [security_findings]
+  - id: design-review
+    name: Design Reviewer
+    prompt: |
+      You are a Design Reviewer. Review ONLY for architectural and design issues.
+      Do NOT consider bugs or security.
+      Do NOT reference any other review perspective.
+      Check for: separation of concerns, error handling patterns, interface design, testability.
+      List each finding with: title, impact, suggestion.
+    consumes: [task_input]
+    produces: [design_findings]
+  - id: triage
+    name: Triage and Deduplicate
+    prompt: |
+      You received findings from 3 independent reviewers. Triage them:
+      1. MERGE duplicate findings (same underlying issue found by multiple reviewers)
+      2. CLASSIFY each as: must-fix (blocks merge), should-fix (before next release), nice-to-have
+      3. ORDER by severity (must-fix first)
+      4. For each merged finding, note which reviewers independently found it.
+    consumes: [blind_findings, security_findings, design_findings]
+    produces: [triaged_findings]
+  - id: synthesize-report
+    name: Synthesize Final Report
+    prompt: |
+      Write the final code review report. Include:
+      1. Executive summary (1-2 sentences)
+      2. Must-fix findings with specific code suggestions
+      3. Should-fix findings
+      4. Nice-to-have suggestions
+      5. Verdict: APPROVE, REQUEST_CHANGES, or BLOCK
+    consumes: [triaged_findings]
+    produces: [final_report]
+guardrails:
+  - REQUEST_CHANGES

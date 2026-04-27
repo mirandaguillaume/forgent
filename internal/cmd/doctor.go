@@ -16,17 +16,14 @@ import (
 	"github.com/mirandaguillaume/forgent/internal/doctor"
 	"github.com/mirandaguillaume/forgent/internal/doctor/analyzer"
 	doctorctx "github.com/mirandaguillaume/forgent/internal/doctor/context"
+	docindex "github.com/mirandaguillaume/forgent/internal/doctor/index"
 	"github.com/mirandaguillaume/forgent/internal/doctor/llmutil"
 	"github.com/mirandaguillaume/forgent/internal/doctor/parser"
 	"github.com/mirandaguillaume/forgent/internal/doctor/registry"
-	"github.com/mirandaguillaume/forgent/internal/doctor/rewrite"
-	docindex "github.com/mirandaguillaume/forgent/internal/doctor/index"
 	"github.com/mirandaguillaume/forgent/internal/doctor/scaffold"
 	"github.com/mirandaguillaume/forgent/internal/doctor/static"
-	"github.com/mirandaguillaume/forgent/internal/scanner"
-	"github.com/mirandaguillaume/forgent/internal/doctor/validate"
-	"github.com/mirandaguillaume/forgent/internal/fileops"
 	"github.com/mirandaguillaume/forgent/internal/llm"
+	"github.com/mirandaguillaume/forgent/internal/scanner"
 	"github.com/spf13/cobra"
 )
 
@@ -130,6 +127,7 @@ Examples:
 				}
 			}
 
+			cmdCtx := cmd.Context()
 			var analysisErr error
 			if isIndex {
 				analysisErr = runIndexModeWithContent(target, indexContent, mode, formatFlag, ciFlag, reg)
@@ -137,11 +135,11 @@ Examples:
 				analysisErr = runQuickMode(target, reg)
 			} else if mode == "quick" && (formatFlag != "" || ciFlag) {
 				// Quick mode but with structured output — use pipeline
-				analysisErr = runPipelineMode(target, providerFlag, modelFlag, debugFlag, noCacheFlag, ciFlag, mode, formatFlag, reg)
+				analysisErr = runPipelineMode(cmdCtx, target, providerFlag, modelFlag, debugFlag, noCacheFlag, ciFlag, mode, formatFlag, reg)
 			} else if info.IsDir() {
-				analysisErr = runDirectoryMode(target, providerFlag, modelFlag, debugFlag, noCacheFlag, reg)
+				analysisErr = runDirectoryMode(cmdCtx, target, providerFlag, modelFlag, debugFlag, noCacheFlag, reg)
 			} else {
-				analysisErr = runPipelineMode(target, providerFlag, modelFlag, debugFlag, noCacheFlag, ciFlag, mode, formatFlag, reg)
+				analysisErr = runPipelineMode(cmdCtx, target, providerFlag, modelFlag, debugFlag, noCacheFlag, ciFlag, mode, formatFlag, reg)
 			}
 
 			// Show registry update notification once, after all findings
@@ -445,7 +443,7 @@ func scaffoldMissing(indexPath string, indexContent []byte, debugFlag bool) erro
 }
 
 // runPipelineMode runs the full pipeline: static → LLM → post-process → gate.
-func runPipelineMode(filePath, providerFlag, modelFlag string, debugFlag, noCacheFlag, ciFlag bool, mode, formatFlag string, reg *registry.Registry) error {
+func runPipelineMode(ctx context.Context, filePath, providerFlag, modelFlag string, debugFlag, noCacheFlag, ciFlag bool, mode, formatFlag string, reg *registry.Registry) error {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("cannot read %s: %w", filePath, err)
@@ -485,10 +483,15 @@ func runPipelineMode(filePath, providerFlag, modelFlag string, debugFlag, noCach
 			fmt.Fprintf(os.Stderr, "\nNo LLM provider available — showing static analysis only.\n")
 		}
 	} else {
+		var spin *doctor.Spinner
 		if tty {
-			fmt.Fprintf(os.Stderr, "\nAnalyzing with LLM...\n")
+			spin = doctor.NewSpinner("Analyzing with LLM...")
+			spin.Start()
 		}
-		llmFindings, _, err = analyzeFile(filePath, providerFlag, modelFlag, debugFlag, noCacheFlag, reg)
+		llmFindings, _, err = analyzeFile(ctx, filePath, providerFlag, modelFlag, debugFlag, noCacheFlag, reg)
+		if spin != nil {
+			spin.Stop()
+		}
 		if err != nil {
 			if debugFlag {
 				fmt.Fprintf(os.Stderr, "[DEBUG] LLM analysis error: %v\n", err)
@@ -523,49 +526,8 @@ func runPipelineMode(filePath, providerFlag, modelFlag string, debugFlag, noCach
 	return nil
 }
 
-// runFileMode analyzes a single file with progressive display: static instant → LLM.
-func runFileMode(filePath, providerFlag, modelFlag string, debugFlag, noCacheFlag bool, reg *registry.Registry) error {
-	// Read and parse for static checks first
-	content, err := os.ReadFile(filePath)
-	if err != nil {
-		return fmt.Errorf("cannot read %s: %w", filePath, err)
-	}
-	p, err := parser.DetectFormat(filePath, content)
-	if err != nil {
-		return fmt.Errorf("cannot detect format of %s: %w", filePath, err)
-	}
-	analysis, err := p.Parse(content)
-	if err != nil {
-		return fmt.Errorf("parse error in %s: %w", filePath, err)
-	}
-
-	tty := doctor.IsTTY()
-
-	// Phase 1: Static checks (instant)
-	staticFindings := static.RunChecks(analysis, "default")
-	structural := doctor.ComputeStructural(staticFindings, sectionMappingCount)
-	doctor.RenderStructural(structural, filePath, tty)
-
-	// Phase 2: LLM analysis
-	if tty {
-		fmt.Fprintf(os.Stderr, "\nAnalyzing with LLM...\n")
-	}
-	findings, _, err := analyzeFile(filePath, providerFlag, modelFlag, debugFlag, noCacheFlag, reg)
-	if err != nil {
-		return err
-	}
-
-	doctor.RenderFindings(findings, filePath, tty, reg)
-
-	totalFindings := len(staticFindings) + len(findings)
-	if totalFindings > 0 {
-		return ErrFindings
-	}
-	return nil
-}
-
 // runDirectoryMode discovers agent files, analyzes each, and renders an aggregate summary.
-func runDirectoryMode(dirPath, providerFlag, modelFlag string, debugFlag, noCacheFlag bool, reg *registry.Registry) error {
+func runDirectoryMode(ctx context.Context, dirPath, providerFlag, modelFlag string, debugFlag, noCacheFlag bool, reg *registry.Registry) error {
 	files, err := doctor.DiscoverAgentFiles(dirPath)
 	if err != nil {
 		return fmt.Errorf("discover agent files in %s: %w", dirPath, err)
@@ -592,7 +554,7 @@ func runDirectoryMode(dirPath, providerFlag, modelFlag string, debugFlag, noCach
 			fmt.Fprintf(os.Stderr, "Analyzing file %d of %d: %s\n", i+1, len(files), f)
 		}
 
-		findings, format, err := analyzeFile(f, providerFlag, modelFlag, debugFlag, noCacheFlag, reg)
+		findings, format, err := analyzeFile(ctx, f, providerFlag, modelFlag, debugFlag, noCacheFlag, reg)
 		result := doctor.FileResult{Path: f, Format: format, Error: err}
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "  Error: %s\n", err)
@@ -656,9 +618,9 @@ func runDirectoryMode(dirPath, providerFlag, modelFlag string, debugFlag, noCach
 	return nil
 }
 
-// analyzeFile runs the full analysis pipeline on a single file.
+// analyzeFile runs the full analysis pipeline on a single file using the DAG engine.
 // Returns findings, detected format name, and any error.
-func analyzeFile(filePath, providerFlag, modelFlag string, debugFlag, noCacheFlag bool, reg *registry.Registry) ([]llmutil.Finding, string, error) {
+func analyzeFile(ctx context.Context, filePath, providerFlag, modelFlag string, debugFlag, noCacheFlag bool, reg *registry.Registry) ([]llmutil.Finding, string, error) {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, "", fmt.Errorf("cannot read %s: %w", filePath, err)
@@ -666,9 +628,6 @@ func analyzeFile(filePath, providerFlag, modelFlag string, debugFlag, noCacheFla
 
 	if debugFlag {
 		fmt.Fprintf(os.Stderr, "[DEBUG] Registered parsers: %v\n", parser.RegisteredFormats())
-	}
-
-	if debugFlag {
 		for _, name := range parser.RegisteredFormats() {
 			pp, _ := parser.Get(name)
 			if pp != nil {
@@ -678,6 +637,7 @@ func analyzeFile(filePath, providerFlag, modelFlag string, debugFlag, noCacheFla
 		}
 	}
 
+	// Format detection (needed early for cache check and fallback path)
 	p, err := parser.DetectFormat(filePath, content)
 	if err != nil {
 		return nil, "", fmt.Errorf("cannot detect format of %s: %w\nSupported formats: Claude Code, GitHub Copilot, Forgent YAML", filePath, err)
@@ -698,87 +658,50 @@ func analyzeFile(filePath, providerFlag, modelFlag string, debugFlag, noCacheFla
 	}
 
 	// Select provider
-	provider, providerName, err := selectProvider(providerFlag, modelFlag, debugFlag)
-	if err != nil {
-		// No LLM available — static analysis + context enrichment only
+	provider, providerName, provErr := selectProvider(providerFlag, modelFlag, debugFlag)
+	if provErr != nil && debugFlag {
+		fmt.Fprintf(os.Stderr, "[DEBUG] No LLM: %s\n", provErr)
+	}
+
+	// Cache check (only when provider is available)
+	var cache *doctor.Cache
+	var cacheKey string
+	if provErr == nil {
 		if debugFlag {
-			fmt.Fprintf(os.Stderr, "[DEBUG] No LLM: %s\n", err)
+			fmt.Fprintf(os.Stderr, "[DEBUG] Using provider: %s\n", providerName)
 		}
-		var findings []llmutil.Finding
+		cwd, cwdErr := os.Getwd()
+		if cwdErr != nil {
+			cwd = filepath.Dir(filePath)
+		}
+		cacheDir := filepath.Join(cwd, ".forgent", "cache", "doctor")
+		cache = doctor.NewCache(cacheDir)
+		cacheProviderName := canonicalProvider(providerName)
+		cacheKey = doctor.CacheKey(content, reg.PromptHash(), cacheProviderName, reg.Version)
 
-		// Context enrichment (includes text ordering check)
-		projectRoot := doctorctx.DetectProjectRoot(filepath.Dir(filePath))
-		ctxFindings, _ := doctorctx.Enrich(analysis, projectRoot)
-		findings = append(findings, ctxFindings...)
-
-		// Show warnings
-		tty := doctor.IsTTY()
-		for _, w := range analysis.Warnings {
-			if tty {
-				fmt.Printf("%s %s\n", color.YellowString("[WARN]"), w)
-			} else {
-				fmt.Printf("WARN: %s\n", w)
+		if !noCacheFlag {
+			if cached := cache.Get(cacheKey); cached != nil {
+				if debugFlag {
+					fmt.Fprintf(os.Stderr, "[DEBUG] Cache hit for %s (key: %s)\n", filePath, cacheKey)
+				}
+				// Cache hit: still run context enrichment
+				projectRoot := doctorctx.DetectProjectRoot(filepath.Dir(filePath))
+				ctxFindings, _ := doctorctx.Enrich(analysis, projectRoot)
+				findings := append(cached, ctxFindings...)
+				return findings, p.Format(), nil
 			}
-		}
-
-		return findings, p.Format(), nil
-	}
-
-	if debugFlag {
-		fmt.Fprintf(os.Stderr, "[DEBUG] Using provider: %s\n", providerName)
-	}
-
-	// Cache setup — use file's directory as fallback if Getwd fails
-	cwd, err := os.Getwd()
-	if err != nil {
-		cwd = filepath.Dir(filePath)
-	}
-	cacheDir := filepath.Join(cwd, ".forgent", "cache", "doctor")
-	cache := doctor.NewCache(cacheDir)
-	// Use canonical provider name for cache key (strip "(auto-detected)" etc.)
-	cacheProviderName := canonicalProvider(providerName)
-	cacheKey := doctor.CacheKey(content, reg.PromptHash(), cacheProviderName, reg.Version)
-
-	// Check cache before LLM call
-	if !noCacheFlag {
-		if cached := cache.Get(cacheKey); cached != nil {
 			if debugFlag {
-				fmt.Fprintf(os.Stderr, "[DEBUG] Cache hit for %s (key: %s)\n", filePath, cacheKey)
+				fmt.Fprintf(os.Stderr, "[DEBUG] Cache miss for %s (key: %s)\n", filePath, cacheKey)
 			}
-			findings := cached
-
-			// Still run context enrichment on cached results
-			projectRoot := doctorctx.DetectProjectRoot(filepath.Dir(filePath))
-			ctxFindings, _ := doctorctx.Enrich(analysis, projectRoot)
-			findings = append(findings, ctxFindings...)
-
-			return findings, p.Format(), nil
-		}
-		if debugFlag {
-			fmt.Fprintf(os.Stderr, "[DEBUG] Cache miss for %s (key: %s)\n", filePath, cacheKey)
 		}
 	}
 
-	// Analyze with LLM
-	findings, err := analyzer.Analyze(analysis, provider, reg)
+	// Build and execute the doctor DAG
+	d, err := doctor.BuildDAG(debugFlag)
 	if err != nil {
-		return nil, p.Format(), fmt.Errorf("analysis failed: %w", err)
+		return nil, p.Format(), fmt.Errorf("build DAG: %w", err)
 	}
 
-	// Store in cache
-	cacheEntry := doctor.CacheEntry{
-		ContentHash:     fmt.Sprintf("%x", sha256.Sum256(content))[:16],
-		PromptHash:      reg.PromptHash(),
-		Model:           providerName,
-		RegistryVersion: reg.Version,
-		Timestamp:       time.Now(),
-		Findings:        findings,
-	}
-	if err := cache.Put(cacheKey, cacheEntry); err != nil && debugFlag {
-		fmt.Fprintf(os.Stderr, "[DEBUG] Cache write error: %v\n", err)
-	}
-
-	// Context enrichment (includes text ordering check)
 	projectRoot := doctorctx.DetectProjectRoot(filepath.Dir(filePath))
 	if debugFlag {
 		if projectRoot != "" {
@@ -787,123 +710,65 @@ func analyzeFile(filePath, providerFlag, modelFlag string, debugFlag, noCacheFla
 			fmt.Fprintf(os.Stderr, "[DEBUG] No project root detected — skipping context enrichment\n")
 		}
 	}
-	ctxFindings, ctxErr := doctorctx.Enrich(analysis, projectRoot)
-	if ctxErr != nil && debugFlag {
-		fmt.Fprintf(os.Stderr, "[DEBUG] Context enrichment error: %v\n", ctxErr)
+
+	input := doctor.DoctorInput{
+		FilePath:    filePath,
+		Content:     content,
+		Provider:    provider, // nil when no provider available
+		Registry:    reg,
+		ProjectRoot: projectRoot,
+		Debug:       debugFlag,
 	}
-	if debugFlag {
-		fmt.Fprintf(os.Stderr, "[DEBUG] Context findings: %d\n", len(ctxFindings))
+
+	// Concurrency=1 for Ollama (local LLM serialization)
+	concurrency := 0
+	if provErr == nil && isOllamaProvider(providerName) {
+		concurrency = 1
 	}
-	findings = append(findings, ctxFindings...)
+
+	result, err := doctor.RunDAG(ctx, d, input, concurrency)
+	if err != nil {
+		return nil, p.Format(), fmt.Errorf("analysis failed: %w", err)
+	}
+
+	// Cache LLM findings (not context findings); cache even when empty so clean files don't get re-analyzed
+	if cache != nil {
+		cacheEntry := doctor.CacheEntry{
+			ContentHash:     fmt.Sprintf("%x", sha256.Sum256(content))[:16],
+			PromptHash:      reg.PromptHash(),
+			Model:           providerName,
+			RegistryVersion: reg.Version,
+			Timestamp:       time.Now(),
+			Findings:        result.LLMFindings,
+		}
+		if cacheErr := cache.Put(cacheKey, cacheEntry); cacheErr != nil && debugFlag {
+			fmt.Fprintf(os.Stderr, "[DEBUG] Cache write error: %v\n", cacheErr)
+		}
+	}
 
 	// Show warnings
-	tty := doctor.IsTTY()
-	for _, w := range analysis.Warnings {
-		if tty {
-			fmt.Printf("%s %s\n", color.YellowString("[WARN]"), w)
-		} else {
-			fmt.Printf("WARN: %s\n", w)
+	if result.Analysis != nil {
+		tty := doctor.IsTTY()
+		for _, w := range result.Analysis.Warnings {
+			if tty {
+				fmt.Printf("%s %s\n", color.YellowString("[WARN]"), w)
+			} else {
+				fmt.Printf("WARN: %s\n", w)
+			}
 		}
 	}
 
-	return findings, p.Format(), nil
+	if debugFlag {
+		fmt.Fprintf(os.Stderr, "[DEBUG] DAG findings: %d (LLM: %d, context: %d)\n",
+			len(result.AllFindings), len(result.LLMFindings), len(result.CtxFindings))
+	}
+
+	return result.AllFindings, p.Format(), nil
 }
 
-// runFixMode analyzes a file, prompts the user to select recommendations,
-// rewrites the file via LLM, validates through the quality gate, and applies via SafeWrite.
-func runFixMode(filePath, providerFlag, modelFlag string, debugFlag, forceFlag, noCacheFlag bool, reg *registry.Registry) error {
-	// Analyze
-	findings, format, err := analyzeFile(filePath, providerFlag, modelFlag, debugFlag, noCacheFlag, reg)
-	if err != nil {
-		return err
-	}
-
-	tty := doctor.IsTTY()
-	doctor.RenderFindings(findings, filePath, tty, reg)
-
-	if len(findings) == 0 {
-		return nil
-	}
-
-	// Need an LLM provider for rewrite
-	provider, _, err := selectProvider(providerFlag, modelFlag, debugFlag)
-	if err != nil {
-		return fmt.Errorf("--fix requires an LLM provider: %w", err)
-	}
-
-	// Interactive selection
-	selected, err := rewrite.SelectRecommendations(findings, tty, nil)
-	if err != nil {
-		return fmt.Errorf("selection: %w", err)
-	}
-	if len(selected) == 0 {
-		fmt.Fprintf(os.Stderr, "No recommendations selected.\n")
-		return nil
-	}
-
-	// Read original content
-	original, err := os.ReadFile(filePath)
-	if err != nil {
-		return fmt.Errorf("read file: %w", err)
-	}
-
-	// Rewrite via LLM
-	fmt.Fprintf(os.Stderr, "\nRewriting with %d selected recommendation(s)...\n", len(selected))
-	rewritten, err := rewrite.Rewrite(original, selected, format, provider)
-	if err != nil {
-		return fmt.Errorf("rewrite: %w", err)
-	}
-
-	// Show diff
-	diff := rewrite.GenerateDiff(original, rewritten, tty)
-	if diff != "" {
-		fmt.Fprintf(os.Stderr, "\n%s\n", diff)
-	} else {
-		fmt.Fprintf(os.Stderr, "No changes produced by rewrite.\n")
-		return nil
-	}
-
-	// Quality gate
-	gateResult := validate.Validate(original, rewritten, validate.GateOptions{Force: forceFlag})
-	if !gateResult.Passed {
-		fmt.Fprintf(os.Stderr, "\nQuality gate FAILED — file NOT modified:\n")
-		for _, f := range gateResult.Failures {
-			fmt.Fprintf(os.Stderr, "  [%s] %s\n", f.Check, f.Detail)
-		}
-		fmt.Fprintf(os.Stderr, "\nTry applying recommendations individually or use --force to skip diff-size check.\n")
-		return fmt.Errorf("quality gate rejected rewrite (%d failures)", len(gateResult.Failures))
-	}
-
-	// SafeWrite with signal handling
-	ctx, cancel := fileops.WithCleanup(context.Background())
-	defer cancel()
-
-	if err := fileops.SafeWrite(ctx, filePath, rewritten); err != nil {
-		return fmt.Errorf("safe write: %w", err)
-	}
-
-	// Purge cache for this file (content changed)
-	fixCwd, cwdErr := os.Getwd()
-	if cwdErr != nil {
-		fixCwd = filepath.Dir(filePath)
-	}
-	fixCache := doctor.NewCache(filepath.Join(fixCwd, ".forgent", "cache", "doctor"))
-	contentHash := fmt.Sprintf("%x", sha256.Sum256(original))[:16]
-	fixCache.Purge(contentHash)
-
-	if tty {
-		color.Green("\nFile updated: %s (backup: %s.bak)", filePath, filePath)
-	} else {
-		fmt.Printf("File updated: %s (backup: %s.bak)\n", filePath, filePath)
-	}
-
-	// Cleanup old backups
-	dir := filepath.Dir(filePath)
-	if cleaned, _ := fileops.CleanupBackups(dir, fileops.DefaultBackupMaxAge); cleaned > 0 && debugFlag {
-		fmt.Fprintf(os.Stderr, "[DEBUG] Cleaned %d old backup(s)\n", cleaned)
-	}
-
-	return nil
+// isOllamaProvider returns true if the provider name indicates Ollama.
+func isOllamaProvider(name string) bool {
+	return strings.HasPrefix(name, "ollama")
 }
 
 // selectProvider chooses an LLM provider using the fallback chain:
@@ -931,7 +796,7 @@ func selectProvider(providerFlag, modelFlag string, debug bool) (llm.Provider, s
 		default:
 			return nil, "", fmt.Errorf("unknown provider %q (available: ollama, openrouter, anthropic)", providerFlag)
 		}
-		p, err := llm.GetProvider(providerFlag, apiKey)
+		p, err := llm.GetProviderWithModel(providerFlag, apiKey, modelFlag)
 		if err != nil {
 			return nil, "", err
 		}
@@ -991,35 +856,6 @@ func ollamaRunning(debug bool) bool {
 	return resp.StatusCode == http.StatusOK
 }
 
-func renderStaticAnalysis(analysis *parser.AgentAnalysis, filePath string) {
-	tty := doctor.IsTTY()
-
-	if tty {
-		bold := color.New(color.Bold)
-		bold.Printf("\nStatic analysis for %s (format: %s):\n\n", filePath, analysis.Format)
-	} else {
-		fmt.Printf("Static analysis for %s (format: %s):\n", filePath, analysis.Format)
-	}
-
-	fmt.Printf("  Sections: %d\n", len(analysis.Sections))
-	fmt.Printf("  Tools: %d", len(analysis.Tools))
-	if len(analysis.Tools) > 0 {
-		fmt.Printf(" (%s)", joinMax(analysis.Tools, 5))
-	}
-	fmt.Println()
-	fmt.Printf("  Frontmatter fields: %d\n", len(analysis.Frontmatter))
-
-	for _, w := range analysis.Warnings {
-		if tty {
-			fmt.Printf("  %s %s\n", color.YellowString("[WARN]"), w)
-		} else {
-			fmt.Printf("  WARN: %s\n", w)
-		}
-	}
-
-	fmt.Println("\n  For full LLM-powered analysis, install Ollama: https://ollama.com")
-}
-
 // canonicalProvider extracts the short provider name from display names
 // like "ollama (auto-detected)" or "openrouter (via OPENROUTER_API_KEY)".
 func canonicalProvider(name string) string {
@@ -1029,9 +865,3 @@ func canonicalProvider(name string) string {
 	return name
 }
 
-func joinMax(items []string, max int) string {
-	if len(items) <= max {
-		return fmt.Sprintf("%v", items)
-	}
-	return fmt.Sprintf("%v and %d more", items[:max], len(items)-max)
-}

@@ -40,8 +40,14 @@ func (d *duplicatesCheck) Run(analysis *parser.AgentAnalysis) []llmutil.Finding 
 	var findings []llmutil.Finding
 	seen := make(map[string]bool) // "lineA:lineB" to avoid duplicate pairs
 
+	const maxFindings = 50
+
+outer:
 	for i := 0; i < len(instructions); i++ {
 		for j := i + 1; j < len(instructions); j++ {
+			if len(findings) >= maxFindings {
+				break outer
+			}
 			sim := jaccard(instructions[i].words, instructions[j].words)
 			if sim >= jaccardThreshold {
 				key := fmt.Sprintf("%d:%d", instructions[i].lineNum, instructions[j].lineNum)
@@ -73,7 +79,7 @@ func extractInstructions(content string) []instructionLine {
 
 	for lineNum, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "```") {
+		if IsCodeFenceLine(trimmed) {
 			inCodeFence = !inCodeFence
 			continue
 		}
@@ -140,9 +146,20 @@ func jaccard(a, b map[string]bool) float64 {
 	return float64(intersection) / float64(union)
 }
 
+// truncate shortens s to maxLen runes (not bytes) followed by "..." when needed.
+// Operating on runes prevents slicing multi-byte UTF-8 sequences in the middle,
+// which would produce invalid UTF-8 output and corrupt JSON serialization.
+// Story 4-0 AC #7.
 func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
+	if maxLen < 0 {
+		return ""
+	}
+	runes := []rune(s)
+	if len(runes) <= maxLen {
 		return s
 	}
-	return s[:maxLen-3] + "..."
+	if maxLen <= 3 {
+		return string(runes[:maxLen])
+	}
+	return string(runes[:maxLen-3]) + "..."
 }

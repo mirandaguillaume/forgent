@@ -143,3 +143,55 @@ func TestSmells_AllTaggedThorough(t *testing.T) {
 	check := &smellsCheck{}
 	assert.Equal(t, []string{"thorough"}, check.Tags())
 }
+
+func TestSmells_LLMGenerated_TransitionsOnlyOR(t *testing.T) {
+	// Only transitions (>3), no numbered lists — should still trigger with OR logic
+	content := `## Rules
+Additionally, you should follow these.
+Furthermore, always check inputs.
+Moreover, handle all errors gracefully.
+In addition, log every operation carefully.`
+
+	analysis := &parser.AgentAnalysis{RawContent: []byte(content)}
+	f := detectLLMGenerated(analysis)
+	assert.NotNil(t, f, "4+ transitions alone should trigger LLM-generated detection (OR logic)")
+}
+
+func TestSmells_LLMGenerated_NumberedOnlyOR(t *testing.T) {
+	// Only numbered lists (>5), no transition phrases — should trigger with OR logic
+	content := `## Steps
+1. First do this important thing
+2. Second validate everything
+3. Third run all tests carefully
+4. Fourth check for regressions
+5. Fifth deploy to staging
+6. Sixth monitor the logs`
+
+	analysis := &parser.AgentAnalysis{RawContent: []byte(content)}
+	f := detectLLMGenerated(analysis)
+	assert.NotNil(t, f, "6+ numbered items alone should trigger LLM-generated detection (OR logic)")
+}
+
+func TestSmells_NumberedList_IgnoresMeasurements(t *testing.T) {
+	// "3.5 GHz" should NOT be detected as a numbered instruction
+	content := "The processor runs at 3.5 GHz with 2.0 TB storage and version 1.0 support."
+	analysis := &parser.AgentAnalysis{RawContent: []byte(content)}
+	f := detectLLMGenerated(analysis)
+	assert.Nil(t, f, "measurements like 3.5 GHz should not trigger numbered list detection")
+}
+
+func TestSmells_CheckboxAgent_EmptySectionsExcluded(t *testing.T) {
+	// 10 sections: 5 with content, 5 empty — average should use only non-empty sections
+	sections := make([]parser.Section, 10)
+	for i := 0; i < 5; i++ {
+		sections[i] = parser.Section{Header: "Section", Level: 2, Content: strings.Repeat("word ", 25)}
+	}
+	for i := 5; i < 10; i++ {
+		sections[i] = parser.Section{Header: "Empty", Level: 2, Content: ""}
+	}
+
+	analysis := &parser.AgentAnalysis{RawContent: []byte("content"), Sections: sections}
+	f := detectCheckboxAgent(analysis)
+	// 5 non-empty sections with 25 words each = avg 25 >= 20 threshold → no finding
+	assert.Nil(t, f, "empty sections should be excluded from average, non-empty avg is 25 words")
+}

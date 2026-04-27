@@ -159,6 +159,41 @@ func TestAnalyze_EnrichesCitationID(t *testing.T) {
 	assert.Equal(t, "guardrails", results[0].CitationID)
 }
 
+func TestBuildPrompt_SizeGuard(t *testing.T) {
+	reg, err := registry.Load("")
+	require.NoError(t, err)
+
+	// Create a large content that exceeds 128KB (~32K tokens)
+	largeContent := make([]byte, 130_000)
+	for i := range largeContent {
+		largeContent[i] = 'A' + byte(i%26)
+	}
+
+	analysis := &parser.AgentAnalysis{
+		Format:     "claude",
+		RawContent: largeContent,
+	}
+
+	prompt := buildPrompt(analysis, reg)
+	assert.Contains(t, prompt, "TRUNCATED")
+	assert.Less(t, len(prompt), len(largeContent)+10_000,
+		"prompt must be shorter than the original oversized content")
+}
+
+func TestBuildPrompt_NormalSizeNotTruncated(t *testing.T) {
+	reg, err := registry.Load("")
+	require.NoError(t, err)
+
+	analysis := &parser.AgentAnalysis{
+		Format:     "claude",
+		RawContent: []byte("Normal sized content here."),
+	}
+
+	prompt := buildPrompt(analysis, reg)
+	assert.NotContains(t, prompt, "TRUNCATED")
+	assert.Contains(t, prompt, "Normal sized content here.")
+}
+
 func TestAnalyze_Integration(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test in short mode")

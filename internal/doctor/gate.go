@@ -38,11 +38,29 @@ func DefaultGate() *QualityGate {
 	}
 }
 
+// isSecretFinding returns true if the finding represents a detected secret.
+// Centralized here so gate evaluation (gate.go) and structural scoring
+// (render.go ComputeStructural) stay in sync. Heuristic: security category +
+// Issue text contains "detected". Story 4-0 AC #3.
+func isSecretFinding(f llmutil.Finding) bool {
+	return strings.EqualFold(f.Category, "security") && strings.Contains(strings.ToLower(f.Issue), "detected")
+}
+
 // Evaluate checks all conditions against the report metrics.
 // Gate passes iff ALL blocking conditions pass.
+//
+// An empty Conditions slice does NOT silently pass — it produces a warning
+// so the user knows the gate configuration is empty. A silent pass on an
+// empty gate is dangerous because it implies "all checks satisfied" when in
+// reality no checks ran. Story 4-0 AC #4.
 func (g *QualityGate) Evaluate(structural StructuralResult, findings []llmutil.Finding) GateResult {
 	metrics := computeMetrics(structural, findings)
 	result := GateResult{Pass: true}
+
+	if len(g.Conditions) == 0 {
+		result.Warnings = append(result.Warnings, "quality gate has no conditions — nothing was evaluated")
+		return result
+	}
 
 	for _, cond := range g.Conditions {
 		val, ok := metrics[cond.Metric]
@@ -71,10 +89,14 @@ func computeMetrics(structural StructuralResult, findings []llmutil.Finding) map
 	secretsFound := 0
 	highFindings := 0
 	for _, f := range findings {
-		if f.Category == "security" && strings.Contains(f.Issue, "detected") {
+		if isSecretFinding(f) {
 			secretsFound++
 		}
-		if strings.ToLower(f.Confidence) == "high" {
+		sev := f.Severity
+		if sev == "" {
+			sev = f.Confidence
+		}
+		if strings.ToLower(sev) == "high" {
 			highFindings++
 		}
 	}

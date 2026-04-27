@@ -1,0 +1,68 @@
+id: iterative-refinement
+name: Iterative Code Refinement Pipeline
+description: |
+  3-pass refinement: generate → critique → fix. Research shows that
+  self-critique in a separate step catches 40-60% more issues than
+  asking the LLM to "be careful" in a single generation. In text mode,
+  the critique is biased toward confirming the original generation
+  (same context window). In DAG mode, the critic gets ONLY the code,
+  not the reasoning that produced it — true independence.
+category: iterative
+input: |
+  Write a Go function that parses a cron expression (minute hour day month weekday)
+  and returns the next N future execution times from a given start time.
+
+  Signature: func NextCronTimes(expr string, from time.Time, n int) ([]time.Time, error)
+
+  Must handle:
+  - Wildcards (*), ranges (1-5), lists (1,3,5), steps (*/5)
+  - Day-of-week: 0=Sun, 6=Sat
+  - Validation: reject invalid ranges, out-of-bounds values
+  - Edge cases: Feb 29, DST transitions, year rollover
+steps:
+  - id: first-draft
+    name: First Draft Implementation
+    prompt: |
+      Write the complete implementation of NextCronTimes.
+      Include all helper functions for parsing fields, matching, and iteration.
+      Focus on correctness first — don't worry about optimization.
+    produces: [draft_code]
+  - id: critique
+    name: Independent Critique
+    prompt: |
+      You are a code reviewer. You did NOT write this code.
+      Review the cron parser implementation for:
+      1. Correctness: Does it handle all field types (*, ranges, lists, steps)?
+      2. Edge cases: Feb 29, month boundaries, year rollover, DST
+      3. Performance: Is there an infinite loop risk? What if no match exists?
+      4. Error handling: Are invalid expressions rejected with clear messages?
+      List every issue found. Be thorough — assume the code has bugs.
+    consumes: [draft_code]
+    produces: [critique]
+  - id: fix
+    name: Apply Fixes
+    prompt: |
+      Take the original implementation and the critique.
+      Fix EVERY issue identified in the critique.
+      Show the complete corrected implementation, not just patches.
+      Add comments explaining each fix.
+    consumes: [draft_code, critique]
+    produces: [fixed_code]
+  - id: verify
+    name: Write Verification Tests
+    prompt: |
+      Write tests that specifically target the issues found in the critique.
+      Each test should verify that a previously-identified bug is now fixed.
+      Include the edge cases: Feb 29, midnight rollover, */5 step parsing.
+    consumes: [critique, fixed_code]
+    produces: [verification_tests]
+  - id: final-review
+    name: Final Quality Assessment
+    prompt: |
+      Compare the first draft against the fixed version.
+      List: how many issues were found, how many were fixed, any remaining risks.
+      Rate the improvement: minor/moderate/significant.
+    consumes: [draft_code, fixed_code, critique]
+    produces: [assessment]
+guardrails:
+  - NextCronTimes

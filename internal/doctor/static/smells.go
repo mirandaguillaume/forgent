@@ -131,34 +131,6 @@ func detectCopyPaste(analysis *parser.AgentAnalysis) *llmutil.Finding {
 	return nil
 }
 
-func toWordSet(text string) map[string]bool {
-	words := make(map[string]bool)
-	for _, w := range strings.Fields(strings.ToLower(text)) {
-		clean := strings.Trim(w, ".,;:!?\"'()[]`")
-		if len(clean) > 2 {
-			words[clean] = true
-		}
-	}
-	return words
-}
-
-func jaccardSimilarity(a, b map[string]bool) float64 {
-	if len(a) == 0 && len(b) == 0 {
-		return 0
-	}
-	intersection := 0
-	for w := range a {
-		if b[w] {
-			intersection++
-		}
-	}
-	union := len(a) + len(b) - intersection
-	if union == 0 {
-		return 0
-	}
-	return float64(intersection) / float64(union)
-}
-
 // --- LLM-Generated Agent: transition phrases + numbered lists ---
 
 var llmTransitions = []string{
@@ -166,24 +138,39 @@ var llmTransitions = []string{
 	"it's worth noting", "it is worth noting", "it should be noted",
 }
 
-var numberedListRe = regexp.MustCompile(`^\s*\d+\.\s`)
+// Require a capital letter after the number+dot to distinguish instructions
+// ("1. Always use...") from measurements ("3.5 GHz", "2.0 release").
+var numberedListRe = regexp.MustCompile(`^\s*\d+\.\s+[A-Z]`)
 
 func detectLLMGenerated(analysis *parser.AgentAnalysis) *llmutil.Finding {
-	content := normalizeApostrophes(strings.ToLower(string(analysis.RawContent)))
+	lowerContent := normalizeApostrophes(strings.ToLower(string(analysis.RawContent)))
 
+	// Multi-word phrases (e.g., "in addition", "it's worth noting") need substring
+	// matching since they aren't single tokens. Single-word transitions go through
+	// countWholeWord to avoid false positives like "additionally" matching inside
+	// other words. Both branches are intentional.
 	transitionCount := 0
 	for _, t := range llmTransitions {
-		transitionCount += strings.Count(content, t)
+		if strings.Contains(t, " ") {
+			transitionCount += strings.Count(lowerContent, t)
+		} else {
+			transitionCount += countWholeWord(lowerContent, t)
+		}
 	}
 
+	// Count numbered lists on original-case content — the regex requires a
+	// capital letter after the number to distinguish "1. Always run tests"
+	// from measurements like "3.5 GHz".
 	numberedCount := 0
-	for _, line := range strings.Split(content, "\n") {
+	for _, line := range strings.Split(string(analysis.RawContent), "\n") {
 		if numberedListRe.MatchString(line) {
 			numberedCount++
 		}
 	}
 
-	if transitionCount <= 3 || numberedCount <= 5 {
+	// Either signal alone is sufficient: 4+ transition phrases OR 6+ numbered
+	// items. Changed from AND to OR per retro finding — single signal is enough.
+	if transitionCount <= 3 && numberedCount <= 5 {
 		return nil
 	}
 
@@ -205,21 +192,32 @@ func detectCheckboxAgent(analysis *parser.AgentAnalysis) *llmutil.Finding {
 		return nil
 	}
 
+	// Exclude empty sections (0 words) from the average — they inflate
+	// the section count without contributing content.
 	totalWords := 0
+	nonEmptySections := 0
 	for _, s := range sections {
-		totalWords += len(strings.Fields(s.Content))
+		wc := len(strings.Fields(s.Content))
+		if wc > 0 {
+			totalWords += wc
+			nonEmptySections++
+		}
 	}
 
-	avgWords := totalWords / len(sections)
+	if nonEmptySections == 0 {
+		return nil
+	}
+
+	avgWords := totalWords / nonEmptySections
 	if avgWords >= 20 {
 		return nil
 	}
 
 	return &llmutil.Finding{
 		Category:             smellCategory,
-		Issue:                fmt.Sprintf("Checkbox agent: %d sections with avg %d words each", len(sections), avgWords),
+		Issue:                fmt.Sprintf("Checkbox agent: %d non-empty sections with avg %d words each", nonEmptySections, avgWords),
 		Confidence:           "moderate",
-		CurrentState:         fmt.Sprintf("%d sections present but averaging only %d words per section (threshold: <20)", len(sections), avgWords),
+		CurrentState:         fmt.Sprintf("%d sections (%d non-empty) averaging only %d words per section (threshold: <20)", len(sections), nonEmptySections, avgWords),
 		SuggestedImprovement: "All sections present but too shallow. Add substance — specific instructions, examples, and criteria to each section.",
 	}
 }
@@ -235,24 +233,20 @@ func normalizeApostrophes(s string) string {
 	return s
 }
 
-// countWordMatches counts occurrences of target words/phrases in a word list.
-// Multi-word phrases are checked against the original content via strings.Count.
-// Single words are matched as whole words from the Fields-split list.
-func countWordMatches(words []string, targets []string) int {
+// countWordOrPhraseMatches counts occurrences of target words and phrases in
+// content. Single-word targets use countWholeWord (whole-word, punctuation-aware).
+// Multi-word phrases (containing a space) use strings.Count substring matching
+// since phrases aren't single tokens.
+//
+// Refactored from a local helper to delegate to countWholeWord (Epic 7 retro
+// action #2 — single source of truth for whole-word matching).
+func countWordOrPhraseMatches(content string, targets []string) int {
 	count := 0
 	for _, target := range targets {
 		if strings.Contains(target, " ") {
-			// Multi-word phrase: count in joined content (already lowercase)
-			content := strings.Join(words, " ")
 			count += strings.Count(content, target)
 		} else {
-			// Single word: match whole words only
-			for _, w := range words {
-				clean := strings.Trim(w, ".,;:!?\"'()[]`")
-				if clean == target {
-					count++
-				}
-			}
+			count += countWholeWord(content, target)
 		}
 	}
 	return count
@@ -263,10 +257,9 @@ var permissionWords = []string{"should", "can", "allowed", "encouraged", "recomm
 
 func detectOverConstrained(analysis *parser.AgentAnalysis) *llmutil.Finding {
 	content := normalizeApostrophes(strings.ToLower(string(analysis.RawContent)))
-	words := strings.Fields(content)
 
-	prohibitions := countWordMatches(words, prohibitionWords)
-	permissions := countWordMatches(words, permissionWords)
+	prohibitions := countWordOrPhraseMatches(content, prohibitionWords)
+	permissions := countWordOrPhraseMatches(content, permissionWords)
 
 	if prohibitions <= 10 || permissions >= 3 {
 		return nil

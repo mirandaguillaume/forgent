@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/mirandaguillaume/forgent/pkg/sandbox"
 	"gopkg.in/yaml.v3"
 )
 
@@ -149,12 +150,33 @@ type ObservabilityFacet struct {
 	Metrics    []string   `yaml:"metrics"`
 }
 
+// FileAccessConfig declares file access permissions for a skill.
+type FileAccessConfig struct {
+	Read  []string `yaml:"read,omitempty"`
+	Write []string `yaml:"write,omitempty"`
+	Deny  []string `yaml:"deny,omitempty"`
+}
+
+// ToPolicy converts the config to a sandbox FileAccessPolicy.
+// Returns nil if the receiver is nil (no policy = allow all).
+func (f *FileAccessConfig) ToPolicy() *sandbox.FileAccessPolicy {
+	if f == nil {
+		return nil
+	}
+	return &sandbox.FileAccessPolicy{
+		ReadGlobs:  f.Read,
+		WriteGlobs: f.Write,
+		DenyGlobs:  f.Deny,
+	}
+}
+
 // SecurityFacet defines access and sandboxing constraints.
 type SecurityFacet struct {
-	Filesystem AccessLevel   `yaml:"filesystem"`
-	Network    NetworkAccess `yaml:"network"`
-	Secrets    []string      `yaml:"secrets"`
-	Sandbox    SandboxType   `yaml:"sandbox,omitempty"`
+	Filesystem AccessLevel       `yaml:"filesystem"`
+	Network    NetworkAccess     `yaml:"network"`
+	Secrets    []string          `yaml:"secrets"`
+	Sandbox    SandboxType       `yaml:"sandbox,omitempty"`
+	FileAccess *FileAccessConfig `yaml:"file_access,omitempty"`
 }
 
 // NegotiationFacet defines conflict resolution behavior.
