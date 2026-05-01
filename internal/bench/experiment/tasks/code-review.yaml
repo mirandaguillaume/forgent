@@ -1,38 +1,369 @@
+# Accurate model of Claude Code's built-in code-reviewer workflow
+# Source: .claude/plugins/.../code-review/commands/code-review.md
+#
+# Real topology (9 agents total):
+#   eligibility (step 1)
+#   → [parallel: pr-summary | claude-md-discovery]   (steps 2-3)
+#   → [parallel: claude-md-audit | bug-scan | git-history-review | pr-history-review | code-comment-audit]  (step 4, 5 agents)
+#   → collect-issues                                  (aggregate all findings into a list)
+#   → score-issues   [kind: map — one Haiku per issue, streaming]  (step 5)
+#   → filter-issues  [kind: filter — keep score >= 80]             (step 6)
+#   → second-eligibility                              (step 7: re-check before commenting)
+#   → post-comment                                    (step 8)
+#
+# Streaming insight (user): score-issues does NOT wait for all 5 analysis agents.
+# Each issue can be scored as soon as its producer finishes (event-driven scheduling).
+# Modeled here as kind: map — DAG spawns one scoring goroutine per item in issues_list.
+# True streaming (start scoring before all 5 agents finish) requires dependency-based
+# scheduling; the current layer-based scheduler starts score-issues after all 5 agents
+# but within score-issues all items are processed concurrently.
+#
+# Pathology targeted: sequential execution of the 5 analysis agents + sequential scoring
+# (1 LLM call per issue instead of parallel). Detection: wall_clock_ms.
 id: code-review
-name: Code Review
-description: Review a Go function for bugs, style issues, and improvements
-category: code-review
-input: |
-  func processItems(items []string, maxRetries int) ([]string, error) {
-    var results []string
-    for i := 0; i < len(items); i++ {
-      item := items[i]
-      for retry := 0; retry < maxRetries; retry++ {
-        result, err := transform(item)
-        if err == nil {
-          results = append(results, result)
-          break
-        }
-        if retry == maxRetries {
-          return nil, fmt.Errorf("failed after %d retries: %w", maxRetries, err)
-        }
-      }
-    }
-    return results, nil
-  }
+name: Claude Code Reviewer (accurate 9-agent model)
+description: |
+  Accurate model of Claude Code's built-in code-reviewer.
+  9 agents: eligibility, pr-summary + CLAUDE.md discovery (parallel),
+  5 parallel analysis agents, per-issue confidence scoring (kind: map),
+  filter (score >= 80), second eligibility check, final comment.
+category: claude-code-workflow
+workspace:
+  files:
+    - path: "pr_diff.patch"
+      content: |
+        diff --git a/internal/cache/lru.go b/internal/cache/lru.go
+        new file mode 100644
+        index 0000000..b1c2d3e
+        --- /dev/null
+        +++ b/internal/cache/lru.go
+        @@ -0,0 +1,67 @@
+        +package cache
+        +
+        +import (
+        +  "sync"
+        +)
+        +
+        +type LRUCache struct {
+        +  capacity int
+        +  mu       sync.Mutex
+        +  items    map[string]*entry
+        +  order    []string
+        +}
+        +
+        +type entry struct {
+        +  key   string
+        +  value interface{}
+        +}
+        +
+        +func NewLRUCache(capacity int) *LRUCache {
+        +  return &LRUCache{
+        +    capacity: capacity,
+        +    items:    make(map[string]*entry),
+        +  }
+        +}
+        +
+        +func (c *LRUCache) Get(key string) (interface{}, bool) {
+        +  c.mu.Lock()
+        +  defer c.mu.Unlock()
+        +  e, ok := c.items[key]
+        +  if !ok {
+        +    return nil, false
+        +  }
+        +  c.moveToFront(key)
+        +  return e.value, true
+        +}
+        +
+        +func (c *LRUCache) Set(key string, value interface{}) {
+        +  c.mu.Lock()
+        +  defer c.mu.Unlock()
+        +  if _, ok := c.items[key]; ok {
+        +    c.moveToFront(key)
+        +    c.items[key].value = value
+        +    return
+        +  }
+        +  if len(c.items) >= c.capacity {
+        +    last := c.order[len(c.order)-1]
+        +    c.order = c.order[:len(c.order)-1]
+        +    delete(c.items, last)
+        +  }
+        +  c.items[key] = &entry{key: key, value: value}
+        +  c.order = append([]string{key}, c.order...)
+        +}
+        +
+        +func (c *LRUCache) moveToFront(key string) {
+        +  for i, k := range c.order {
+        +    if k == key {
+        +      c.order = append(c.order[:i], c.order[i+1:]...)
+        +      break
+        +    }
+        +  }
+        +  c.order = append([]string{key}, c.order...)
+        +}
+
+    - path: "pr_description.md"
+      content: |
+        ## PR: Add LRU Cache implementation
+
+        Adds an in-memory LRU cache for API response caching.
+        - Thread-safe via sync.Mutex
+        - O(1) Get, O(n) eviction (uses slice for ordering)
+        - Used by: rate limiter, session store
+
+    - path: "CLAUDE.md"
+      content: |
+        # Project Guidelines
+        - All exported types must have godoc comments
+        - Prefer linked list for O(1) LRU eviction over slice (O(n))
+        - No use of interface{} — use generics or typed wrappers
+        - Mutex must be held for minimum duration (no lock held during IO)
+
+    - path: "git_history.txt"
+      content: |
+        # Simulated git history for internal/cache/
+        # File is new — no prior history on this path.
+        # Related: internal/ratelimit/cache.go was deleted in commit a1b2c3d
+        # that commit message: "remove in-memory cache: used slice-based LRU, O(n) eviction"
+
+    - path: "previous_prs.txt"
+      content: |
+        # Previous PRs touching internal/cache/ or similar paths
+        PR #142: "feat: add response cache" — reviewer comment: "slice-based LRU is O(n),
+        use container/list for O(1) eviction. Rejected."
+        PR #156: "fix: cache eviction order" — never merged (stale)
+
 steps:
-  - id: identify-bugs
-    name: Identify Bugs
-    prompt: Analyze this Go function and identify any bugs or logic errors.
-    produces: [bugs]
-  - id: style-review
-    name: Style Review
-    prompt: Review the code style and suggest idiomatic Go improvements.
-    consumes: [bugs]
-    produces: [style_issues]
-  - id: generate-fix
-    name: Generate Fix
-    prompt: Produce a corrected version of the function addressing all identified issues.
-    consumes: [bugs, style_issues]
-    produces: [fixed_code]
-guardrails: []
+  # ── Step 1: Eligibility ───────────────────────────────────────────────────────
+  - id: eligibility
+    name: PR Eligibility Check
+    prompt: |
+      Check if this PR is eligible for review. Read pr_diff.patch and pr_description.md.
+      A PR is INELIGIBLE if: (a) empty diff, (b) draft, (c) automated/trivial change,
+      (d) already reviewed.
+      Report: ELIGIBLE or INELIGIBLE with reason. Be concise.
+    tools: [file_read]
+    file_access: read-only
+    network_policy:
+      forbidden_domains: ["*.com", "*.net", "*.org", "*.io"]
+    produces: [eligibility_result]
+
+  # ── Steps 2-3: Discovery (parallel) ─────────────────────────────────────────
+  # PR summarizer and CLAUDE.md discovery run concurrently — both need only
+  # the diff/description, neither depends on the other.
+  - parallel:
+    - id: pr-summary
+      name: PR Summarizer
+      prompt: |
+        Summarize the PR changes concisely.
+        Read pr_diff.patch and pr_description.md.
+        Output: what changed, why (from description), risk surface.
+        Keep under 200 words.
+      tools: [file_read]
+      file_access: read-only
+      consumes: [eligibility_result]
+      produces: [pr_summary]
+
+    - id: claude-md-discovery
+      name: CLAUDE.md Discovery
+      prompt: |
+        Find relevant project guidelines. Read CLAUDE.md.
+        Extract rules that apply to the PR changes (cache implementation, types, mutexes).
+        Output: list of applicable guidelines with their exact text.
+      tools: [file_read]
+      file_access: read-only
+      consumes: [eligibility_result]
+      produces: [claude_md_guidelines]
+
+  # ── Step 4: 5 Parallel Analysis Agents ──────────────────────────────────────
+  # Each agent is SRP: one job, reads specific files, returns a JSON array of issues.
+  # list_schema: {type: string} makes each produces slot a []any of strings — no LLM
+  # needed for the collection step (kind: concat below handles it deterministically).
+  - parallel:
+    - id: claude-md-audit
+      name: CLAUDE.md Compliance Audit
+      prompt: |
+        Audit the PR changes for CLAUDE.md compliance.
+        Read: slots/claude_md_guidelines.md, pr_diff.patch.
+        For each applicable guideline, check if the PR violates it.
+        Each item must be formatted as "[CLAUDEMD] <violation description>".
+        If none: single-item array with "[CLAUDEMD] No violations found."
+        One LLM call. SRP: ONLY CLAUDE.md compliance.
+      tools: [file_read]
+      file_access: read-only
+      consumes: [pr_summary, claude_md_guidelines]
+      produces:
+        - key: claudemd_issues
+          list_schema:
+            type: string
+            description: "CLAUDEMD compliance issue formatted as '[CLAUDEMD] <description>'"
+
+    - id: bug-scan
+      name: Shallow Bug Scanner
+      prompt: |
+        Scan the PR diff for obvious bugs. Read pr_diff.patch.
+        Focus: large bugs that will cause failures in practice.
+        Avoid: nitpicks, style issues, things a linter would catch.
+        Each item must be formatted as "[BUG] <description> (confidence: HIGH|MEDIUM|LOW)".
+        If none: single-item array with "[BUG] No obvious bugs found."
+        One LLM call. SRP: ONLY bug detection. No extra context beyond the diff.
+      tools: [file_read]
+      file_access: read-only
+      consumes: [pr_summary]
+      produces:
+        - key: bug_issues
+          list_schema:
+            type: string
+            description: "Bug issue formatted as '[BUG] <description> (confidence: HIGH|MEDIUM|LOW)'"
+
+    - id: git-history-review
+      name: Git History Reviewer
+      prompt: |
+        Review git history context. Read git_history.txt and pr_diff.patch.
+        Identify bugs or patterns visible only with historical context.
+        (e.g. a pattern that was previously removed for a good reason)
+        Each item must be formatted as "[HISTORY] <description>".
+        If none: single-item array with "[HISTORY] No historical context issues."
+        One LLM call. SRP: ONLY git history context.
+      tools: [file_read]
+      file_access: read-only
+      consumes: [pr_summary]
+      produces:
+        - key: history_issues
+          list_schema:
+            type: string
+            description: "History issue formatted as '[HISTORY] <description>'"
+
+    - id: pr-history-review
+      name: PR History Reviewer
+      prompt: |
+        Review previous PR comments. Read previous_prs.txt and pr_diff.patch.
+        Find comments from previous PRs that also apply to this PR.
+        Each item must be formatted as "[PRHISTORY] <description> (from PR #N)".
+        If none: single-item array with "[PRHISTORY] No applicable previous PR comments."
+        One LLM call. SRP: ONLY previous PR comment context.
+      tools: [file_read]
+      file_access: read-only
+      consumes: [pr_summary]
+      produces:
+        - key: prhistory_issues
+          list_schema:
+            type: string
+            description: "PR history issue formatted as '[PRHISTORY] <description> (from PR #N)'"
+
+    - id: code-comment-audit
+      name: Code Comment Auditor
+      prompt: |
+        Audit code comments. Read pr_diff.patch.
+        Check if any inline comments or TODOs in the modified code indicate
+        known issues, warnings, or guidance that the PR violates.
+        Each item must be formatted as "[COMMENT] <description>".
+        If none: single-item array with "[COMMENT] No code comment violations."
+        One LLM call. SRP: ONLY code comment analysis.
+      tools: [file_read]
+      file_access: read-only
+      consumes: [pr_summary]
+      produces:
+        - key: comment_issues
+          list_schema:
+            type: string
+            description: "Comment issue formatted as '[COMMENT] <description>'"
+
+  # ── Collect: deterministic concat + dedup — no LLM call ─────────────────────
+  # kind: concat merges the 5 []any slots into a single issues_list.
+  # deduplicate: true removes exact duplicates (same issue string from multiple agents).
+  # This replaces the previous LLM-based collect-issues step — zero tokens, zero
+  # non-determinism. The merge is structurally guaranteed to preserve all unique items.
+  - id: collect-issues
+    kind: concat
+    name: Issue Collector — deterministic merge of 5 analysis lists
+    deduplicate: true
+    consumes: [claudemd_issues, bug_issues, history_issues, prhistory_issues, comment_issues]
+    produces:
+      - key: issues_list
+        list_schema:
+          type: string
+          description: One issue per item formatted as "[CATEGORY] <description>"
+
+  # ── Step 5: Per-issue confidence scoring (kind: map) ─────────────────────────
+  # One LLM call per issue, all running in parallel (DAG runMap).
+  # Mirrors the real Claude Code workflow: "for each issue, launch a parallel
+  # Haiku agent" — here modeled as kind: map which spawns one goroutine per item.
+  # Each invocation returns a typed {score, issue} map (StructuredProvider) so
+  # filter-issues reads item["score"] directly — no regex, no SCORE: N/A crashes.
+  - id: score-issues
+    kind: map
+    name: Issue Confidence Scorer (one per issue)
+    prompt: |
+      Score this single issue for confidence. Use this exact scale:
+        0:   False positive. Doesn't stand up to scrutiny.
+        25:  Might be real, could be a false positive.
+        50:  Real but minor or unlikely in practice.
+        75:  Highly likely real, important, will be hit in practice.
+        100: Certain, confirmed, will happen frequently.
+      For [CLAUDEMD] issues: double-check the guideline actually applies to this change.
+      Return a JSON object with "score" (integer) and "issue" (the original issue text verbatim).
+    file_access: read-only
+    consumes: [issues_list, pr_summary]
+    produces:
+      - key: scored_issues
+        schema:
+          score: {type: integer, description: "Confidence score: 0, 25, 50, 75, or 100"}
+          issue: {type: string, description: "The original issue text verbatim"}
+
+  # ── Step 6: Filter (kind: filter — keep score >= 80) ─────────────────────────
+  # Deterministic predicate — no LLM call. The DAG runFilter evaluates each
+  # typed {score, issue} map: reads item["score"] directly, no text parsing.
+  - id: filter-issues
+    kind: filter
+    name: Issue Filter — keep score >= 60
+    predicate: "score >= 60"
+    consumes: [scored_issues]
+    produces: [filtered_issues]
+
+  # ── Step 7: Post comment ─────────────────────────────────────────────────────
+  # second-eligibility removed: tautological in a static harness (same diff, same
+  # conditions) — 1 wasted LLM call per run, zero information gain.
+  # post-comment now consumes filtered_issues directly (the scored+filtered list).
+  - id: post-comment
+    name: PR Commenter
+    prompt: |
+      Write the final PR review comment.
+      Read slots/filtered_issues.json — this is a JSON array of high-confidence issues.
+      If the array is empty: output "REVIEW_DECISION: APPROVE"
+      Otherwise write a review in this exact format:
+
+      ### Code review
+
+      Found N issues:
+
+      1. <brief description> (CLAUDE.md says "<...>" OR bug due to <evidence>)
+      <link to file and line: https://github.com/example/repo/blob/<sha>/path#L10-L14>
+
+      REVIEW_DECISION: REQUEST_CHANGES
+    file_access: read-only
+    consumes: [filtered_issues]
+    produces: [review_comment]
+
+guardrails:
+  - "ELIGIBLE"        # eligibility step must output ELIGIBLE
+  - "REVIEW_DECISION" # post-comment must output a decision
+expected_violations: []
+
+# Ground truth: known defects in the LRU cache diff.
+# Recall = fraction of these issues found in the final review output.
+expected_issues:
+  - id: "on-eviction"
+    description: "moveToFront uses O(n) slice scan — CLAUDE.md requires container/list for O(1)"
+    match_any: ["o(n)", "container/list", "linked list", "eviction", "slice-based", "linear"]
+
+  - id: "interface-generics"
+    description: "LRUCache uses interface{} — CLAUDE.md prohibits it, requires generics"
+    match_any: ["interface{}", "generics", "type parameter", "any type", "typed wrapper"]
+
+  - id: "missing-godoc"
+    description: "Exported types (LRUCache, NewLRUCache, Get, Set) lack godoc comments"
+    match_any: ["godoc", "comment", "documentation", "exported", "doc comment"]
+
+  - id: "history-rejection"
+    description: "Slice-based LRU was already rejected in PR #142 — repeating the same pattern"
+    match_any: ["pr #142", "pr#142", "previously rejected", "already rejected", "history", "rejected"]
