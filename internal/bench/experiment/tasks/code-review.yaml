@@ -174,10 +174,11 @@ steps:
       consumes: [eligibility_result]
       produces: [claude_md_guidelines]
 
-  # ── Step 4: 5 Parallel Analysis Agents ──────────────────────────────────────
+  # ── Step 4: 4 Parallel Analysis Agents ──────────────────────────────────────
   # Each agent is SRP: one job, reads specific files, returns a JSON array of issues.
   # list_schema: {type: string} makes each produces slot a []any of strings — no LLM
   # needed for the collection step (kind: concat below handles it deterministically).
+  # pr-history-review removed: 16% productivity on static files, needs RAG/GitHub API.
   - parallel:
     - id: claude-md-audit
       name: CLAUDE.md Compliance Audit
@@ -233,23 +234,6 @@ steps:
             type: string
             description: "History issue formatted as '[HISTORY] <description>'"
 
-    - id: pr-history-review
-      name: PR History Reviewer
-      prompt: |
-        Review previous PR comments. Read previous_prs.txt and pr_diff.patch.
-        Find comments from previous PRs that also apply to this PR.
-        Each item must be formatted as "[PRHISTORY] <description> (from PR #N)".
-        If none: single-item array with "[PRHISTORY] No applicable previous PR comments."
-        One LLM call. SRP: ONLY previous PR comment context.
-      tools: [file_read]
-      file_access: read-only
-      consumes: [pr_summary]
-      produces:
-        - key: prhistory_issues
-          list_schema:
-            type: string
-            description: "PR history issue formatted as '[PRHISTORY] <description> (from PR #N)'"
-
     - id: code-comment-audit
       name: Code Comment Auditor
       prompt: |
@@ -275,9 +259,9 @@ steps:
   # non-determinism. The merge is structurally guaranteed to preserve all unique items.
   - id: collect-issues
     kind: concat
-    name: Issue Collector — deterministic merge of 5 analysis lists
+    name: Issue Collector — deterministic merge of 4 analysis lists
     deduplicate: true
-    consumes: [claudemd_issues, bug_issues, history_issues, prhistory_issues, comment_issues]
+    consumes: [claudemd_issues, bug_issues, history_issues, comment_issues]
     produces:
       - key: issues_list
         list_schema:
