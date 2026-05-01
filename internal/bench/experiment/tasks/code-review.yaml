@@ -4,7 +4,8 @@
 # Real topology (9 agents total):
 #   eligibility (step 1)
 #   → [parallel: pr-summary | claude-md-discovery]   (steps 2-3)
-#   → [parallel: claude-md-audit | bug-scan | git-history-review | pr-history-review | code-comment-audit]  (step 4, 5 agents)
+#   → [parallel: claude-md-audit | bug-scan | git-history-review | code-comment-audit]  (step 4, 4 agents)
+#   (pr-history-review omitted: needs live GitHub PR index, static file gives 16% productivity)
 #   → collect-issues                                  (aggregate all findings into a list)
 #   → score-issues   [kind: map — one Haiku per issue, streaming]  (step 5)
 #   → filter-issues  [kind: filter — keep score >= 80]             (step 6)
