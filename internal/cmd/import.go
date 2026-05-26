@@ -9,12 +9,11 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/mirandaguillaume/forgent/internal/importer"
-	"github.com/mirandaguillaume/forgent/internal/llm"
 	"github.com/spf13/cobra"
 )
 
 func init() {
-	var provider, outputDir string
+	var provider, model, outputDir string
 	var minScore int
 	var yes, dryRun, force bool
 
@@ -25,11 +24,12 @@ func init() {
 		Run: func(cmd *cobra.Command, args []string) {
 			source := args[0]
 
-			runImport(source, provider, outputDir, minScore, yes, dryRun, force)
+			runImport(source, provider, model, outputDir, minScore, yes, dryRun, force)
 		},
 	}
 
 	importCmd.Flags().StringVarP(&provider, "provider", "p", "", "LLM provider name")
+	importCmd.Flags().StringVar(&model, "model", "", "LLM model name (provider-specific)")
 	importCmd.Flags().StringVarP(&outputDir, "output", "o", ".", "output directory")
 	importCmd.Flags().IntVar(&minScore, "min-score", 60, "minimum quality score")
 	importCmd.Flags().BoolVar(&yes, "yes", false, "skip confirmation prompt")
@@ -39,35 +39,14 @@ func init() {
 	rootCmd.AddCommand(importCmd)
 }
 
-func runImport(source, providerFlag, outputDir string, minScore int, yes, dryRun, force bool) {
-	// 1. Resolve provider name: flag → env → default
-	providerName := providerFlag
-	if providerName == "" {
-		providerName = os.Getenv("FORGENT_LLM_PROVIDER")
-	}
-	if providerName == "" {
-		providerName = "anthropic"
-	}
-
-	// 2. Resolve API key
-	envMap := map[string]string{
-		"FORGENT_API_KEY":    os.Getenv("FORGENT_API_KEY"),
-		"ANTHROPIC_API_KEY":  os.Getenv("ANTHROPIC_API_KEY"),
-		"OPENAI_API_KEY":     os.Getenv("OPENAI_API_KEY"),
-		"OPENROUTER_API_KEY": os.Getenv("OPENROUTER_API_KEY"),
-	}
-	apiKey, err := resolveAPIKey(providerName, envMap)
+func runImport(source, providerFlag, modelFlag, outputDir string, minScore int, yes, dryRun, force bool) {
+	// 1. Resolve provider: flag → Ollama auto-detect → env keys → error
+	llmProvider, providerName, err := selectProvider(providerFlag, modelFlag, false)
 	if err != nil {
 		fmt.Println(color.RedString("Error: %v", err))
 		os.Exit(1)
 	}
-
-	// 3. Get provider
-	llmProvider, err := llm.GetProvider(providerName, apiKey)
-	if err != nil {
-		fmt.Println(color.RedString("Error: %v", err))
-		os.Exit(1)
-	}
+	_ = providerName
 
 	// 4. Run import pipeline
 	result := importer.RunImport(importer.ImportOptions{
@@ -129,33 +108,6 @@ func runImport(source, providerFlag, outputDir string, minScore int, yes, dryRun
 	}
 }
 
-// resolveAPIKey resolves the API key for the given provider from an environment
-// map. Priority: FORGENT_API_KEY → provider-specific key → error.
-func resolveAPIKey(provider string, env map[string]string) (string, error) {
-	// Check FORGENT_API_KEY first.
-	if key := env["FORGENT_API_KEY"]; key != "" {
-		return key, nil
-	}
-
-	// Check provider-specific key.
-	var envVar string
-	switch provider {
-	case "anthropic":
-		envVar = "ANTHROPIC_API_KEY"
-	case "openai":
-		envVar = "OPENAI_API_KEY"
-	case "openrouter":
-		envVar = "OPENROUTER_API_KEY"
-	default:
-		envVar = strings.ToUpper(provider) + "_API_KEY"
-	}
-
-	if key := env[envVar]; key != "" {
-		return key, nil
-	}
-
-	return "", fmt.Errorf("no API key found: set FORGENT_API_KEY or %s", envVar)
-}
 
 // removeExistingFiles removes files that would conflict with WriteImportResult.
 func removeExistingFiles(result importer.ImportResult, outputDir string) {
