@@ -6,54 +6,46 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestResolveAPIKey(t *testing.T) {
-	tests := []struct {
-		name     string
-		env      map[string]string
-		provider string
-		expected string
-		wantErr  bool
-	}{
-		{
-			name:     "FORGENT_API_KEY takes priority",
-			env:      map[string]string{"FORGENT_API_KEY": "forgent-key"},
-			provider: "anthropic",
-			expected: "forgent-key",
-		},
-		{
-			name:     "falls back to ANTHROPIC_API_KEY",
-			env:      map[string]string{"ANTHROPIC_API_KEY": "anthropic-key"},
-			provider: "anthropic",
-			expected: "anthropic-key",
-		},
-		{
-			name:     "falls back to OPENAI_API_KEY",
-			env:      map[string]string{"OPENAI_API_KEY": "openai-key"},
-			provider: "openai",
-			expected: "openai-key",
-		},
-		{
-			name:     "falls back to OPENROUTER_API_KEY",
-			env:      map[string]string{"OPENROUTER_API_KEY": "openrouter-key"},
-			provider: "openrouter",
-			expected: "openrouter-key",
-		},
-		{
-			name:     "no key found",
-			env:      map[string]string{},
-			provider: "anthropic",
-			wantErr:  true,
-		},
+func TestSelectProviderExplicitOllama(t *testing.T) {
+	p, name, err := selectProvider("ollama", "", false)
+	// Ollama may or may not be running in CI — we only check that no API key is required.
+	if err != nil {
+		assert.Contains(t, err.Error(), "ollama")
+		return
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			key, err := resolveAPIKey(tt.provider, tt.env)
-			if tt.wantErr {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expected, key)
-			}
-		})
+	assert.NotNil(t, p)
+	assert.Equal(t, "ollama", name)
+}
+
+func TestSelectProviderAnthropicKeyRequired(t *testing.T) {
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	t.Setenv("OPENROUTER_API_KEY", "")
+	t.Setenv("FORGENT_API_KEY", "")
+
+	_, _, err := selectProvider("anthropic", "", false)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "ANTHROPIC_API_KEY")
+}
+
+func TestSelectProviderForgentAPIKeyOverride(t *testing.T) {
+	t.Setenv("FORGENT_API_KEY", "test-key")
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	t.Setenv("OPENROUTER_API_KEY", "")
+
+	// FORGENT_API_KEY is accepted as a fallback for any cloud provider.
+	p, _, err := selectProvider("anthropic", "", false)
+	assert.NoError(t, err)
+	assert.NotNil(t, p)
+}
+
+func TestSelectProviderNoProviderAvailable(t *testing.T) {
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	t.Setenv("OPENROUTER_API_KEY", "")
+	t.Setenv("FORGENT_API_KEY", "")
+
+	_, _, err := selectProvider("", "", false)
+	if err != nil {
+		// Expected when Ollama is not running.
+		assert.Contains(t, err.Error(), "no LLM provider available")
 	}
 }
