@@ -3,6 +3,7 @@ package importer
 import (
 	"testing"
 
+	"github.com/mirandaguillaume/forgent/internal/classifier"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,7 +18,7 @@ func TestBuildImportPrompt(t *testing.T) {
 		Tools:       []string{"Read", "Grep"},
 	}
 
-	prompt := BuildImportPrompt(source, fm, "# Review Agent\nReviews PRs", []string{"read_file", "grep"})
+	prompt := BuildImportPrompt(source, fm, "# Review Agent\nReviews PRs", []string{"read_file", "grep"}, classifier.Result{})
 
 	assert.Contains(t, prompt, "Forgent skill YAML schema")
 	assert.Contains(t, prompt, "review")
@@ -32,7 +33,7 @@ func TestBuildImportPrompt_NoFrontmatter(t *testing.T) {
 	source := Source{Name: "agent.md"}
 	fm := AgentFrontmatter{}
 
-	prompt := BuildImportPrompt(source, fm, "# My Agent", nil)
+	prompt := BuildImportPrompt(source, fm, "# My Agent", nil, classifier.Result{})
 
 	assert.Contains(t, prompt, "# My Agent")
 	assert.NotContains(t, prompt, "Source file:")
@@ -42,7 +43,7 @@ func TestBuildImportPrompt_ContractExtraction(t *testing.T) {
 	source := Source{Name: "agent.md", Content: "# Agent"}
 	fm := AgentFrontmatter{Name: "test"}
 
-	prompt := BuildImportPrompt(source, fm, "# Agent", nil)
+	prompt := BuildImportPrompt(source, fm, "# Agent", nil, classifier.Result{})
 
 	assert.Contains(t, prompt, "output format templates")
 	assert.Contains(t, prompt, "contracts")
@@ -53,12 +54,31 @@ func TestBuildImportPrompt_SRPGuidance(t *testing.T) {
 	source := Source{Name: "agent.md", Content: "# Agent"}
 	fm := AgentFrontmatter{Name: "test"}
 
-	prompt := BuildImportPrompt(source, fm, "# Agent", nil)
+	prompt := BuildImportPrompt(source, fm, "# Agent", nil, classifier.Result{})
 
 	assert.Contains(t, prompt, "exactly ONE output")
 	assert.Contains(t, prompt, "ONE action")
 	assert.Contains(t, prompt, "Maximum 5 steps")
 	assert.Contains(t, prompt, "REJECT skills")
+}
+
+func TestBuildImportPrompt_WithClassification(t *testing.T) {
+	source := Source{Name: "agent.md", Content: "# Agent"}
+	fm := AgentFrontmatter{Name: "test"}
+	cl := classifier.Result{
+		Items: []classifier.Item{
+			{Text: "Never expose secrets", Facet: classifier.FacetGuardrails, Section: "Rules"},
+			{Text: "Use bash for commands", Facet: classifier.FacetStrategy, Section: "Commands"},
+		},
+	}
+
+	prompt := BuildImportPrompt(source, fm, "# Agent", nil, cl)
+
+	assert.Contains(t, prompt, "Pre-classified instructions")
+	assert.Contains(t, prompt, "GUARDRAILS")
+	assert.Contains(t, prompt, "Never expose secrets")
+	assert.Contains(t, prompt, "STRATEGY")
+	assert.Contains(t, prompt, "Use bash for commands")
 }
 
 func TestBuildRetryPrompt(t *testing.T) {
