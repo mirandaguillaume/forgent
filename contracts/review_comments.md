@@ -1,214 +1,73 @@
-Provide your review as a structured list. For each finding:
+# Review Comments — Story 10-5: HTTP Proxy Network Sandbox
 
-1. **Severity**: critical | warning | suggestion
-2. **Location**: `file:line`
-3. **Issue**: One-sentence description
-4. **Fix**: Concrete code suggestion or action
-5. **Rationale**: Why this matters
+## C1 — CONNECT tunnel goroutine leak: only one of two copy goroutines is awaited
+**File:** pkg/sandbox/network.go:156-159
+Code: `<-done` (single receive from a channel fed by two goroutines)
+Only one receive is issued. When the first half-connection closes the handler returns, defers fire and close both connections, but the second io.Copy goroutine remains alive referencing closed file descriptors.
+Fix: add a second `<-done` or use sync.WaitGroup.
 
-Group findings by severity (critical first). End with a summary count.
+## C2 — WriteHeader(200) sent before the Hijack type-assertion
+**File:** pkg/sandbox/network.go:142-146
+Code: `w.WriteHeader(http.StatusOK)` then `hijacker, ok := w.(http.Hijacker); if !ok { http.Error(w, "502...", ...) }`
+If w does not implement Hijacker the 200 is already flushed; the subsequent http.Error call writes a 502 body but the status line is 200. On HTTP/2 the Hijack path is never available so this is a guaranteed protocol violation.
+Fix: assert Hijacker first; only call WriteHeader(200) after the assertion succeeds.
 
----
+## C3 — http.DefaultTransport reused in proxy handleHTTP — connection pool bypasses per-step proxy
+**File:** pkg/sandbox/network.go:179
+Code: `resp, err := http.DefaultTransport.RoundTrip(outReq)`
+DefaultTransport is package-global and pools connections. Connections dialed through one step's proxy remain pooled and are reused in the next step, bypassing that step's NetworkPolicy audit entirely. Additionally the proxy handler itself inherits HTTP_PROXY so it may loop back to itself.
+Fix: create a dedicated http.Transport per ProxyServer with Proxy: nil.
 
-# Review Comments — feat/scanner-enricher-bench → main
+## C4 — handleHTTP: empty host passes CheckHost when r.URL.Hostname() returns ""
+**File:** pkg/sandbox/network.go:163
+Code: `host := r.URL.Hostname()`
+A relative-URL request (malformed proxy client) produces an empty host. CheckHost("") passes with an empty AllowedDomains list, allowing the request with no audit entry naming a host.
+Fix: guard `if host == "" { http.Error(w, "400 Bad Request", 400); return }`.
 
-Branch : `feat/scanner-enricher-bench`
-Tests  : 706/706 pass
-Lint   : 103 mineurs, 0 critiques
+## C5 — handleCONNECT: SplitHostPort failure falls back to raw r.Host (with port) for policy check
+**File:** pkg/sandbox/network.go:120-123
+Code: `host, _, err := net.SplitHostPort(r.Host); if err != nil { host = r.Host }`
+If SplitHostPort fails, the raw value (possibly "api.example.com:" with trailing colon) is passed to CheckHost. Pattern "api.example.com" will not match "api.example.com:", silently denying a legitimate host. The audit logs the wrong host string. net.Dial("tcp", r.Host) on line 135 then fails, but only after policy was already evaluated.
+Fix: return 400 on SplitHostPort failure instead of falling back.
 
----
+## C6 — NO_PROXY / no_proxy not saved or restored
+**File:** internal/bench/experiment/runtime_runner.go:492-508
+Code: Only HTTP_PROXY and HTTPS_PROXY are saved/restored; NO_PROXY is untouched.
+If the environment has NO_PROXY=api.example.com, Go's ProxyFromEnvironment bypasses the step's enforcement proxy for that host even if the NetworkPolicy forbids it. The audit trail shows zero entries for those bypassed requests.
+Fix: save and clear NO_PROXY/no_proxy for the duration of the step, restore in defer.
 
-## Critiques
+## C7 — os.Setenv errors silently discarded; proxy runs but traffic bypasses it undetected
+**File:** internal/bench/experiment/runtime_runner.go:494-495
+Code: `os.Setenv("HTTP_PROXY", proxy.URL()) //nolint:errcheck`
+If Setenv fails (ENOMEM, read-only env), the proxy is started and bound but the Go runtime uses the old HTTP_PROXY. LLM calls proceed with no policy enforcement and an empty audit trail.
+Fix: check the error and return it, closing the proxy before returning.
 
-Aucun problème bloquant identifié.
+## C8 — proxy.Close() only closes the listener, not the http.Server
+**File:** pkg/sandbox/network.go:106-108
+Code: `func (ps *ProxyServer) Close() error { return ps.listener.Close() }`
+Closing the listener stops new accepts but does not terminate in-flight requests or their goroutines. Active CONNECT tunnels and their two io.Copy goroutines remain alive after Close() returns. The step defer returns and HTTP_PROXY is restored, but the old proxy goroutines continue running against the closed policy.
+Fix: call ps.server.Close() instead, which closes the listener AND forces-closes all active connections.
 
----
+## C9 — Tests use os.Setenv/os.Unsetenv instead of t.Setenv — env leaks under parallel execution
+**File:** internal/bench/experiment/network_policy_test.go:153-154, 192-193, 228-229
+Code: `os.Unsetenv("HTTP_PROXY")` / `os.Setenv("HTTP_PROXY", sentinel)` / `defer os.Unsetenv(...)`
+t.Setenv is the Go 1.17+ idiom that registers cleanup via t.Cleanup, safe for future t.Parallel use. If tests are ever parallelised without fixing env handling, concurrent tests will race on HTTP_PROXY with no detector warning.
+Fix: replace all raw os.Setenv/os.Unsetenv pairs in tests with t.Setenv.
 
-## Avertissements
+## C10 — validateNetworkPolicy does not reject patterns with a port suffix
+**File:** internal/bench/experiment/design.go:450-468
+Code: Only "/" and "?" are rejected; "api.example.com:443" passes validation.
+CheckHost receives a bare hostname (port already stripped). A pattern containing a port never matches, silently turning that allowlist entry into a dead rule with no error. No test covers this.
+Fix: add `strings.ContainsAny(pat, ":")` check and return an error.
 
-### 1
+## C11 — hostMatch: bare "*" pattern silently never matches (WAI but surprising)
+**File:** pkg/sandbox/network.go:56-71
+Code: `if !strings.HasPrefix(pattern, "*.") { return false }` — bare "*" takes the false branch.
+A task author writing `allowed_domains: ["*"]` expecting "allow all" gets "deny all" because the non-empty allowlist matches nothing. validateNetworkPolicy does not reject it and there is no test documenting this behaviour.
+Fix: reject bare "*" in validateNetworkPolicy with an explicit error message pointing to the correct idiom (empty allowed_domains list).
 
-**Severity**: warning
-**Location**: `internal/generator/claude/agent.go:66`
-**Issue**: Quand un skill figure dans `agent.Skills` mais pas dans `resolvedSkills`, le générateur émet l'en-tête `### Step N: X` suivi d'une ligne vide sans bloc `Launch a subagent`, produisant une étape vide dans le markdown final.
-**Fix**: Déplacer l'ajout de l'en-tête à l'intérieur de la branche `if s.Skill == skillName` afin qu'il ne soit émis que si le skill est effectivement résolu, ou ajouter un commentaire `(skill not resolved)` explicite.
-
-```go
-// Avant (ligne 66-88)
-lines = append(lines, fmt.Sprintf("### Step %d: %s", i+1, generator.ToTitle(skillName)))
-effort := model.EffortMedium
-for _, s := range resolvedSkills {
-    if s.Skill == skillName {
-        lines = append(lines, "Launch a subagent:")
-        ...
-        break
-    }
-}
-lines = append(lines, "")
-
-// Après — déplacer l'en-tête à l'intérieur du if
-for _, s := range resolvedSkills {
-    if s.Skill == skillName {
-        lines = append(lines, fmt.Sprintf("### Step %d: %s", i+1, generator.ToTitle(skillName)))
-        lines = append(lines, "Launch a subagent:")
-        ...
-        break
-    }
-}
-```
-**Rationale**: Le même problème existe dans `internal/generator/copilot/agent.go:66`. Un skill non résolu produit du markdown silencieusement cassé sans que le build échoue ni n'avertisse au niveau du générateur.
-
----
-
-### 2
-
-**Severity**: warning
-**Location**: `internal/generator/copilot/effort.go:6`
-**Issue**: `EffortToModel` du package `copilot` retourne `"haiku"`, `"sonnet"`, `"opus"` — des noms de modèles Anthropic — alors que GitHub Copilot utilise des modèles GPT/OpenAI.
-**Fix**: Mapper vers les identifiants corrects pour Copilot (ex. `"gpt-4o-mini"`, `"gpt-4o"`, `"o1"`) ou documenter explicitement que ces noms sont intentionnellement génériques et laissés à l'utilisateur.
-**Rationale**: Un agent Copilot généré avec `Model: haiku` sera incompréhensible pour un utilisateur GitHub Copilot ; cela peut induire des erreurs de configuration silencieuses.
-
----
-
-### 3
-
-**Severity**: warning
-**Location**: `internal/generator/copilot/effort.go` (fichier entier)
-**Issue**: `EffortToModel` est dupliqué à l'identique dans `internal/generator/claude/effort.go` et `internal/generator/copilot/effort.go` sans factorisation.
-**Fix**: Extraire la logique commune dans `internal/generator/effort.go` (package `generator`) et appeler `generator.EffortToModel` depuis chaque package, ou au moins ajouter un commentaire signalant la divergence intentionnelle (noms de modèles différents par cible).
-**Rationale**: Toute évolution future (ajout d'un niveau `EffortUltra`) devra être dupliquée manuellement, avec risque de désynchronisation.
-
----
-
-### 4
-
-**Severity**: warning
-**Location**: `internal/generator/claude/agent.go:44`
-**Issue**: La section `## Execution` et le texte d'orchestration sont toujours émis, même quand `resolvedSkills` est vide (ex. aucun skill chargé), ce qui produit un agent avec `Execute 2 skills sequentially...` mais aucun step.
-**Fix**: Conditionner l'émission du bloc `## Execution` à `len(resolvedSkills) > 0`, ou au moins à `len(agent.Skills) > 0`.
-**Rationale**: Le test `TestGenerateAgentMd_NoSkills` passe `nil` comme `resolvedSkills` mais `agent.Skills` reste `["code-review","security-scan"]` — l'output contient le texte d'orchestration sans aucune étape concrète.
-
----
-
-### 5
-
-**Severity**: warning
-**Location**: `pkg/model/skill.go:143–148` (suppression de `DependencyFacet` / `DependsOn`)
-**Issue**: Le champ `DependsOn DependencyFacet` a été supprimé du modèle `SkillBehavior` sans versioning ni note de migration : les fichiers `.skill.yaml` existants contenant `depends_on:` seront silencieusement ignorés par le loader YAML.
-**Fix**: Ajouter un avertissement dans le loader YAML ou le linter quand un champ `depends_on` est détecté dans le fichier source (strict mode YAML ou vérification explicite).
-**Rationale**: Un breaking change silencieux sur le format YAML de définition des skills peut casser des projets utilisateurs sans message d'erreur.
-
----
-
-## Suggestions
-
-### 6
-
-**Severity**: suggestion
-**Location**: `internal/generator/copilot/agent.go:35`
-**Issue**: La valeur `tools: ["task"]` est un littéral de chaîne Go brut non construit programmatiquement, contrairement à `GenerateCompactCopilotAgentMd` (ligne 138) qui génère le format `tools: ["read", ...]` via `fmt.Sprintf`.
-**Fix**: Utiliser une constante ou une construction cohérente :
-
-```go
-const copilotTaskTool = `tools: ["task"]`
-lines = append(lines, copilotTaskTool)
-```
-**Rationale**: Incohérence de style entre les deux fonctions du même fichier ; risque d'erreur typographique lors d'une future modification.
-
----
-
-### 7
-
-**Severity**: suggestion
-**Location**: `internal/generator/claude/agent.go:41`
-**Issue**: Le corps de l'agent en mode dispatch ne contient plus la `description` de l'agent (remplacée par le template fixe `An orchestrator that coordinates N specialized subagents`), alors que `GenerateCompactAgentMd` (ligne 150) conserve la description dans le corps.
-**Fix**: Soit inclure la description dans les deux modes de façon cohérente :
-
-```go
-lines = append(lines, fmt.Sprintf("You are %s. %s Orchestrates %d specialized subagents.",
-    generator.ToTitle(agent.Agent), agent.Description, len(agent.Skills)))
-```
-soit documenter que le mode dispatch n'expose pas la description dans le corps.
-**Rationale**: Incohérence comportementale entre `--compact` et mode standard ; peut surprendre les utilisateurs qui personnalisent la description.
-
----
-
-### 8
-
-**Severity**: suggestion
-**Location**: `internal/generator/copilot/effort.go` (absence de fichier `effort_test.go`)
-**Issue**: `EffortToModel` dans le package `copilot` n'a aucun test unitaire dédié, alors que le package `claude` possède `effort_test.go`.
-**Fix**: Créer `internal/generator/copilot/effort_test.go` avec les quatre cas (`light`, `medium`, `heavy`, `""`).
-**Rationale**: Couverture asymétrique entre les deux packages pour une fonction identique.
-
----
-
-### 9
-
-**Severity**: suggestion
-**Location**: `internal/generator/claude/agent.go:114`
-**Issue**: `formatIOPointers` est une fonction privée triviale (2 lignes) qui duplique partiellement la logique de formatage d'I/O déjà présente dans `internal/generator/util.go`.
-**Fix**: Vérifier si `generator.FormatIO` ou une fonction similaire existe dans `util.go` et consolider, ou au moins ajouter un commentaire de justification.
-**Rationale**: Fragmentation des helpers de formatage entre `util.go` (package `generator`) et les sous-packages.
-
----
-
-### 10
-
-**Severity**: suggestion
-**Location**: `internal/generator/claude/agent_test.go:112`
-**Issue**: `TestGenerateAgentMd_NoSkills` passe `resolvedSkills=nil` mais l'agent a toujours `Skills: ["code-review","security-scan"]` — la condition testée est donc `resolvedSkills vide` et non `agent.Skills vide` ; le cas `agent.Skills=[]` + `resolvedSkills=[]` n'est pas couvert.
-**Fix**: Ajouter un test explicite :
-
-```go
-func TestGenerateAgentMd_EmptySkillsList(t *testing.T) {
-    agent := testAgent()
-    agent.Skills = nil
-    md := claude.GenerateAgentMd(agent, nil, ".claude")
-    assert.NotContains(t, md, "## Execution")
-}
-```
-**Rationale**: La validation `ValidateAgent` rejette `len(Skills)==0`, mais ce chemin de génération reste non couvert.
-
----
-
-### 11
-
-**Severity**: suggestion
-**Location**: `internal/generator/claude/agent_test.go` (absence de test d'étape orpheline)
-**Issue**: Aucun test ne vérifie le comportement quand `agent.Skills` référence un skill absent de `resolvedSkills` (ex. skill déclaré mais non chargé).
-**Fix**: Ajouter :
-
-```go
-func TestGenerateAgentMd_UnresolvedSkill_NoOrphanBlock(t *testing.T) {
-    agent := testAgent() // Skills: ["code-review", "security-scan"]
-    // Ne passer qu'un seul des deux skills
-    md := claude.GenerateAgentMd(agent, testResolvedSkills()[:1], ".claude")
-    // Vérifier que l'étape sans skill résolu ne produit pas de header vide
-    assert.NotContains(t, md, "### Step 2: Security Scan\n\n")
-}
-```
-**Rationale**: Le comportement actuel (header + ligne vide sans contenu) est silencieux et non spécifié.
-
----
-
-### 12
-
-**Severity**: suggestion
-**Location**: `pkg/model/skill.go:169-178`
-**Issue**: `WhenToUseFacet.IsEmpty()` ne vérifie que `len == 0` pour trois champs, ce qui est correct, mais la méthode n'est pas testée isolément — elle est uniquement exercée indirectement via les règles du linter et le score.
-**Fix**: Ajouter un test unitaire minimal dans `pkg/model/skill_test.go` pour `IsEmpty()` avec un cas vide et un cas non-vide.
-**Rationale**: Méthode publique sur un type de modèle central, sans test direct.
-
----
-
-## Résumé
-
-| Sévérité   | Nombre |
-|------------|--------|
-| Critique   | 0      |
-| Avertissement | 5   |
-| Suggestion | 7      |
-| **Total**  | **12** |
-
-Les tests passent tous (706/706). Les points les plus risqués sont l'étape orpheline en cas de skill non résolu (#1, #11) et le breaking change silencieux sur `depends_on` (#5). Le mapping de modèles Copilot (#2) est fonctionnellement incorrect pour les utilisateurs GitHub Copilot.
+## C12 — Network audit reason "domain not in allowed_domains" matches OutOfScopeAttempts counter
+**File:** internal/bench/experiment/runtime_runner.go:485 + internal/bench/experiment/sandbox.go:223
+Code: `stepSandbox.record(stepCopy.ID, "network", host, allowed, reason)` where reason = "domain not in allowed_domains"
+ComputeActionMetrics uses `strings.Contains(e.Reason, "not in allowed")` to count OutOfScopeAttempts. The network denial reason contains that substring, so network policy denials inflate the file-scope-creep metric.
+Fix: change the network denial reason to avoid the substring, e.g. "domain blocked: not listed in allowed_domains", or add a dedicated NetworkDenials counter.

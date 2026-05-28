@@ -22,6 +22,9 @@
 #   - in-progress: Developer actively working on implementation
 #   - review: Ready for code review (via Dev's code-review workflow)
 #   - done: Story completed
+#   - closed: Story decided not to implement (superseded by another story or deferred post-MVP);
+#            see the comment next to the story key for the rationale and pointer to the
+#            sprint-change-proposal that records the decision
 #
 # Retrospective Status:
 #   - optional: Can be completed but not required
@@ -57,9 +60,9 @@
 # Party mode consensus — all agents agreed.
 
 generated: 2026-03-30
-last_updated: 2026-04-27  # 10-0 done (review patches applied)
-last_story_created: 10-0-epic9-debt-cleanup
-last_story_modified: 10-0-epic9-debt-cleanup
+last_updated: 2026-05-13  # 10-12 review complete: 12 patches applied, T3/T4 still blocked
+last_story_created: 10-12-swebench-validation
+last_story_modified: 10-9-experiment-rerun
 last_epic_completed: epic-9  # retro done 2026-04-27
 project: Forgent
 project_key: NOKEY
@@ -119,23 +122,25 @@ development_status:
   6-2-file-access-control: done
   6-3-budget-guards: done
   6-4-quality-gate-inline: done
-  6-5-pii-output-filter: backlog
-  6-6-output-schema-and-produces-contract: backlog
-  6-7-regex-and-length-enforcement: backlog
-  6-8-idempotency-detection: backlog
-  6-9-rate-limiter: backlog
-  6-10-code-syntax-validation: backlog
-  6-11-diff-applicability: backlog
+  # -- Epic 6 backlog closure 2026-04-28 — see sprint-change-proposal-2026-04-28-epic6-closure.md
+  #    Six items superseded by Epic 10 stories; seven deferred post-MVP. Action #4 of Epic 9 retro resolved.
+  6-5-pii-output-filter: closed  # superseded by 10-4 (output-contract-validation specialisation)
+  6-6-output-schema-and-produces-contract: closed  # direct duplicate of 10-4
+  6-7-regex-and-length-enforcement: closed  # superseded by 10-1 (step-level guardrails + length extension)
+  6-8-idempotency-detection: closed  # deferred post-MVP — replay safety, different concern
+  6-9-rate-limiter: closed  # deferred post-MVP — provider-level, not node-level
+  6-10-code-syntax-validation: closed  # superseded by 10-4 (output contract = "must compile")
+  6-11-diff-applicability: closed  # superseded by 10-4 (template validates diff structure)
   # -- CI/CD gates (usinage) --
-  6-12-build-gate: backlog
-  6-13-lint-gate: backlog
-  6-14-test-gate: backlog
-  6-15-format-gate: backlog
+  6-12-build-gate: closed  # deferred post-MVP — CI/CD level, not runtime-step
+  6-13-lint-gate: closed  # deferred post-MVP — CI/CD level
+  6-14-test-gate: closed  # deferred post-MVP — CI/CD level
+  6-15-format-gate: closed  # deferred post-MVP — CI/CD level
   # -- Essentiels enterprise --
-  6-16-circuit-breaker: backlog
-  6-17-audit-trail: backlog
+  6-16-circuit-breaker: closed  # deferred post-MVP — provider-level resilience, pairs with 6-9
+  6-17-audit-trail: closed  # implemented implicitly by 10-3/4/5/6 (sandbox.AccessEntry + NodeViolations)
   # -- Expérience finale --
-  6-18-harness-experiment: review
+  6-18-harness-experiment: done
   6-19-slotspec-template-contracts: done
   6-20-qualitygate-format-validation: done
   6-21-file-based-slot-passing: done
@@ -173,11 +178,14 @@ development_status:
   10-0-epic9-debt-cleanup: done  # Tasks 1+3+4+5.5 + 12 review patches; Task 2 → 10-7, 5.2+5.4 → 10-4, 5.1+5.3 → polish
   10-1-node-level-guardrails: done
   10-2-fix-template-file-runtime: done
-  10-3-file-level-permissions: backlog
-  10-4-output-contract-validation: backlog
-  10-5-http-proxy-network-sandbox: backlog
-  10-6-violation-telemetry: backlog
-  10-7-loop-bounds-exit-criteria: backlog
-  10-8-per-node-experiment-metrics: backlog
-  10-9-experiment-rerun: backlog
+  10-3-file-level-permissions: done
+  10-4-output-contract-validation: done
+  10-5-http-proxy-network-sandbox: done
+  10-6-violation-telemetry: done
+  10-7-loop-bounds-exit-criteria: done
+  10-11-markdown-ast-output-validation: done  # goldmark AST; heuristic + REQUIRED markers removed; QualityGateMiddleware wraps consumes errors; 9 review patches applied
+  10-10-typed-node-output-schema: done  # pkg/schema + ValidateTyped + extractJSON + StructuredProvider; 7 review patches; 330 tests
+  10-8-per-node-experiment-metrics: done  # NodeMetrics+TheoryAB+baseline delta+CLI flags; 277 tests race-clean; all 8 review patches applied
+  10-9-experiment-rerun: done  # T5-martian: specialists 50-task Martian CR-Bench (text 22% / runtime 34% / specialists 41% recall, -10% tokens). T5-enforcement deferred post-MVP (Theory B risk). See sprint-change-proposal-2026-05-13-swebench.md
+  10-12-swebench-validation: in-progress  # resolve-issue.yaml + Docker harness + SWE-Bench Lite 300 tasks x 3 conditions + bootstrap CI. FR-SWE claim. See sprint-change-proposal-2026-05-13-swebench.md
   epic-10-retrospective: optional

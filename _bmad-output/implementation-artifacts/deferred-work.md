@@ -1,5 +1,46 @@
 # Deferred Work
 
+## Deferred from: code review of 10-10-typed-node-output-schema (2026-04-29)
+
+- `getStructuredProvider` only unwraps `callCountingProvider` — any deeper wrapper (future telemetry, budget) hides `StructuredProvider` capability, silently downgrades to text extraction [internal/bench/experiment/runtime_runner.go:160]
+- `callCountingProvider` call count not incremented for `CompleteStructured` calls — cost telemetry under-counts typed-produce steps when constrained decoding is used [internal/bench/experiment/runtime_runner.go:162]
+- `ToJSONSchema` lacks `additionalProperties: false` — required by many strict-mode providers (OpenAI, Outlines); without it providers may reject schema or allow unconstrained extra fields [pkg/schema/compile.go:34]
+- Retrievers (`PrefixRetriever`, `RankedRetriever`) only read `.md` slot files — typed `.json` slots silently skipped, context injection disabled for typed slot lineages [internal/bench/experiment/retriever.go]
+- `StructuredProvider` failure is fatal with no text-extraction fallback — transient API error causes hard step failure rather than graceful degradation; deliberate design choice, may reconsider when real providers are wired [internal/bench/experiment/runtime_runner.go:871]
+- No real provider implements `StructuredProvider` — structured path exercised by test mocks only; implementation for Anthropic/Ollama tracked as future work [internal/llm/]
+- Lint rule for `schema` (inter-node) vs `template_file` (human-facing) not implemented in `forgent lint` — AC10 defers this to lint epic
+- `ValidateTyped` iterates schema map in Go map order (non-deterministic) — per-field violation reason in telemetry may vary across runs; validation pass/fail is deterministic [pkg/qualitygate/typed.go:13]
+- `consumesRetryMiddleware` passes empty inputs to typed producers on recovery — re-produced typed value may diverge from original; pre-existing design, documented in code comment [internal/bench/experiment/runtime_runner.go:95]
+- `extractJSON` brace scan uses first `{` in string — fails when preamble text contains `{...}` before actual JSON; rare in practice [internal/bench/experiment/json_extract.go:47]
+- Retry prefix not passed to `CompleteStructured` call — DAG `runWithRetry` re-invokes whole runFn; no failure context (which field, which constraint) reaches the structured provider on retry [internal/bench/experiment/runtime_runner.go:870]
+- `extractJSON` has no input size limit — large LLM responses scanned char-by-char; DoS protection belongs at budget layer not extraction layer [internal/bench/experiment/json_extract.go:17]
+
+## Deferred from: code review of 10-8-per-node-experiment-metrics (2026-04-29)
+
+- Theory A/B table emits `n/a` rows for every node in a condition even when that node never observed a given violation type — produces sparse, cluttered tables; cosmetic UX issue [internal/bench/experiment/report.go:538-549]
+- `collect(ranked, "ranked")` iterates a nil slice without an explicit nil check — safe no-op in Go but lacks defensive comment; brittle if surrounding code is refactored [internal/bench/experiment/compare.go:81]
+- `formatPerNodeSection` writes warning to `os.Stderr` from inside a string-builder formatter — side-effect makes the function untestable without capturing stderr; design smell [internal/bench/experiment/report.go:379-384]
+- `SaveBaseline` stores only ISO date in `CapturedAt`, losing sub-day granularity — two baselines captured on the same day are indistinguishable by timestamp [internal/bench/experiment/baseline.go:55]
+
+## Deferred from: code review of 10-12-swebench-validation (2026-05-13)
+
+- `swebench.go` bufio.Scanner 64KB default buffer exceeded by large JSONL lines — task list silently truncated mid-file [internal/bench/swebench.go:55-66]
+- `swebench.go` `--depth 1` clone misses `base_commit` when not HEAD of default branch — all tasks produce wrong diff base silently [internal/bench/swebench.go:113]
+- `swebench.go` search/replace edge cases — empty search block always matches at line 0; empty replace block produces malformed `+N,0` hunk; both fail `git apply` silently [internal/bench/swebench.go:368-400]
+- `swebench.go` `parseHarnessResults` returns empty map with nil error when no JSON file matches glob — all tasks marked unresolved with no indicator harness output was missing [internal/bench/swebench.go:914-983]
+- `swebench.go` `extractTagContent` returns garbage substring when closeTag precedes openTag in output [internal/bench/swebench.go:269-278]
+- AC2 default conditions = text,runtime only — user must pass `--conditions text,runtime,specialists` for 3-condition run; no smoke-test guard enforces this [bench.go CLI]
+- AC3 `--swe-size lite` maps to `swebench_lite_30.jsonl` (30 tasks, not 300) — blocked on API budget; bootstrap CI n=30 is too small for 95% CI claim [internal/bench/cmd/bench.go]
+- `extractUnifiedDiffFromOutput` brittle for multi-file diffs with interleaved LLM prose — `isDiffLine` heuristic cannot distinguish diff lines from commentary sharing the same character prefix [internal/bench/swebench_experiment.go:319-338]
+
+## Deferred from: code review of 10-11-markdown-ast-output-validation (2026-04-29)
+
+- `extractOutputSection` only walks top-level document children — headings inside blockquotes or HTML blocks are invisible; real-world LLM outputs rarely use this pattern but it is a known gap [pkg/qualitygate/ast.go:81]
+- `classifyValidationReason` uses fragile string matching on human-readable error messages instead of typed sentinel errors; pin tests in `output_contract_test.go` currently guard the wording but refactoring away from `errors.As` is blocked by the flat error model in `validateASTStructure` [internal/bench/experiment/runtime_runner.go:126]
+- Budget middleware truncation and qualitygate inline check see inconsistent data: the inline `ValidateProduces` call inside `runFn` runs on `lastResponse` (pre-truncation), the middleware post-check runs on budget-truncated output; a structurally valid but oversized LLM response will loop until retries are exhausted with no actionable error — cross-story concern (budget + qualitygate interaction)
+
+
+
 ## Triage 2026-04-27 (Epic 9 retro action #3)
 
 **Status:** Full triage done. See `deferred-work-triage-2026-04-27.md` for the per-item table.
@@ -290,3 +331,43 @@ Motivation : les guardrails keyword (`!LGTM`, `!safe`) sont des proxies sémanti
 - **TaskDir not symlink-resolved in LoadTasks** — `td.TaskDir = dir` stores `dir` without `filepath.EvalSymlinks`; symlink-accessed task dirs may resolve TemplateFile paths to unintended locations. Low-risk edge case.
 - **`effectiveGuardrails` returns direct slice reference** — same as deferred in 10-1; alias risk if callers mutate; safe for current sequential model.
 - **TaskDir unset in 15+ programmatic TaskDefinition constructions across tests** — latent risk: any test that adds a `TemplateFile` slot to a directly-constructed `TaskDefinition` will silently skip the quality gate. Not an active bug.
+
+## Deferred from: code review of 10-4-output-contract-validation (2026-04-28)
+
+- **Multi-key recovery test coverage** — partial recovery with multiple consumes slots is untested in `internal/bench/experiment/output_contract_test.go`. Source: Blind Hunter B20.
+- **Partial recovery state corruption when one of multiple producers fails mid-recovery** in `consumesRetryMiddleware` — sandbox left with cleared upstream files but no replacements. Multi-consumes scenario; current 10-4 tasks all use single-consumes. Source: Edge Case Hunter E5. Pointer: `internal/bench/experiment/runtime_runner.go:consumesRetryMiddleware`.
+- **Multiple-produces-with-different-templates: only first non-empty template enforced** — pre-existing behavior in `buildTaskDAG` template-resolution loop, not introduced by 10-4 (same in old middleware path). Should validate every produces slot's template against its slot text. Source: Edge Case Hunter E14.
+- **Sentinel-error refactor for `isConsumesValidationError`** — replace string-match on qualitygate error wording with `errors.Is/As` and a typed error. Larger qualitygate refactor; out of 10-4 scope. Source: Blind Hunter B2 + Edge Case Hunter E1. Pointer: `internal/bench/experiment/runtime_runner.go:isConsumesValidationError` + `pkg/qualitygate/gate.go`.
+- **`sandbox.Delete` error swallowed in `consumesRetryMiddleware` slot-clear path** — bounded impact in practice (producer rewrite covers stale slot), but the swallow + double-record pattern (manual `sandbox.record` followed by `Delete` which records again) is a smell worth cleaning. Source: Edge Case Hunter E2. Pointer: `internal/bench/experiment/runtime_runner.go:consumesRetryMiddleware`.
+
+## Deferred from: code review of 6-18-harness-experiment (2026-04-28)
+
+- **`consumesRetryMiddleware`: delete slot before confirming `producerOut[key]`** — slot is cleared from sandbox via `sandbox.Delete` before verifying the producer's output contains the expected key. If the producer succeeds but returns a different key name, the slot is cleared but never refilled — cascades into missing `file_read` target. Conflicts semantically with 10-6 (slot_clear audit semantics), so deferred post-10-6. Source: Edge Case Hunter. Pointer: `internal/bench/experiment/runtime_runner.go:91-95`.
+- **`len(consumes) > 0` guard too broad in middleware wiring** — `consumesRetryMiddleware` is attached even when `consumes = [{Key: "task_input"}]` only (no upstream producer), causing a misleading "no upstream producer for recovery" error on consumes-gate failure. Deferred: potential line conflict with 10-5 middleware wiring section. Source: Edge Case Hunter. Pointer: `internal/bench/experiment/runtime_runner.go:685`.
+
+## Backlog — Query/Command node split (2026-04-29)
+
+- **Produces slots = seuls writes autorisés par défaut** — si un step ne déclare pas `FileAccess` explicitement, dériver les allowed write targets depuis `step.Produces` (i.e. `slots/{key}.md` uniquement). Rend les tâches existantes plus sûres sans changer les YAML. La séparation formelle Query/Command est laissée de côté — ambiguë en pratique, aucune enforcement nouvelle par rapport aux mécanismes existants (`FileAccess` + `NetworkPolicy` + `AllowedPaths`).
+
+## Deferred from: code review of 10-5-http-proxy-network-sandbox (2026-04-28)
+
+- **`os.Setenv("HTTP_PROXY")` process-global Phase 1 limitation** — Documented in code. Safe for sequential per-task execution. Phase 2 switches to per-request `http.Transport.Proxy` when parallel DAG layers are enabled (story 10-7+). Source: Blind Hunter + Acceptance Auditor. Pointer: `internal/bench/experiment/runtime_runner.go`.
+- **Network audit reason may inflate file `ScopeCreepRate` metric** — `ComputeActionMetrics` may match `"domain not in allowed_domains"` reason strings against file scope creep heuristics. Needs verification that `Action: "network"` entries are correctly excluded from file-specific metrics. Source: Edge Case Hunter (C12). Pointer: `internal/bench/experiment/sandbox.go:ComputeActionMetrics`.
+- **`context.Background()` hardcoded in `runRuntimeTask`** — `d.Execute(context.Background(), ...)` discards any outer cancellation signal (SIGINT, HTTP deadline). Structural fix: thread the caller's context through. Deferred post-MVP. Source: Edge Case Hunter. Pointer: `internal/bench/experiment/runtime_runner.go:271`.
+- **Goroutine leak: `provider.Complete` has no `ctx` parameter** — budget timeout via `context.WithTimeout` cannot abort an in-flight HTTP call when `Complete(prompt string)` doesn't accept a context. Structural fix: add `ctx context.Context` to `llm.Provider.Complete` and all implementations. Deferred post-MVP (interface-breaking change). Source: Edge Case Hunter. Pointer: `pkg/budget/middleware.go` + `llm.Provider` interface.
+
+## Deferred from: code review of 10-6-violation-telemetry (2026-04-29)
+
+- **Unknown step IDs sort to position 0 in `aggregateViolations`** — The "dag" stepID used in `sandbox.Write("dag", "task_context.md", ...)` is not present in `task.Steps`; `stepIndex["dag"]` returns Go's zero value (0), silently placing that violation first — same position as the real first step. Pre-existing design in runtime_runner.go; requires renaming the "dag" stepID to a sentinel (e.g., "__harness__") or filtering harness-level writes from the violation log. Pointer: `internal/bench/experiment/telemetry.go:aggregateViolations`, `internal/bench/experiment/runtime_runner.go`.
+- **AttemptNumber=0 violations excluded from CCR penalty** — `computeContractComplianceRate` checks `v.AttemptNumber == 1`; violations with `AttemptNumber=0` (recorded outside the retry loop, before `SetCurrentAttempt` is called) are not penalized. Unreachable in current paths (`SetCurrentAttempt(stepID, 1)` is always called before any enforcement fires). Latent bug for future callers that use `SandboxFS` outside the retry loop. Pointer: `internal/bench/experiment/telemetry.go:computeContractComplianceRate`.
+- **DAG-level retry resets AttemptNumber** — If `pkg/dag` MaxRetries > 0, `runRuntimeTask` can be re-invoked; each re-invocation starts `attempt=0` and calls `SetCurrentAttempt(stepID, 1)`, making second-DAG-invocation violations indistinguishable from first-invocation attempt-1 violations. Bench tasks don't use DAG-level node retries currently. Pointer: `internal/bench/experiment/runtime_runner.go`, `pkg/dag/execute.go:runWithRetry`.
+- **Sandboxless tasks report CCR=1.0, indistinguishable from measured compliance** — When `sandbox == nil`, `runRuntimeTask` returns `ContractComplianceRate: 1.0` (default). Consumers can't tell if 1.0 means "measured zero violations" or "no sandbox = no measurement". Requires nullable float or a `ContractComplianceMeasured bool` field. Pointer: `internal/bench/experiment/runtime_runner.go:runRuntimeTask`.
+
+## Deferred from: code review of 10-7-loop-bounds-exit-criteria (2026-04-29)
+
+- **Legacy loop off-by-one: MaxIterations+1 total LLM calls** — In the legacy path (Loop=nil), the first `provider.Complete` is called before the tool-call loop, giving `MaxIterations+1` total calls instead of `MaxIterations`. Pre-existing behavior, not introduced by 10-7. Pointer: `internal/bench/experiment/runtime_runner.go` legacy loop path.
+- **No upper bound on `max_iterations` value** — `validateLoopPolicy` accepts `max_iterations: 10000` with no exit criterion. A misconfigured task can run thousands of billable LLM calls. Requires a product decision on the max sane cap (e.g., 100). Pointer: `internal/bench/experiment/design.go:validateLoopPolicy`.
+- **Multiple `loop_exceeded` audit records across DAG retries** — With `node.MaxRetries=2`, a step that exhausts its loop 3 times emits 3 `loop_exceeded` records with distinct attempt numbers. Inflates `NodeViolations` volume. Design decision: should loop exhaustion be deduplicated per step per task run? Pointer: `internal/bench/experiment/runtime_runner.go:717`, `pkg/dag/execute.go:runWithRetry`.
+- **Synthesize call returns `ErrLoopExhausted` if LLM includes `<tool .../>` XML in prose (no exit criterion)** — When `hasExitCriterion=false` and the synthesize response contains any `<tool .../>` XML (e.g., an example in a prose explanation), `len(synthCalls) > 0` triggers `ErrLoopExhausted` even if the prose answer is otherwise valid. Theoretical edge case; "Final Answer Required" prompt should prevent this in practice. Pointer: `internal/bench/experiment/runtime_runner.go:715`.
+- **`exitToolArgs` synthetic key not DAG-wired to downstream steps** — The key `<stepID>_<toolName>_args` is added to `out` at runtime but not declared in `step.Produces`; DAG auto-wiring ignores it. Downstream steps can only access it via `allOutputs` (global), not via DAG `consumes` declaration. Requires design decision on whether synthetic keys should be registered. Pointer: `internal/bench/experiment/runtime_runner.go:820`.
+- **Accumulator reset between DAG-level retries** — `acc` is declared inside `runFn` body; when `pkg/dag` retries the node, a fresh accumulator is created and tool-result history from the prior invocation is lost. AC6 scopes accumulation to iteration-level (within a single `runFn` invocation); surviving DAG retries requires moving `acc` to the closure capture scope. Design decision. Pointer: `internal/bench/experiment/runtime_runner.go:624`.
