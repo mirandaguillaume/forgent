@@ -31,9 +31,14 @@ func (g *claudeGenerator) GenerateAgent(agent model.AgentComposition, skills []m
 	return GenerateAgentMd(agent, skills, outputDir)
 }
 
+func (g *claudeGenerator) GenerateInstructions(skills []model.SkillBehavior, agents []model.AgentComposition) string {
+	return GenerateClaudeMd(skills, agents)
+}
+
+func (g *claudeGenerator) InstructionsPath() string     { return "CLAUDE.md" }
 func (g *claudeGenerator) SkillPath(name string) string { return "skills/" + name + "/SKILL.md" }
 func (g *claudeGenerator) AgentPath(name string) string { return "agents/" + name + ".md" }
-func (g *claudeGenerator) ContextDir() string            { return "context" }
+func (g *claudeGenerator) ContextDir() string           { return "context" }
 
 func init() {
 	spec.Register("claude", func() spec.Generator { return &claudeGenerator{} })
