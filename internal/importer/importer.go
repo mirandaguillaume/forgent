@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/mirandaguillaume/forgent/internal/analyzer"
+	"github.com/mirandaguillaume/forgent/internal/classifier"
 	"github.com/mirandaguillaume/forgent/internal/linter"
 	"github.com/mirandaguillaume/forgent/internal/llm"
 	"github.com/mirandaguillaume/forgent/pkg/model"
@@ -85,16 +86,19 @@ func RunImport(opts ImportOptions) ImportResult {
 	// 3. Reverse map tools
 	genericTools := ReverseMapTools(fm.Tools, source.Framework)
 
-	// 4. Build prompt
-	prompt := BuildImportPrompt(source, fm, body, genericTools)
+	// 4. Pre-classify instructions to ground the LLM prompt.
+	classification := classifier.Classify(body, source.Framework.String())
 
-	// 5. Call LLM
+	// 5. Build prompt
+	prompt := BuildImportPrompt(source, fm, body, genericTools, classification)
+
+	// 6. Call LLM
 	response, err := opts.Provider.Complete(prompt)
 	if err != nil {
 		return ImportResult{Error: fmt.Sprintf("LLM completion failed: %v", err)}
 	}
 
-	// 6. Parse response
+	// 7. Parse response
 	skills, agent, rawYAMLs, contracts, err := parseLLMResponse(response)
 	if err != nil {
 		return ImportResult{Error: fmt.Sprintf("parsing LLM response: %v", err)}

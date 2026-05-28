@@ -28,6 +28,18 @@ const (
 	FrameworkCopilot
 )
 
+// String returns the lowercase name of the framework for display and prompt use.
+func (f Framework) String() string {
+	switch f {
+	case FrameworkClaude:
+		return "claude"
+	case FrameworkCopilot:
+		return "copilot"
+	default:
+		return "unknown"
+	}
+}
+
 // Source represents a resolved import source with its content and framework.
 type Source struct {
 	Name      string

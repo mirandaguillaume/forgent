@@ -3,10 +3,13 @@ package importer
 import (
 	"fmt"
 	"strings"
+
+	"github.com/mirandaguillaume/forgent/internal/classifier"
 )
 
 // BuildImportPrompt constructs the LLM prompt for agent-to-skill decomposition.
-func BuildImportPrompt(source Source, fm AgentFrontmatter, body string, genericTools []string) string {
+// classification is optional: a zero-value Result skips the pre-classification section.
+func BuildImportPrompt(source Source, fm AgentFrontmatter, body string, genericTools []string, classification classifier.Result) string {
 	var b strings.Builder
 
 	b.WriteString("You are converting an agent definition into Forgent skill YAML specs.\n\n")
@@ -70,6 +73,25 @@ func BuildImportPrompt(source Source, fm AgentFrontmatter, body string, genericT
 	b.WriteString("\n\n")
 
 	// Instructions
+	// Pre-classification hint: guide the LLM with facet assignments already done.
+	if len(classification.Items) > 0 {
+		b.WriteString("## Pre-classified instructions\n\n")
+		b.WriteString("Each instruction below has already been mapped to a Forgent facet.\n")
+		b.WriteString("Use these assignments when generating skill YAML fields.\n\n")
+		byFacet := classification.ByFacet()
+		for _, facet := range classifier.AllFacets {
+			items := byFacet[facet]
+			if len(items) == 0 {
+				continue
+			}
+			b.WriteString(fmt.Sprintf("%s:\n", strings.ToUpper(string(facet))))
+			for _, item := range items {
+				b.WriteString(fmt.Sprintf("  - %s\n", item.Text))
+			}
+			b.WriteString("\n")
+		}
+	}
+
 	b.WriteString("## Instructions\n\n")
 	b.WriteString("1. Analyze this agent definition and identify distinct responsibilities.\n")
 	b.WriteString("2. Create one Forgent skill YAML per responsibility.\n")
