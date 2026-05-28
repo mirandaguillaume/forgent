@@ -160,14 +160,14 @@ func FormatCompactSkill(skill model.SkillBehavior) string {
 	return sb.String()
 }
 
-// BuildSkillDescription creates a description from skill facets.
+// BuildSkillDescription creates a human-readable description from skill facets.
 func BuildSkillDescription(skill model.SkillBehavior) string {
-	parts := []string{skill.Strategy.Approach + "-based skill"}
-	if len(skill.Context.Consumes) > 0 {
-		parts = append(parts, "consuming "+strings.Join(skill.Context.Consumes, ", "))
+	if skill.Strategy.Approach != "" {
+		return skill.Strategy.Approach
 	}
+	// Fallback when approach is empty.
 	if len(skill.Context.Produces) > 0 {
-		parts = append(parts, "to produce "+strings.Join(skill.Context.Produces, ", "))
+		return "Produces " + strings.Join(skill.Context.Produces, ", ")
 	}
-	return strings.Join(parts, " ")
+	return skill.Skill
 }

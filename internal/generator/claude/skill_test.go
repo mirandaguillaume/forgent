@@ -47,7 +47,7 @@ func testSkill() model.SkillBehavior {
 func TestGenerateSkillMd_Frontmatter(t *testing.T) {
 	md := claude.GenerateSkillMd(testSkill(), nil, "")
 	assert.Contains(t, md, "---\nname: code-review\n")
-	assert.Contains(t, md, "description: analytical-based skill")
+	assert.Contains(t, md, "description: analytical")
 }
 
 func TestGenerateSkillMd_Title(t *testing.T) {

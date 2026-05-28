@@ -31,7 +31,7 @@ func TestBuildSkillDescription(t *testing.T) {
 		},
 	}
 	desc := generator.BuildSkillDescription(skill)
-	assert.Equal(t, "analytical-based skill consuming source-code to produce report", desc)
+	assert.Equal(t, "analytical", desc)
 }
 
 func TestBuildSkillDescription_NoConsumesProduces(t *testing.T) {
@@ -39,7 +39,7 @@ func TestBuildSkillDescription_NoConsumesProduces(t *testing.T) {
 		Strategy: model.StrategyFacet{Approach: "generative"},
 	}
 	desc := generator.BuildSkillDescription(skill)
-	assert.Equal(t, "generative-based skill", desc)
+	assert.Equal(t, "generative", desc)
 }
 
 func parseGuardrails(t *testing.T, yamlStr string) []model.GuardrailRule {
