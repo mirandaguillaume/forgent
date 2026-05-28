@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"math"
 	"os"
 	"strings"
 
@@ -16,37 +15,36 @@ func init() {
 	var providerFlag, modelFlag string
 	var quick, all bool
 	var targets []string
-	threshold := 0.80
 
 	checkCmd := &cobra.Command{
 		Use:   "check <file>",
-		Short: "Estimate instruction following compliance per harness",
-		Long: `Analyzes each instruction in an agent file and estimates how reliably
-it will be followed on each AI coding harness (Claude Code, Copilot, Cursor).
+		Short: "Assess instruction following compliance risk per harness",
+		Long: `Analyzes each instruction in an agent file and flags compliance risks
+per AI coding harness (Claude Code, Copilot, Cursor).
 
-Uses research-backed heuristics:
-  - Position effect: Liu et al. 2023 "Lost in the Middle"
-  - Framing effect: IFEval benchmark (Zhou et al. 2023)
-  - Harness deltas: empirical estimates (labeled as such)
+Risk levels are derived from documented factors — no invented percentages:
+  - Negative framing: IFEval benchmark (Zhou et al. 2023)
+  - Middle position:  Liu et al. 2023 "Lost in the Middle"
+  - Semantic constraint: not statically verifiable
+  - Harness weakness: community-reported empirical observation (labeled)
 
-Use --bench to measure actual compliance empirically.`,
+Use --bench to validate empirically.`,
 		Args: cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			runCheck(args[0], providerFlag, modelFlag, targets, quick, all, threshold)
+			runCheck(args[0], providerFlag, modelFlag, targets, quick, all)
 		},
 	}
 
-	checkCmd.Flags().StringVar(&providerFlag, "provider", "", "LLM provider for classification (ollama, anthropic…)")
+	checkCmd.Flags().StringVar(&providerFlag, "provider", "", "LLM provider for classification")
 	checkCmd.Flags().StringVar(&modelFlag, "model", "claude-haiku-4-5-20251001", "LLM model name")
 	checkCmd.Flags().BoolVar(&quick, "quick", false, "static classification only — no LLM")
-	checkCmd.Flags().BoolVar(&all, "all", false, "show all instructions including high-compliance ones")
-	checkCmd.Flags().Float64Var(&threshold, "threshold", 0.80, "only show instructions below this compliance score")
+	checkCmd.Flags().BoolVar(&all, "all", false, "show all instructions including low-risk ones")
 	checkCmd.Flags().StringSliceVar(&targets, "targets", checker.Harnesses, "harnesses to check against")
 
 	rootCmd.AddCommand(checkCmd)
 }
 
-func runCheck(filePath, providerFlag, modelFlag string, targets []string, quick, all bool, threshold float64) {
+func runCheck(filePath, providerFlag, modelFlag string, targets []string, quick, all bool) {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		fmt.Println(color.RedString("Error: %v", err))
@@ -74,15 +72,14 @@ func runCheck(filePath, providerFlag, modelFlag string, targets []string, quick,
 	}
 
 	result := checker.Check(string(content), format, targets, cl)
-	printCheckResult(filePath, result, targets, all, threshold)
+	printCheckResult(filePath, result, targets, all)
 }
 
-func printCheckResult(filePath string, result checker.CheckResult, targets []string, all bool, threshold float64) {
+func printCheckResult(filePath string, result checker.CheckResult, targets []string, all bool) {
 	bold := color.New(color.Bold)
-	bold.Printf("Compliance check: %s\n", filePath)
+	bold.Printf("Compliance risk: %s\n", filePath)
 	fmt.Println()
 
-	// Per-facet breakdown
 	byFacet := groupByFacet(result.Instructions)
 	facetLabels := map[classifier.Facet]string{
 		classifier.FacetContext:       "Context",
@@ -97,89 +94,121 @@ func printCheckResult(filePath string, result checker.CheckResult, targets []str
 		if len(items) == 0 {
 			continue
 		}
-		label := facetLabels[facet]
-		fmt.Printf("  %s (%d)\n", color.New(color.Bold).Sprint(label), len(items))
+
 		shown := 0
+		var skipped int
 		for _, ir := range items {
-			// Skip high-compliance items without suggestions unless --all.
-			if !all {
-				minScore := 1.0
-				for _, h := range targets {
-					if s := ir.Scores[h]; s < minScore {
-						minScore = s
-					}
-				}
-				if minScore >= threshold && len(ir.Suggestions) == 0 {
-					continue
-				}
+			if !all && maxRisk(ir.Risks, targets) == checker.RiskLow && len(ir.Suggestions) == 0 {
+				skipped++
+				continue
 			}
 			shown++
-			text := ir.Text
-			if len(text) > 70 {
-				text = text[:67] + "..."
-			}
-			fmt.Printf("    · %s\n", text)
-			for _, harness := range targets {
-				score := ir.Scores[harness]
-				bar := complianceBar(score)
-				flag := complianceFlag(score)
-				fmt.Printf("        %-12s %s %s\n", harness, bar, flag)
-			}
-			for _, s := range ir.Suggestions {
-				fmt.Printf("        %s %s\n", color.YellowString("↑"), color.YellowString(s))
-			}
 		}
-		if !all && shown < len(items) {
-			fmt.Printf("    %s\n", color.New(color.Faint).Sprintf("… %d more instructions above threshold (use --all to show)", len(items)-shown))
+
+		fmt.Printf("  %s (%d)\n", bold.Sprint(facetLabels[facet]), len(items))
+
+		for _, ir := range items {
+			if !all && maxRisk(ir.Risks, targets) == checker.RiskLow && len(ir.Suggestions) == 0 {
+				continue
+			}
+			printInstruction(ir, targets)
+		}
+
+		_ = shown
+		if skipped > 0 {
+			fmt.Printf("    %s\n", color.New(color.Faint).Sprintf("… %d low-risk instructions hidden (--all to show)", skipped))
 		}
 		fmt.Println()
 	}
 
-	// Overall summary
-	fmt.Printf("  %s\n", color.New(color.Bold).Sprint("Overall compliance (estimated)"))
+	// Summary
+	bold.Println("  Summary")
 	for _, h := range targets {
-		score := result.Overall[h]
-		bar := complianceBar(score)
-		flag := complianceFlag(score)
-		fmt.Printf("    %-12s %s %s\n", h, bar, flag)
+		level := result.Overall[h]
+		high := result.HighRiskCount[h]
+		icon := riskIcon(level)
+		label := riskLabel(level)
+		if high > 0 {
+			fmt.Printf("    %-12s %s %s  (%d high-risk instruction(s))\n", h, icon, label, high)
+		} else {
+			fmt.Printf("    %-12s %s %s\n", h, icon, label)
+		}
 	}
 	fmt.Println()
+	fmt.Println(color.New(color.Faint).Sprint("  Risk levels based on documented factors only. Run 'forgent bench' to measure empirically."))
+}
 
-	// Warnings
-	if len(result.Warnings) > 0 {
-		fmt.Printf("  %s\n", color.YellowString("⚠ Low compliance warnings:"))
-		for _, w := range result.Warnings {
-			fmt.Printf("    · %s\n", w)
+func printInstruction(ir checker.InstructionResult, targets []string) {
+	text := ir.Text
+	if len(text) > 72 {
+		text = text[:69] + "..."
+	}
+	fmt.Printf("    · %s\n", text)
+
+	// Show per-harness risk only when they differ, otherwise show once.
+	allSame := true
+	firstLevel := ir.Risks[targets[0]]
+	for _, h := range targets[1:] {
+		if ir.Risks[h] != firstLevel {
+			allSame = false
+			break
 		}
-		fmt.Println()
 	}
 
-	fmt.Println(color.New(color.Faint).Sprint("  Scores are estimates. Run 'forgent bench' to measure empirically."))
+	if allSame {
+		level := firstLevel
+		factors := ir.Factors[targets[0]]
+		fmt.Printf("        all harnesses  %s %s\n", riskIcon(level), riskLabel(level))
+		if level > checker.RiskLow {
+			fmt.Printf("        factors: %s\n", strings.Join(factors.ActiveFactors(), " · "))
+		}
+	} else {
+		for _, h := range targets {
+			level := ir.Risks[h]
+			factors := ir.Factors[h]
+			fmt.Printf("        %-12s %s %s", h, riskIcon(level), riskLabel(level))
+			if level > checker.RiskLow {
+				fmt.Printf("  [%s]", strings.Join(factors.ActiveFactors(), ", "))
+			}
+			fmt.Println()
+		}
+	}
+
+	for _, s := range ir.Suggestions {
+		fmt.Printf("        %s %s\n", color.YellowString("↑"), color.YellowString(s))
+	}
 }
 
-func complianceBar(score float64) string {
-	filled := int(math.Round(score * 10))
-	bar := strings.Repeat("█", filled) + strings.Repeat("░", 10-filled)
-	pct := int(math.Round(score * 100))
-	if pct >= 80 {
-		return color.GreenString(bar)
-	}
-	if pct >= 60 {
-		return color.YellowString(bar)
-	}
-	return color.RedString(bar)
-}
-
-func complianceFlag(score float64) string {
-	pct := int(math.Round(score * 100))
-	switch {
-	case pct >= 80:
-		return color.GreenString(fmt.Sprintf("%d%%", pct))
-	case pct >= 60:
-		return color.YellowString(fmt.Sprintf("%d%% ⚠", pct))
+func riskIcon(r checker.RiskLevel) string {
+	switch r {
+	case checker.RiskLow:
+		return color.GreenString("✓")
+	case checker.RiskMedium:
+		return color.YellowString("⚠")
 	default:
-		return color.RedString(fmt.Sprintf("%d%% ✗", pct))
+		return color.RedString("✗")
 	}
+}
+
+func riskLabel(r checker.RiskLevel) string {
+	switch r {
+	case checker.RiskLow:
+		return color.GreenString("low risk")
+	case checker.RiskMedium:
+		return color.YellowString("medium risk")
+	default:
+		return color.RedString("HIGH RISK")
+	}
+}
+
+func maxRisk(risks map[string]checker.RiskLevel, targets []string) checker.RiskLevel {
+	var max checker.RiskLevel
+	for _, h := range targets {
+		if r := risks[h]; r > max {
+			max = r
+		}
+	}
+	return max
 }
 
 func groupByFacet(items []checker.InstructionResult) map[classifier.Facet][]checker.InstructionResult {
