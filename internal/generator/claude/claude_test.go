@@ -40,10 +40,11 @@ func TestClaudeGenerator_AgentPath(t *testing.T) {
 	assert.Equal(t, "agents/code-reviewer.md", ag.AgentPath("code-reviewer"))
 }
 
-func TestClaudeGenerator_NoInstructionsGenerator(t *testing.T) {
+func TestClaudeGenerator_ImplementsInstructionsGenerator(t *testing.T) {
 	gen, _ := spec.Get("claude")
-	_, ok := gen.(spec.InstructionsGenerator)
-	assert.False(t, ok, "Claude generator should not implement InstructionsGenerator")
+	ig, ok := gen.(spec.InstructionsGenerator)
+	require.True(t, ok, "Claude generator must implement InstructionsGenerator")
+	assert.Equal(t, "CLAUDE.md", ig.InstructionsPath())
 }
 
 func TestClaudeGenerator_GenerateSkill(t *testing.T) {
