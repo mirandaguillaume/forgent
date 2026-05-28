@@ -19,7 +19,9 @@ func TestSelectProviderExplicitOllama(t *testing.T) {
 
 func TestSelectProviderAnthropicKeyRequired(t *testing.T) {
 	t.Setenv("ANTHROPIC_API_KEY", "")
+	t.Setenv("ANTHROPIC_FORGENT_API_KEY", "")
 	t.Setenv("OPENROUTER_API_KEY", "")
+	t.Setenv("OPENROUTER_FORGENT_API_KEY", "")
 	t.Setenv("FORGENT_API_KEY", "")
 
 	_, _, err := selectProvider("anthropic", "", false)
@@ -40,7 +42,9 @@ func TestSelectProviderForgentAPIKeyOverride(t *testing.T) {
 
 func TestSelectProviderNoProviderAvailable(t *testing.T) {
 	t.Setenv("ANTHROPIC_API_KEY", "")
+	t.Setenv("ANTHROPIC_FORGENT_API_KEY", "")
 	t.Setenv("OPENROUTER_API_KEY", "")
+	t.Setenv("OPENROUTER_FORGENT_API_KEY", "")
 	t.Setenv("FORGENT_API_KEY", "")
 
 	_, _, err := selectProvider("", "", false)

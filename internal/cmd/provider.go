@@ -14,14 +14,15 @@ import (
 // selectProvider chooses an LLM provider using the fallback chain:
 // 1. Explicit --provider flag
 // 2. Ollama (if running locally)
-// 3. FORGENT_ANTHROPIC env var  → anthropic
-// 4. OPENROUTER_API_KEY env var → openrouter
-// 5. ANTHROPIC_API_KEY env var  → anthropic
-// 6. FORGENT_API_KEY env var    → anthropic
-// 7. Error (no provider available)
+// 3. ANTHROPIC_FORGENT_API_KEY → anthropic
+// 4. OPENROUTER_FORGENT_API_KEY → openrouter
+// 5. OPENROUTER_API_KEY env var → openrouter
+// 6. ANTHROPIC_API_KEY env var  → anthropic
+// 7. FORGENT_API_KEY env var    → anthropic
+// 8. Error (no provider available)
 func selectProvider(providerFlag, modelFlag string, debug bool) (llm.Provider, string, error) {
 	forgentKey := os.Getenv("FORGENT_API_KEY")
-	forgentAnthropic := os.Getenv("FORGENT_ANTHROPIC")
+	forgentAnthropic := os.Getenv("ANTHROPIC_FORGENT_API_KEY")
 
 	if providerFlag != "" {
 		apiKey := ""
@@ -29,9 +30,9 @@ func selectProvider(providerFlag, modelFlag string, debug bool) (llm.Provider, s
 		case "ollama":
 			// No API key needed
 		case "openrouter":
-			apiKey = firstNonEmpty(os.Getenv("OPENROUTER_API_KEY"), forgentKey)
+			apiKey = firstNonEmpty(os.Getenv("OPENROUTER_FORGENT_API_KEY"), os.Getenv("OPENROUTER_API_KEY"), forgentKey)
 			if apiKey == "" {
-				return nil, "", fmt.Errorf("OPENROUTER_API_KEY not set")
+				return nil, "", fmt.Errorf("OPENROUTER_FORGENT_API_KEY or OPENROUTER_API_KEY not set")
 			}
 		case "anthropic":
 			apiKey = firstNonEmpty(forgentAnthropic, os.Getenv("ANTHROPIC_API_KEY"), forgentKey)
@@ -58,11 +59,11 @@ func selectProvider(providerFlag, modelFlag string, debug bool) (llm.Provider, s
 	if forgentAnthropic != "" {
 		p, err := llm.GetProvider("anthropic", forgentAnthropic)
 		if err == nil {
-			return p, "anthropic (via FORGENT_ANTHROPIC)", nil
+			return p, "anthropic (via ANTHROPIC_FORGENT_API_KEY)", nil
 		}
 	}
 
-	if key := firstNonEmpty(os.Getenv("OPENROUTER_API_KEY"), forgentKey); key != "" {
+	if key := firstNonEmpty(os.Getenv("OPENROUTER_FORGENT_API_KEY"), os.Getenv("OPENROUTER_API_KEY"), forgentKey); key != "" {
 		p, err := llm.GetProvider("openrouter", key)
 		if err == nil {
 			return p, "openrouter (via OPENROUTER_API_KEY)", nil
@@ -76,7 +77,7 @@ func selectProvider(providerFlag, modelFlag string, debug bool) (llm.Provider, s
 		}
 	}
 
-	return nil, "", fmt.Errorf("no LLM provider available. Install Ollama or set FORGENT_ANTHROPIC / OPENROUTER_API_KEY / ANTHROPIC_API_KEY")
+	return nil, "", fmt.Errorf("no LLM provider available. Install Ollama or set ANTHROPIC_FORGENT_API_KEY / OPENROUTER_FORGENT_API_KEY / ANTHROPIC_API_KEY")
 }
 
 func ollamaRunning(debug bool) bool {
