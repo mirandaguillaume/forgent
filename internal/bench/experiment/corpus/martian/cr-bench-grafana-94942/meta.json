@@ -1,0 +1,18 @@
+{
+  "id": "cr-bench-grafana-94942",
+  "source_url": "https://github.com/grafana/grafana/pull/94942",
+  "original_url": "https://github.com/grafana/grafana/pull/94942",
+  "project": "grafana",
+  "pr_num": "94942",
+  "title": "Advanced SQL Analytics Framework",
+  "golden_comments": [
+    {
+      "comment": "The enableSqlExpressions function has flawed logic that always returns false, effectively disabling SQL expressions unconditionally:",
+      "severity": "Critical"
+    },
+    {
+      "comment": "Several methods such as NewInMemoryDB().RunCommands and db.QueryFramesInto return 'not implemented'.",
+      "severity": "High"
+    }
+  ]
+}

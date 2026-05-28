@@ -23,8 +23,8 @@ func FormatInstructionReport(result *InstructionBenchResult, opts InstructionRep
 
 	// Metadata
 	sb.WriteString("## Metadata\n\n")
-	sb.WriteString(fmt.Sprintf("| Field | Value |\n"))
-	sb.WriteString(fmt.Sprintf("|-------|-------|\n"))
+	sb.WriteString("| Field | Value |\n")
+	sb.WriteString("|-------|-------|\n")
 	sb.WriteString(fmt.Sprintf("| Date | %s |\n", time.Now().Format("2006-01-02")))
 	if opts.Model != "" {
 		sb.WriteString(fmt.Sprintf("| Model | %s |\n", opts.Model))
@@ -57,8 +57,8 @@ func FormatInstructionReport(result *InstructionBenchResult, opts InstructionRep
 			formatCounts[fr.Format]++
 		}
 	}
-	sb.WriteString(fmt.Sprintf("| Format | Files |\n"))
-	sb.WriteString(fmt.Sprintf("|--------|-------|\n"))
+	sb.WriteString("| Format | Files |\n")
+	sb.WriteString("|--------|-------|\n")
 	formats := sortedMapKeys(formatCounts)
 	for _, f := range formats {
 		sb.WriteString(fmt.Sprintf("| %s | %d |\n", f, formatCounts[f]))

@@ -1,0 +1,172 @@
+# SWE-Bench Validation (Story 10-12) — FR-SWE claim
+#
+# Topology:
+#   read-issue (read task_context.md → structured issue analysis)
+#       ↓
+#   explore-repo (read code context from task_context.md → relevant files)
+#       ↓
+#   generate-patch (optional specialists via agent_tools → unified diff)
+#       ↓
+#   validate-patch (format check → final unified diff)
+#
+# Runtime integration:
+#   - task.Input = problem_statement + "\n\n" + code_context (injected per SWE-Bench task)
+#   - Input is available via task_context.md (section "## Original Input")
+#   - 3 conditions: text (compiled prompt), runtime (DAG), specialists (runtime + tool_nodes)
+#   - Final output extracted from TaskResult.CombinedOutput: lines starting with --- a/
+
+id: resolve-issue
+name: Issue Resolver
+description: |
+  Resolve a GitHub issue by generating a minimal unified diff patch.
+  Reads the problem statement and code context from task_context.md,
+  analyzes root cause, then generates and validates a unified diff.
+category: swebench
+steps:
+  # ── Step 1: Read and understand the issue ────────────────────────────────
+  - id: read-issue
+    name: Issue Reader
+    prompt: |
+      Read task_context.md to understand the issue and the relevant code context.
+      Focus on:
+      - What is broken or missing?
+      - Which files are likely involved?
+      - What is the minimal change needed?
+
+      Output a concise analysis:
+      1. Root cause (1-2 sentences)
+      2. Files to change (list)
+      3. Proposed approach (2-3 sentences)
+    tools: [file_read]
+    file_access: read-only
+    network_policy:
+      forbidden_domains:
+        - "*.com"
+        - "*.net"
+        - "*.org"
+        - "*.io"
+    produces: [issue_analysis]
+
+  # ── Step 2: Explore relevant code context ────────────────────────────────
+  - id: explore-repo
+    name: Code Explorer
+    prompt: |
+      Based on the issue analysis, re-read task_context.md to extract the exact
+      code sections that need to change.
+
+      For each file to modify:
+      - Quote the exact lines that need to change (the "before" state)
+      - Note the line context (surrounding functions, imports)
+      - Identify any dependencies that the patch must respect
+
+      Output: a structured summary of the code sections to modify, quoting
+      exact lines from the task context.
+    tools: [file_read]
+    file_access: read-only
+    network_policy:
+      forbidden_domains:
+        - "*.com"
+        - "*.net"
+        - "*.org"
+        - "*.io"
+    consumes: [issue_analysis]
+    produces: [code_context]
+
+  # ── Step 3: Generate the unified diff patch ───────────────────────────────
+  - id: generate-patch
+    name: Patch Generator
+    prompt: |
+      Generate a valid unified diff patch that resolves the issue.
+
+      Requirements:
+      - Use standard unified diff format (--- a/<path> / +++ b/<path> / @@ ... @@)
+      - The diff must apply cleanly against the original code in the context
+      - Be minimal: only change what is strictly necessary to fix the issue
+      - Include enough context lines (3) for git apply to work
+      - Do NOT add new files unless the issue explicitly requires it
+
+      You have access to specialist tools:
+      - complexity-specialist: call if the change is architecturally complex to
+        verify you are not introducing regressions
+      - security-specialist: call if the change touches auth, input validation,
+        or data handling to verify no security issues
+
+      Output the complete unified diff and nothing else after it.
+      The diff must start with: --- a/<path>
+    tools: [file_read]
+    file_access: read-only
+    network_policy:
+      forbidden_domains:
+        - "*.com"
+        - "*.net"
+        - "*.org"
+        - "*.io"
+    agent_tools: [complexity-specialist, security-specialist]
+    consumes: [issue_analysis, code_context]
+    produces: [unified_diff]
+
+  # ── Step 4: Validate and emit the final patch ─────────────────────────────
+  - id: validate-patch
+    name: Patch Validator
+    prompt: |
+      Validate the unified diff patch from the previous step.
+
+      Check:
+      1. Starts with "--- a/<path>" on the first line of the diff
+      2. Has "+++ b/<path>" as the second line
+      3. Has at least one @@ hunk
+      4. Context lines (unchanged) use " " prefix, added lines use "+", removed use "-"
+
+      If valid: output the patch verbatim and nothing else.
+      If invalid: fix the formatting and output the corrected patch.
+
+      The output MUST start with "--- a/" for downstream processing.
+    file_access: read-only
+    network_policy:
+      forbidden_domains:
+        - "*.com"
+        - "*.net"
+        - "*.org"
+        - "*.io"
+    consumes: [unified_diff]
+    produces: [final_patch]
+
+guardrails:
+  - "--- a/"
+  - "+++ b/"
+expected_violations: []
+
+# ── Tool nodes (called on-demand by generate-patch) ──────────────────────────
+# These are full LLM nodes executed inline when generate-patch emits a tool call.
+# They are NOT scheduled by the DAG — only invoked on demand.
+tool_nodes:
+  - id: complexity-specialist
+    name: Complexity / Regression Specialist
+    model: claude-haiku-4-5-20251001
+    prompt: |
+      You are a senior software engineer specializing in change impact analysis.
+      You are reviewing a proposed code change to assess complexity and regression risk.
+
+      Analyze the change described in the context:
+      - Is the change minimal and focused, or does it have unintended side effects?
+      - Does it respect the existing architecture and patterns?
+      - Are there likely regression risks in related code paths?
+
+      Answer concisely: SAFE or RISKY, with a brief explanation (2-3 sentences).
+      If RISKY, suggest a simpler alternative if one exists.
+
+  - id: security-specialist
+    name: Security Specialist
+    model: claude-haiku-4-5-20251001
+    prompt: |
+      You are a security code reviewer.
+      You are reviewing a proposed code change for security vulnerabilities.
+
+      Check specifically for:
+      - Input validation gaps (injection, path traversal, XSS)
+      - Authentication/authorization bypasses
+      - Unsafe data handling (logging secrets, unescaped output)
+      - Memory safety issues in low-level code
+
+      Answer concisely: SAFE or RISKY, with a brief explanation (2-3 sentences).
+      If RISKY, describe the specific vulnerability class.

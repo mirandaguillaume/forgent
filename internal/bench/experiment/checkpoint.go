@@ -19,6 +19,7 @@ type TaskResultJSON struct {
 	TokensUsed     int          `json:"tokens_used"`
 	WallClockMs    int64        `json:"wall_clock_ms"`
 	LLMCalls       int          `json:"llm_calls"`
+	CombinedOutput string       `json:"combined_output,omitempty"`
 	Error          string       `json:"error,omitempty"`
 
 	// Tool-based tasks (Story 5-4)
@@ -37,6 +38,7 @@ func ToResultJSON(r TaskResult) TaskResultJSON {
 		TokensUsed:     r.TokensUsed,
 		WallClockMs:    r.WallClockMs,
 		LLMCalls:       r.LLMCalls,
+		CombinedOutput: r.CombinedOutput,
 	}
 	if r.Error != nil {
 		j.Error = r.Error.Error()
@@ -60,6 +62,7 @@ func (j TaskResultJSON) ToTaskResult() TaskResult {
 		TokensUsed:     j.TokensUsed,
 		WallClockMs:    j.WallClockMs,
 		LLMCalls:       j.LLMCalls,
+		CombinedOutput: j.CombinedOutput,
 	}
 	if j.Error != "" {
 		r.Error = fmt.Errorf("%s", j.Error)

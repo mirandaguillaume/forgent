@@ -1,0 +1,48 @@
+PR #29234: fix(ui): stable focus and state hoisting for team selection
+  review: **Actionable comments posted: 1**
+
+<details>
+<summary>🧹 Nitpick comments (3)</summary><blockquote>
+
+<details>
+<summary>packages/features/eventtypes/components/CheckedTeamSelect.tsx (1)</summary><block
+PR #29230: docs: improve CONTRIBUTING.md (grammar, clarity, minor fixes)
+  review: **Actionable comments posted: 2**
+
+<details>
+<summary>🤖 Prompt for all review comments with AI agents</summary>
+
+```
+Verify each finding against the current code and only fix it if needed.
+
+Inline com
+PR #29229: baseline/p01-public-booking-api
+  review: **Actionable comments posted: 2**
+
+<details>
+<summary>🧹 Nitpick comments (1)</summary><blockquote>
+
+<details>
+<summary>apps/web/pages/api/public/book.ts (1)</summary><blockquote>
+
+`70-95`: **Compute a
+PR #29227: Fix OTP input text invisible in light theme
+  review: can you please add before and after screenshots of UI
+PR #29219: fix(payments): replace console.error with structured logger in handleRefundError
+  review: <details>
+<summary>🧹 Nitpick comments (1)</summary><blockquote>
+
+<details>
+<summary>packages/features/bookings/lib/payment/handleRefundError.ts (1)</summary><blockquote>
+
+`8-8`: **Consider passing con
+PR #29210: fix(lib/errors): replace console.log/error with logger and fix spurious 204 console.error
+  review: **Actionable comments posted: 1**
+
+<details>
+<summary>🧹 Nitpick comments (1)</summary><blockquote>
+
+<details>
+<summary>packages/lib/errors.ts (1)</summary><blockquote>
+
+`78-84`: **Rewrite the 204 note

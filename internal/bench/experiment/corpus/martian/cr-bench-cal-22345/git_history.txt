@@ -1,0 +1,18 @@
+# History for packages/lib/server/service/__tests__/insightsBooking.integration-test.ts
+commit cd576f53: refactor: use dependency injection for InsightsBookingService (#22790) (2025-08-05)
+commit a2205d49: feat: add booking status filter to /insights (#22842) (2025-08-04)
+commit 96744289: feat: convert InsightsBookingService to use Prisma.sql raw queries (#22345) (2025-07-15)
+commit 0a3b3a69: fix: add InsightsRoutingService and refactor InsightsBookingRepository (#22057) (2025-06-27)
+# History for packages/lib/server/service/insightsBooking.ts
+commit cd576f53: refactor: use dependency injection for InsightsBookingService (#22790) (2025-08-05)
+commit 593c48c8: refactor: replace tremor with recharts (#22791) (2025-08-05)
+commit a2205d49: feat: add booking status filter to /insights (#22842) (2025-08-04)
+commit 3e299f95: refactor: update charts on /insights to use InsightsBookingService (#22744) (2025-07-29)
+commit 9cd806ff: fix: CSV generation from insights returns empty results (#22775) (2025-07-28)
+commit e6a0a0fc: refactor: event trends chart on /insights to use InsightsBookingService (#22741) (2025-07-25)
+commit f901fba0: fix: use InsightsBookingService for Download button on /insights (#22698) (2025-07-25)
+commit cd50719b: fix: refactor AverageEventDurationChart to use InsightsBookingService (#22702) (2025-07-25)
+commit e7535b9d: feat: add hourly booking charts on /insights (#22619) (2025-07-21)
+commit 96744289: feat: convert InsightsBookingService to use Prisma.sql raw queries (#22345) (2025-07-15)
+commit efd15c5a: refactor: convert TeamRepository to use dependency injection pattern (#22383) (2025-07-10)
+commit 0a3b3a69: fix: add InsightsRoutingService and refactor InsightsBookingRepository (#22057) (2025-06-27)

@@ -48,14 +48,14 @@ func LoadEvalTasks(path string) ([]EvalTask, error) {
 }
 
 // RunEval runs the LLM-as-judge evaluation comparing composed vs monolithic prompts.
-func RunEval(tasks []EvalTask, composedPrompt, monolithicPrompt string, provider llm.Provider) (*AggregateEvalResult, error) {
+// composedFn receives the task input and returns the composed review text; this allows
+// the caller to back it with either a static prompt or a full experiment pipeline run.
+func RunEval(tasks []EvalTask, composedFn func(input string) (string, error), monolithicPrompt string, provider llm.Provider) (*AggregateEvalResult, error) {
 	agg := &AggregateEvalResult{Tasks: len(tasks)}
 
 	for _, task := range tasks {
-		// Get composed review
-		composedReview, err := provider.Complete(fmt.Sprintf(
-			"%s\n\nReview the following code:\n```\n%s\n```",
-			composedPrompt, task.Input))
+		// Get composed review via caller-supplied strategy
+		composedReview, err := composedFn(task.Input)
 		if err != nil {
 			return nil, fmt.Errorf("composed review for %s: %w", task.ID, err)
 		}

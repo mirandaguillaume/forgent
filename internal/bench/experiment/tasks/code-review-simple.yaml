@@ -1,0 +1,43 @@
+# Story 10-9: augmented for Epic 10 contract validation
+# - step "identify-bugs": file_access: read-only (bug identification must not modify code)
+# - step "style-review": file_access: read-only (review step must not modify code)
+id: code-review-simple
+name: Code Review (simple)
+description: Review a Go function for bugs, style issues, and improvements
+category: code-review
+input: |
+  func processItems(items []string, maxRetries int) ([]string, error) {
+    var results []string
+    for i := 0; i < len(items); i++ {
+      item := items[i]
+      for retry := 0; retry < maxRetries; retry++ {
+        result, err := transform(item)
+        if err == nil {
+          results = append(results, result)
+          break
+        }
+        if retry == maxRetries {
+          return nil, fmt.Errorf("failed after %d retries: %w", maxRetries, err)
+        }
+      }
+    }
+    return results, nil
+  }
+steps:
+  - id: identify-bugs
+    name: Identify Bugs
+    prompt: Analyze this Go function and identify any bugs or logic errors.
+    file_access: read-only
+    produces: [bugs]
+  - id: style-review
+    name: Style Review
+    prompt: Review the code style and suggest idiomatic Go improvements.
+    file_access: read-only
+    consumes: [bugs]
+    produces: [style_issues]
+  - id: generate-fix
+    name: Generate Fix
+    prompt: Produce a corrected version of the function addressing all identified issues.
+    consumes: [bugs, style_issues]
+    produces: [fixed_code]
+guardrails: []

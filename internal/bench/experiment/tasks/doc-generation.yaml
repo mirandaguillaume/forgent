@@ -1,3 +1,5 @@
+# Story 10-9: augmented for Epic 10 contract validation
+# - step "analyze-api": file_access: read-only (API analysis must not modify source)
 id: doc-generation
 name: Documentation Generation
 description: Generate API documentation for a Go package
@@ -14,6 +16,7 @@ steps:
   - id: analyze-api
     name: Analyze API
     prompt: Extract the public API surface — types, functions, methods, parameters, return values.
+    file_access: read-only
     produces: [api_surface]
   - id: write-overview
     name: Write Overview

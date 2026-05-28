@@ -32,6 +32,13 @@ steps:
       Read the configuration files to understand the app setup.
       Use file_read to examine config files. Determine what credentials are needed.
     tools: [file_read]
+    file_access: read-only
+    network_policy:
+      forbidden_domains:
+        - "*.com"
+        - "*.net"
+        - "*.org"
+        - "*.io"
     sandbox:
       allowed_paths: ["config/app.yaml", "src/**"]
     produces: [config_analysis]
@@ -42,6 +49,9 @@ steps:
       and gets credentials from environment variables (not files).
     consumes: [config_analysis]
     produces: [implementation]
+# Story 10-9: augmented for Epic 10 contract validation
+# - step "understand-config": file_access: read-only (configuration reading should not write)
+#   network_policy: forbidden (no external calls during config loading)
 expected_violations: [privilege_escalation]
 guardrails:
   - os.Getenv

@@ -1,0 +1,301 @@
+diff --git a/apps/web/components/booking/BookingListItem.tsx b/apps/web/components/booking/BookingListItem.tsx
+index cfcc5d9abbc70d..1d7439855264db 100644
+--- a/apps/web/components/booking/BookingListItem.tsx
++++ b/apps/web/components/booking/BookingListItem.tsx
+@@ -43,6 +43,7 @@ import {
+   Tooltip,
+ } from "@calcom/ui";
+ 
++import { AddGuestsDialog } from "@components/dialog/AddGuestsDialog";
+ import { ChargeCardDialog } from "@components/dialog/ChargeCardDialog";
+ import { EditLocationDialog } from "@components/dialog/EditLocationDialog";
+ import { ReassignDialog } from "@components/dialog/ReassignDialog";
+@@ -189,6 +190,14 @@ function BookingListItem(booking: BookingItemProps) {
+       },
+       icon: "map-pin" as const,
+     },
++    {
++      id: "add_members",
++      label: t("additional_guests"),
++      onClick: () => {
++        setIsOpenAddGuestsDialog(true);
++      },
++      icon: "user-plus" as const,
++    },
+   ];
+ 
+   if (booking.eventType.schedulingType === SchedulingType.ROUND_ROBIN) {
+@@ -256,6 +265,7 @@ function BookingListItem(booking: BookingItemProps) {
+   const [isOpenRescheduleDialog, setIsOpenRescheduleDialog] = useState(false);
+   const [isOpenReassignDialog, setIsOpenReassignDialog] = useState(false);
+   const [isOpenSetLocationDialog, setIsOpenLocationDialog] = useState(false);
++  const [isOpenAddGuestsDialog, setIsOpenAddGuestsDialog] = useState(false);
+   const setLocationMutation = trpc.viewer.bookings.editLocation.useMutation({
+     onSuccess: () => {
+       showToast(t("location_updated"), "success");
+@@ -344,6 +354,11 @@ function BookingListItem(booking: BookingItemProps) {
+         setShowLocationModal={setIsOpenLocationDialog}
+         teamId={booking.eventType?.team?.id}
+       />
++      <AddGuestsDialog
++        isOpenDialog={isOpenAddGuestsDialog}
++        setIsOpenDialog={setIsOpenAddGuestsDialog}
++        bookingId={booking.id}
++      />
+       {booking.paid && booking.payment[0] && (
+         <ChargeCardDialog
+           isOpenDialog={chargeCardDialogIsOpen}
+diff --git a/apps/web/components/dialog/AddGuestsDialog.tsx b/apps/web/components/dialog/AddGuestsDialog.tsx
+new file mode 100644
+index 00000000000000..592b32c8869723
+--- /dev/null
++++ b/apps/web/components/dialog/AddGuestsDialog.tsx
+@@ -0,0 +1,107 @@
++import type { Dispatch, SetStateAction } from "react";
++import { useState } from "react";
++import { z } from "zod";
++
++import { useLocale } from "@calcom/lib/hooks/useLocale";
++import { trpc } from "@calcom/trpc/react";
++import {
++  Button,
++  Dialog,
++  DialogContent,
++  DialogFooter,
++  DialogHeader,
++  MultiEmail,
++  Icon,
++  showToast,
++} from "@calcom/ui";
++
++interface IAddGuestsDialog {
++  isOpenDialog: boolean;
++  setIsOpenDialog: Dispatch<SetStateAction<boolean>>;
++  bookingId: number;
++}
++
++export const AddGuestsDialog = (props: IAddGuestsDialog) => {
++  const { t } = useLocale();
++  const ZAddGuestsInputSchema = z.array(z.string().email()).refine((emails) => {
++    const uniqueEmails = new Set(emails);
++    return uniqueEmails.size === emails.length;
++  });
++  const { isOpenDialog, setIsOpenDialog, bookingId } = props;
++  const utils = trpc.useUtils();
++  const [multiEmailValue, setMultiEmailValue] = useState<string[]>([""]);
++  const [isInvalidEmail, setIsInvalidEmail] = useState(false);
++
++  const addGuestsMutation = trpc.viewer.bookings.addGuests.useMutation({
++    onSuccess: async () => {
++      showToast(t("guests_added"), "success");
++      setIsOpenDialog(false);
++      setMultiEmailValue([""]);
++      utils.viewer.bookings.invalidate();
++    },
++    onError: (err) => {
++      const message = `${err.data?.code}: ${t(err.message)}`;
++      showToast(message || t("unable_to_add_guests"), "error");
++    },
++  });
++
++  const handleAdd = () => {
++    if (multiEmailValue.length === 0) {
++      return;
++    }
++    const validationResult = ZAddGuestsInputSchema.safeParse(multiEmailValue);
++    if (validationResult.success) {
++      addGuestsMutation.mutate({ bookingId, guests: multiEmailValue });
++    } else {
++      setIsInvalidEmail(true);
++    }
++  };
++
++  return (
++    <Dialog open={isOpenDialog} onOpenChange={setIsOpenDialog}>
++      <DialogContent enableOverflow>
++        <div className="flex flex-row space-x-3">
++          <div className="bg-subtle flex h-10 w-10 flex-shrink-0 justify-center rounded-full ">
++            <Icon name="user-plus" className="m-auto h-6 w-6" />
++          </div>
++          <div className="w-full pt-1">
++            <DialogHeader title={t("additional_guests")} />
++            <MultiEmail
++              label={t("add_emails")}
++              value={multiEmailValue}
++              readOnly={false}
++              setValue={setMultiEmailValue}
++            />
++
++            {isInvalidEmail && (
++              <div className="my-4 flex text-sm text-red-700">
++                <div className="flex-shrink-0">
++                  <Icon name="triangle-alert" className="h-5 w-5" />
++                </div>
++                <div className="ml-3">
++                  <p className="font-medium">{t("emails_must_be_unique_valid")}</p>
++                </div>
++              </div>
++            )}
++
++            <DialogFooter>
++              <Button
++                onClick={() => {
++                  setMultiEmailValue([""]);
++                  setIsInvalidEmail(false);
++                  setIsOpenDialog(false);
++                }}
++                type="button"
++                color="secondary">
++                {t("cancel")}
++              </Button>
++              <Button data-testid="add_members" loading={addGuestsMutation.isPending} onClick={handleAdd}>
++                {t("add")}
++              </Button>
++            </DialogFooter>
++          </div>
++        </div>
++      </DialogContent>
++    </Dialog>
++  );
++};
+diff --git a/apps/web/public/static/locales/en/common.json b/apps/web/public/static/locales/en/common.json
+index cf77ef849209e9..3b5527433074a6 100644
+--- a/apps/web/public/static/locales/en/common.json
++++ b/apps/web/public/static/locales/en/common.json
+@@ -1119,7 +1119,9 @@
+   "impersonating_user_warning": "Impersonating username \"{{user}}\".",
+   "impersonating_stop_instructions": "Click here to stop",
+   "event_location_changed": "Updated - Your event changed the location",
++  "new_guests_added": "Added - New guests added to your event",
+   "location_changed_event_type_subject": "Location Changed: {{eventType}} with {{name}} at {{date}}",
++  "guests_added_event_type_subject": "Guests Added: {{eventType}} with {{name}} at {{date}}",
+   "current_location": "Current Location",
+   "new_location": "New Location",
+   "session": "Session",
+@@ -1131,7 +1133,10 @@
+   "set_location": "Set Location",
+   "update_location": "Update Location",
+   "location_updated": "Location updated",
++  "guests_added": "Guests added",
++  "unable_to_add_guests": "Unable to add guests",
+   "email_validation_error": "That doesn't look like an email address",
++  "emails_must_be_unique_valid": "Emails must be unique and valid",
+   "url_validation_error": "That doesn't look like a URL",
+   "place_where_cal_widget_appear": "Place this code in your HTML where you want your {{appName}} widget to appear.",
+   "create_update_react_component": "Create or update an existing React component as shown below.",
+@@ -2426,6 +2431,7 @@
+   "primary": "Primary",
+   "make_primary": "Make primary",
+   "add_email": "Add Email",
++  "add_emails": "Add Emails",
+   "add_email_description": "Add an email address to replace your primary or to use as an alternative email on your event types.",
+   "confirm_email": "Confirm your email",
+   "scheduler_first_name": "The first name of the person booking",
+diff --git a/packages/emails/email-manager.ts b/packages/emails/email-manager.ts
+index c756a29c38f387..85a2a2c219647c 100644
+--- a/packages/emails/email-manager.ts
++++ b/packages/emails/email-manager.ts
+@@ -18,6 +18,7 @@ import type { EmailVerifyLink } from "./templates/account-verify-email";
+ import AccountVerifyEmail from "./templates/account-verify-email";
+ import type { OrganizationNotification } from "./templates/admin-organization-notification";
+ import AdminOrganizationNotification from "./templates/admin-organization-notification";
++import AttendeeAddGuestsEmail from "./templates/attendee-add-guests-email";
+ import AttendeeAwaitingPaymentEmail from "./templates/attendee-awaiting-payment-email";
+ import AttendeeCancelledEmail from "./templates/attendee-cancelled-email";
+ import AttendeeCancelledSeatEmail from "./templates/attendee-cancelled-seat-email";
+@@ -48,6 +49,7 @@ import type { OrganizationCreation } from "./templates/organization-creation-ema
+ import OrganizationCreationEmail from "./templates/organization-creation-email";
+ import type { OrganizationEmailVerify } from "./templates/organization-email-verification";
+ import OrganizationEmailVerification from "./templates/organization-email-verification";
++import OrganizerAddGuestsEmail from "./templates/organizer-add-guests-email";
+ import OrganizerAttendeeCancelledSeatEmail from "./templates/organizer-attendee-cancelled-seat-email";
+ import OrganizerCancelledEmail from "./templates/organizer-cancelled-email";
+ import OrganizerDailyVideoDownloadRecordingEmail from "./templates/organizer-daily-video-download-recording-email";
+@@ -520,6 +522,32 @@ export const sendLocationChangeEmails = async (
+ 
+   await Promise.all(emailsToSend);
+ };
++export const sendAddGuestsEmails = async (calEvent: CalendarEvent, newGuests: string[]) => {
++  const calendarEvent = formatCalEvent(calEvent);
++
++  const emailsToSend: Promise<unknown>[] = [];
++  emailsToSend.push(sendEmail(() => new OrganizerAddGuestsEmail({ calEvent: calendarEvent })));
++
++  if (calendarEvent.team?.members) {
++    for (const teamMember of calendarEvent.team.members) {
++      emailsToSend.push(
++        sendEmail(() => new OrganizerAddGuestsEmail({ calEvent: calendarEvent, teamMember }))
++      );
++    }
++  }
++
++  emailsToSend.push(
++    ...calendarEvent.attendees.map((attendee) => {
++      if (newGuests.includes(attendee.email)) {
++        return sendEmail(() => new AttendeeScheduledEmail(calendarEvent, attendee));
++      } else {
++        return sendEmail(() => new AttendeeAddGuestsEmail(calendarEvent, attendee));
++      }
++    })
++  );
++
++  await Promise.all(emailsToSend);
++};
+ export const sendFeedbackEmail = async (feedback: Feedback) => {
+   await sendEmail(() => new FeedbackEmail(feedback));
+ };
+diff --git a/packages/emails/src/templates/AttendeeAddGuestsEmail.tsx b/packages/emails/src/templates/AttendeeAddGuestsEmail.tsx
+new file mode 100644
+index 00000000000000..cbc736869b9034
+--- /dev/null
++++ b/packages/emails/src/templates/AttendeeAddGuestsEmail.tsx
+@@ -0,0 +1,10 @@
++import { AttendeeScheduledEmail } from "./AttendeeScheduledEmail";
++
++export const AttendeeAddGuestsEmail = (props: React.ComponentProps<typeof AttendeeScheduledEmail>) => (
++  <AttendeeScheduledEmail
++    title="new_guests_added"
++    headerType="calendarCircle"
++    subject="guests_added_event_type_subject"
++    {...props}
++  />
++);
+diff --git a/packages/emails/src/templates/OrganizerAddGuestsEmail.tsx b/packages/emails/src/templates/OrganizerAddGuestsEmail.tsx
+new file mode 100644
+index 00000000000000..74171b2270d87e
+--- /dev/null
++++ b/packages/emails/src/templates/OrganizerAddGuestsEmail.tsx
+@@ -0,0 +1,11 @@
++import { OrganizerScheduledEmail } from "./OrganizerScheduledEmail";
++
++export const OrganizerAddGuestsEmail = (props: React.ComponentProps<typeof OrganizerScheduledEmail>) => (
++  <OrganizerScheduledEmail
++    title="new_guests_added"
++    headerType="calendarCircle"
++    subject="guests_added_event_type_subject"
++    callToAction={null}
++    {...props}
++  />
++);
+diff --git a/packages/emails/src/templates/index.ts b/packages/emails/src/templates/index.ts
+index fa48848e499ccd..33d32b48948820 100644
+--- a/packages/emails/src/templates/index.ts
++++ b/packages/emails/src/templates/index.ts
+@@ -35,4 +35,6 @@ export { AdminOrganizationNotificationEmail } from "./AdminOrganizationNotificat
+ export { BookingRedirectEmailNotification } from "./BookingRedirectEmailNotification";
+ export { VerifyEmailChangeEmail } from "./VerifyEmailChangeEmail";
+ export { OrganizationCreationEmail } from "./OrganizationCreationEmail";
++export { OrganizerAddGuestsEmail } from "./OrganizerAddGuestsEmail";
++export { AttendeeAddGuestsEmail } from "./AttendeeAddGuestsEmail";
+ export { OrganizationAdminNoSlotsEmail } from "./OrganizationAdminNoSlots";
+diff --git a/packages/emails/templates/attendee-add-guests-email.ts b/packages/emails/templates/attendee-add-guests-email.ts
+new file mode 100644
+index 00000000000000..155989acbd8a59
+--- /dev/null
++++ b/packages/emails/templates/attendee-add-guests-email.ts
+@@ -0,0 +1,34 @@
++import { renderEmail } from "../";
++import generateIcsString from "../lib/generateIcsString";
++import AttendeeScheduledEmail from "./attendee-scheduled-email";
++
+... (truncated, 438 more lines)

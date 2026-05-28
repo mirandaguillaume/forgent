@@ -1,0 +1,301 @@
+diff --git a/devservices/config.yml b/devservices/config.yml
+index 51f67a698ec..2a448bc5502 100644
+--- a/devservices/config.yml
++++ b/devservices/config.yml
+@@ -20,6 +20,13 @@ x-sentry-service-config:
+         branch: master
+         repo_link: https://github.com/getsentry/snuba.git
+         mode: containerized-profiles
++    snuba-metrics:
++      description: Service that provides fast aggregation and query capabilities on top of Clickhouse that includes metrics consumers
++      remote:
++        repo_name: snuba
++        branch: master
++        repo_link: https://github.com/getsentry/snuba.git
++        mode: containerized-metrics-dev
+     relay:
+       description: Service event forwarding and ingestion service
+       remote:
+@@ -121,6 +128,15 @@ x-sentry-service-config:
+       description: Post-process forwarder for transaction events
+     post-process-forwarder-issue-platform:
+       description: Post-process forwarder for issue platform events
++    # Subscription results consumers
++    eap-spans-subscription-results:
++      description: Kafka consumer for processing subscription results for spans
++    subscription-results-eap-items:
++      description: Kafka consumer for processing subscription results for eap items
++    metrics-subscription-results:
++      description: Kafka consumer for processing subscription results for metrics
++    generic-metrics-subscription-results:
++      description: Kafka consumer for processing subscription results for generic metrics
+     # Uptime monitoring
+     uptime-results:
+       description: Kafka consumer for uptime monitoring results
+@@ -138,6 +154,29 @@ x-sentry-service-config:
+     rabbitmq: [postgres, snuba, rabbitmq, spotlight]
+     symbolicator: [postgres, snuba, symbolicator, spotlight]
+     memcached: [postgres, snuba, memcached, spotlight]
++    tracing:
++      [
++        postgres,
++        snuba-metrics,
++        relay,
++        spotlight,
++        ingest-events,
++        ingest-transactions,
++        ingest-metrics,
++        ingest-generic-metrics,
++        billing-metrics-consumer,
++        post-process-forwarder-errors,
++        post-process-forwarder-transactions,
++        post-process-forwarder-issue-platform,
++        eap-spans-subscription-results,
++        subscription-results-eap-items,
++        metrics-subscription-results,
++        generic-metrics-subscription-results,
++        process-spans,
++        ingest-occurrences,
++        process-segments,
++        worker,
++      ]
+     crons:
+       [
+         postgres,
+@@ -283,6 +322,14 @@ x-programs:
+     command: sentry run consumer post-process-forwarder-issue-platform --consumer-group=sentry-consumer --auto-offset-reset=latest --no-strict-offset-reset
+   ingest-feedback-events:
+     command: sentry run consumer ingest-feedback-events --consumer-group=sentry-consumer --auto-offset-reset=latest --no-strict-offset-reset
++  eap-spans-subscription-results:
++    command: sentry run consumer eap-spans-subscription-results --consumer-group=sentry-consumer --auto-offset-reset=latest --no-strict-offset-reset
++  subscription-results-eap-items:
++    command: sentry run consumer subscription-results-eap-items --consumer-group=sentry-consumer --auto-offset-reset=latest --no-strict-offset-reset
++  metrics-subscription-results:
++    command: sentry run consumer metrics-subscription-results --consumer-group=sentry-consumer --auto-offset-reset=latest --no-strict-offset-reset
++  generic-metrics-subscription-results:
++    command: sentry run consumer generic-metrics-subscription-results --consumer-group=sentry-consumer --auto-offset-reset=latest --no-strict-offset-reset
+   worker:
+     command: sentry run worker -c 1 --autoreload
+ 
+diff --git a/src/sentry/constants.py b/src/sentry/constants.py
+index c5374e1dcb0..d2ef563c826 100644
+--- a/src/sentry/constants.py
++++ b/src/sentry/constants.py
+@@ -721,7 +721,7 @@ class InsightModules(Enum):
+ TARGET_SAMPLE_RATE_DEFAULT = 1.0
+ SAMPLING_MODE_DEFAULT = "organization"
+ ROLLBACK_ENABLED_DEFAULT = True
+-DEFAULT_AUTOFIX_AUTOMATION_TUNING_DEFAULT = "low"
++DEFAULT_AUTOFIX_AUTOMATION_TUNING_DEFAULT = "off"
+ DEFAULT_SEER_SCANNER_AUTOMATION_DEFAULT = False
+ INGEST_THROUGH_TRUSTED_RELAYS_ONLY_DEFAULT = False
+ 
+diff --git a/src/sentry/feedback/usecases/feedback_summaries.py b/src/sentry/feedback/usecases/feedback_summaries.py
+index 27000dd16ee..7da2167d11e 100644
+--- a/src/sentry/feedback/usecases/feedback_summaries.py
++++ b/src/sentry/feedback/usecases/feedback_summaries.py
+@@ -10,12 +10,14 @@
+ def make_input_prompt(
+     feedbacks,
+ ):
+-    feedbacks_string = "\n".join(f"- {msg}" for msg in feedbacks)
++    feedbacks_string = "\n------\n".join(feedbacks)
+     return f"""Instructions:
+ 
+-You are an assistant that summarizes customer feedback. Given a list of customer feedback entries, generate a concise summary of 1-2 sentences that reflects the key themes. Begin the summary with "Users...", for example, "Users say...".
++You are an assistant that summarizes customer feedback. Given a list of customer feedback entries, generate a concise summary of 1-2 sentences that reflects the key themes. Begin the summary with "Users...", for example, "Users say...". Don't make overly generic statements like "Users report a variety of issues."
+ 
+-Balance specificity and generalization based on the size of the input based *only* on the themes and topics present in the list of customer feedback entries. Prioritize brevity and clarity and trying to capture what users are saying, over trying to mention random specific topics. Please don't write overly long sentences, you can leave certain things out and the decision to mention specific topics or themes should be proportional to the number of times they appear in the user feedback entries.
++Balance specificity and generalization based on the size of the input and based only on the themes and topics present in the list of customer feedback entries. Your goal is to focus on identifying and summarizing broader themes that are mentioned more frequently across different feedback entries. For example, if there are many feedback entries, it makes more sense to prioritize mentioning broader themes that apply to many feedbacks, versus mentioning one or two specific isolated concerns and leaving out others that are just as prevalent.
++
++The summary must be AT MOST 55 words, that is an absolute upper limit, and you must write AT MOST two sentences. You can leave certain things out, and when deciding what topics/themes to mention, make sure it is proportional to the number of times they appear in different customer feedback entries.
+ 
+ User Feedbacks:
+ 
+diff --git a/src/sentry/grouping/parameterization.py b/src/sentry/grouping/parameterization.py
+index bfcef71f5d2..c06a719e833 100644
+--- a/src/sentry/grouping/parameterization.py
++++ b/src/sentry/grouping/parameterization.py
+@@ -11,7 +11,6 @@
+     "ParameterizationCallableExperiment",
+     "ParameterizationExperiment",
+     "ParameterizationRegex",
+-    "ParameterizationRegexExperiment",
+     "Parameterizer",
+     "UniqueIdExperiment",
+ ]
+@@ -206,15 +205,6 @@ def run(self, content: str, callback: Callable[[str, int], None]) -> str:
+         return content
+ 
+ 
+-class ParameterizationRegexExperiment(ParameterizationRegex):
+-    def run(
+-        self,
+-        content: str,
+-        callback: Callable[[re.Match[str]], str],
+-    ) -> str:
+-        return self.compiled_pattern.sub(callback, content)
+-
+-
+ class _UniqueId:
+     # just a namespace for the uniq_id logic, no need to instantiate
+ 
+@@ -275,7 +265,7 @@ def replace_uniq_ids_in_str(string: str) -> tuple[str, int]:
+ )
+ 
+ 
+-ParameterizationExperiment = ParameterizationCallableExperiment | ParameterizationRegexExperiment
++ParameterizationExperiment = ParameterizationCallableExperiment
+ 
+ 
+ class Parameterizer:
+@@ -355,10 +345,8 @@ def _handle_regex_match(match: re.Match[str]) -> str:
+         for experiment in self._experiments:
+             if not should_run(experiment.name):
+                 continue
+-            if isinstance(experiment, ParameterizationCallableExperiment):
+-                content = experiment.run(content, _incr_counter)
+-            else:
+-                content = experiment.run(content, _handle_regex_match)
++
++            content = experiment.run(content, _incr_counter)
+ 
+         return content
+ 
+diff --git a/src/sentry/hybridcloud/tasks/deliver_webhooks.py b/src/sentry/hybridcloud/tasks/deliver_webhooks.py
+index d87dec54a87..bf8c7c51e26 100644
+--- a/src/sentry/hybridcloud/tasks/deliver_webhooks.py
++++ b/src/sentry/hybridcloud/tasks/deliver_webhooks.py
+@@ -82,6 +82,7 @@ class DeliveryFailed(Exception):
+     silo_mode=SiloMode.CONTROL,
+     taskworker_config=TaskworkerConfig(
+         namespace=hybridcloud_control_tasks,
++        processing_deadline_duration=30,
+     ),
+ )
+ def schedule_webhook_delivery() -> None:
+@@ -157,6 +158,7 @@ def schedule_webhook_delivery() -> None:
+     silo_mode=SiloMode.CONTROL,
+     taskworker_config=TaskworkerConfig(
+         namespace=hybridcloud_control_tasks,
++        processing_deadline_duration=300,
+     ),
+ )
+ def drain_mailbox(payload_id: int) -> None:
+@@ -234,6 +236,7 @@ def drain_mailbox(payload_id: int) -> None:
+     silo_mode=SiloMode.CONTROL,
+     taskworker_config=TaskworkerConfig(
+         namespace=hybridcloud_control_tasks,
++        processing_deadline_duration=120,
+     ),
+ )
+ def drain_mailbox_parallel(payload_id: int) -> None:
+diff --git a/src/sentry/integrations/github/integration.py b/src/sentry/integrations/github/integration.py
+index dc0a4382c0b..3506ca32848 100644
+--- a/src/sentry/integrations/github/integration.py
++++ b/src/sentry/integrations/github/integration.py
+@@ -384,8 +384,6 @@ def get_open_pr_comment_workflow(self) -> OpenPRCommentWorkflow:
+ 
+ <sub>Did you find this useful? React with a 👍 or 👎</sub>"""
+ 
+-MERGED_PR_SINGLE_ISSUE_TEMPLATE = "- ‼️ **{title}** `{subtitle}` [View Issue]({url})"
+-
+ 
+ class GitHubPRCommentWorkflow(PRCommentWorkflow):
+     organization_option_key = "sentry:github_pr_bot"
+@@ -405,10 +403,10 @@ def get_comment_body(self, issue_ids: list[int]) -> str:
+ 
+         issue_list = "\n".join(
+             [
+-                MERGED_PR_SINGLE_ISSUE_TEMPLATE.format(
++                self.get_merged_pr_single_issue_template(
+                     title=issue.title,
+-                    subtitle=self.format_comment_subtitle(issue.culprit or "unknown culprit"),
+                     url=self.format_comment_url(issue.get_absolute_url(), self.referrer_id),
++                    environment=self.get_environment_info(issue),
+                 )
+                 for issue in issues
+             ]
+diff --git a/src/sentry/integrations/gitlab/integration.py b/src/sentry/integrations/gitlab/integration.py
+index c7afbd5f57f..0244c9a811d 100644
+--- a/src/sentry/integrations/gitlab/integration.py
++++ b/src/sentry/integrations/gitlab/integration.py
+@@ -230,8 +230,6 @@ def get_open_pr_comment_workflow(self) -> OpenPRCommentWorkflow:
+ 
+ {issue_list}"""
+ 
+-MERGED_PR_SINGLE_ISSUE_TEMPLATE = "- ‼️ **{title}** `{subtitle}` [View Issue]({url})"
+-
+ 
+ class GitlabPRCommentWorkflow(PRCommentWorkflow):
+     organization_option_key = "sentry:gitlab_pr_bot"
+@@ -253,10 +251,10 @@ def get_comment_body(self, issue_ids: list[int]) -> str:
+ 
+         issue_list = "\n".join(
+             [
+-                MERGED_PR_SINGLE_ISSUE_TEMPLATE.format(
++                self.get_merged_pr_single_issue_template(
+                     title=issue.title,
+-                    subtitle=self.format_comment_subtitle(issue.culprit),
+                     url=self.format_comment_url(issue.get_absolute_url(), self.referrer_id),
++                    environment=self.get_environment_info(issue),
+                 )
+                 for issue in issues
+             ]
+diff --git a/src/sentry/integrations/source_code_management/commit_context.py b/src/sentry/integrations/source_code_management/commit_context.py
+index ce5483df02e..8492b931ec0 100644
+--- a/src/sentry/integrations/source_code_management/commit_context.py
++++ b/src/sentry/integrations/source_code_management/commit_context.py
+@@ -139,6 +139,10 @@ class PullRequestFile:
+     patch: str
+ 
+ 
++ISSUE_TITLE_MAX_LENGTH = 50
++MERGED_PR_SINGLE_ISSUE_TEMPLATE = "* ‼️ [**{title}**]({url}){environment}\n"
++
++
+ class CommitContextIntegration(ABC):
+     """
+     Base class for integrations that include commit context features: suspect commits, suspect PR comments
+@@ -570,6 +574,37 @@ def get_top_5_issues_by_count(
+         )
+         return raw_snql_query(request, referrer=self.referrer.value)["data"]
+ 
++    @staticmethod
++    def _truncate_title(title: str, max_length: int = ISSUE_TITLE_MAX_LENGTH) -> str:
++        """Truncate title if it's too long and add ellipsis."""
++        if len(title) <= max_length:
++            return title
++        return title[:max_length].rstrip() + "..."
++
++    def get_environment_info(self, issue: Group) -> str:
++        try:
++            recommended_event = issue.get_recommended_event()
++            if recommended_event:
++                environment = recommended_event.get_environment()
++                if environment and environment.name:
++                    return f" in `{environment.name}`"
++        except Exception as e:
++            # If anything goes wrong, just continue without environment info
++            logger.info(
++                "get_environment_info.no-environment",
++                extra={"issue_id": issue.id, "error": e},
++            )
++        return ""
++
++    @staticmethod
++    def get_merged_pr_single_issue_template(title: str, url: str, environment: str) -> str:
++        truncated_title = PRCommentWorkflow._truncate_title(title)
++        return MERGED_PR_SINGLE_ISSUE_TEMPLATE.format(
++            title=truncated_title,
++            url=url,
++            environment=environment,
++        )
++
+ 
+ class OpenPRCommentWorkflow(ABC):
+     def __init__(self, integration: CommitContextIntegration):
+diff --git a/src/sentry/issues/endpoints/browser_reporting_collector.py b/src/sentry/issues/endpoints/browser_reporting_collector.py
+index 2bcf8976511..52fdcde5eeb 100644
+--- a/src/sentry/issues/endpoints/browser_reporting_collector.py
+... (truncated, 5982 more lines)

@@ -1,0 +1,14 @@
+{
+  "id": "cr-bench-grafana-80329",
+  "source_url": "https://github.com/grafana/grafana/pull/80329",
+  "original_url": "https://github.com/grafana/grafana/pull/80329",
+  "project": "grafana",
+  "pr_num": "80329",
+  "title": "Database Performance Optimizations",
+  "golden_comments": [
+    {
+      "comment": "The code uses Error log level for what appears to be debugging information. This will pollute error logs in production. Consider using Debug or Info level instead.",
+      "severity": "Low"
+    }
+  ]
+}

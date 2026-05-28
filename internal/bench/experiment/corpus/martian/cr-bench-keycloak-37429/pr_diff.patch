@@ -1,0 +1,301 @@
+diff --git a/js/apps/account-ui/maven-resources/theme/keycloak.v3/account/messages/messages_en.properties b/js/apps/account-ui/maven-resources/theme/keycloak.v3/account/messages/messages_en.properties
+index 0f8ba16e2a8c..955d20109387 100644
+--- a/js/apps/account-ui/maven-resources/theme/keycloak.v3/account/messages/messages_en.properties
++++ b/js/apps/account-ui/maven-resources/theme/keycloak.v3/account/messages/messages_en.properties
+@@ -185,7 +185,7 @@ webauthn-help-text=Use your Passkey to sign in.
+ webauthn-passwordless-display-name=Passkey
+ webauthn-passwordless-help-text=Use your Passkey for passwordless sign in.
+ passwordless=Passwordless
+-error-invalid-multivalued-size=Attribute {{0}} must have at least {{1}} and at most {{2}} value(s).
++error-invalid-multivalued-size=Attribute {0} must have at least {1} and at most {2} {2,choice,0#values|1#value|1<values}.
+ recovery-authn-code=My recovery authentication codes
+ recovery-authn-codes-display-name=Recovery authentication codes
+ recovery-authn-codes-help-text=These codes can be used to regain your access in case your other 2FA means are not available.
+diff --git a/js/apps/admin-ui/maven-resources-community/theme/keycloak.v2/admin/messages/messages_zh_CN.properties b/js/apps/admin-ui/maven-resources-community/theme/keycloak.v2/admin/messages/messages_zh_CN.properties
+index f7283a5a87f6..39eae6687214 100644
+--- a/js/apps/admin-ui/maven-resources-community/theme/keycloak.v2/admin/messages/messages_zh_CN.properties
++++ b/js/apps/admin-ui/maven-resources-community/theme/keycloak.v2/admin/messages/messages_zh_CN.properties
+@@ -1252,7 +1252,7 @@ onDragCancel=已取消拖动。列表未更改。
+ removeUser=移除用户
+ ownerManagedAccess=启用用户管理访问
+ userModelAttributeNameHelp=从 LDAP 导入用户时要添加的模型属性的名称
+-templateHelp=用于格式化要导入的用户名的模板。替换包含在 ${} 中。例如：'${ALIAS}.${CLAIM.sub}'。ALIAS 是供应商别名。CLAIM.<NAME > 引用 ID 或访问令牌声明。可以通过将 |uppercase 或 |lowercase 附加到替换值来将替换转换为大写或小写，例如“${CLAIM.sub | lowercase}”。
++templateHelp=用于格式化要导入的用户名的模板。替换包含在 ${} 中。例如：'${ALIAS}.${CLAIM.sub}'。ALIAS 是供应商别名。CLAIM.<NAME> 引用 ID 或访问令牌声明。可以通过将 |uppercase 或 |lowercase 附加到替换值来将替换转换为大写或小写，例如“${CLAIM.sub | lowercase}”。
+ permissions=权限
+ emptyExecutionInstructions=您可以通过添加子流程或执行器来开始定义此流程
+ offlineSessionSettings=离线会话设置
+diff --git a/js/apps/admin-ui/maven-resources/theme/keycloak.v2/admin/messages/messages_en.properties b/js/apps/admin-ui/maven-resources/theme/keycloak.v2/admin/messages/messages_en.properties
+index ab0d45a005d5..b9ca4b20353d 100644
+--- a/js/apps/admin-ui/maven-resources/theme/keycloak.v2/admin/messages/messages_en.properties
++++ b/js/apps/admin-ui/maven-resources/theme/keycloak.v2/admin/messages/messages_en.properties
+@@ -3135,7 +3135,7 @@ bruteForceMode.PermanentLockout=Lockout permanently
+ bruteForceMode.TemporaryLockout=Lockout temporarily
+ bruteForceMode.PermanentAfterTemporaryLockout=Lockout permanently after temporary lockout
+ bruteForceMode=Brute Force Mode
+-error-invalid-multivalued-size=Attribute {{0}} must have at least {{1}} and at most {{2}} value(s).
++error-invalid-multivalued-size=Attribute {0} must have at least {1} and at most {2} {2,choice,0#values|1#value|1<values}.
+ multivalued=Multivalued
+ multivaluedHelp=If this attribute supports multiple values. This setting is an indicator and does not enable any validation.
+ to the attribute. For that, make sure to use any of the built-in validators to properly validate the size and the values.
+diff --git a/misc/theme-verifier/pom.xml b/misc/theme-verifier/pom.xml
+index c179ab821473..9b06207b8550 100644
+--- a/misc/theme-verifier/pom.xml
++++ b/misc/theme-verifier/pom.xml
+@@ -72,6 +72,17 @@
+             <version>2.2</version>
+             <scope>test</scope>
+         </dependency>
++        <dependency>
++            <groupId>com.googlecode.owasp-java-html-sanitizer</groupId>
++            <artifactId>owasp-java-html-sanitizer</artifactId>
++            <version>20240325.1</version>
++        </dependency>
++        <dependency>
++            <groupId>org.apache.commons</groupId>
++            <artifactId>commons-text</artifactId>
++            <version>1.13.0</version>
++            <scope>compile</scope>
++        </dependency>
+     </dependencies>
+ 
+ 
+diff --git a/misc/theme-verifier/src/main/java/org/keycloak/themeverifier/VerifyMessageProperties.java b/misc/theme-verifier/src/main/java/org/keycloak/themeverifier/VerifyMessageProperties.java
+index 95657448ce79..9368853e9bf8 100644
+--- a/misc/theme-verifier/src/main/java/org/keycloak/themeverifier/VerifyMessageProperties.java
++++ b/misc/theme-verifier/src/main/java/org/keycloak/themeverifier/VerifyMessageProperties.java
+@@ -17,15 +17,22 @@
+ package org.keycloak.themeverifier;
+ 
+ import org.apache.maven.plugin.MojoExecutionException;
++import org.owasp.html.PolicyFactory;
+ 
+ import java.io.BufferedReader;
+ import java.io.File;
++import java.io.FileInputStream;
+ import java.io.IOException;
+ import java.io.StringReader;
+ import java.nio.file.Files;
+ import java.util.ArrayList;
+ import java.util.HashSet;
+ import java.util.List;
++import java.util.MissingResourceException;
++import java.util.Objects;
++import java.util.PropertyResourceBundle;
++import java.util.regex.Matcher;
++import java.util.regex.Pattern;
+ 
+ public class VerifyMessageProperties {
+ 
+@@ -41,12 +48,129 @@ public List<String> verify() throws MojoExecutionException {
+         try {
+             String contents = Files.readString(file.toPath());
+             verifyNoDuplicateKeys(contents);
++            verifySafeHtml();
+         } catch (IOException e) {
+             throw new MojoExecutionException("Can not read file " + file, e);
+         }
+         return messages;
+     }
+ 
++    PolicyFactory POLICY_SOME_HTML = new org.owasp.html.HtmlPolicyBuilder()
++            .allowElements(
++                    "br", "p", "strong", "b"
++            ).toFactory();
++
++    PolicyFactory POLICY_NO_HTML = new org.owasp.html.HtmlPolicyBuilder().toFactory();
++
++    private void verifySafeHtml() {
++        PropertyResourceBundle bundle;
++        try (FileInputStream fis = new FileInputStream(file)) {
++            bundle = new PropertyResourceBundle(fis);
++        } catch (IOException e) {
++            throw new RuntimeException("unable to read file " + file, e);
++        }
++
++        PropertyResourceBundle bundleEnglish;
++        String englishFile = file.getAbsolutePath().replaceAll("resources-community", "resources")
++                .replaceAll("_[a-zA-Z-_]*\\.properties", "_en.properties");
++        try (FileInputStream fis = new FileInputStream(englishFile)) {
++            bundleEnglish = new PropertyResourceBundle(fis);
++        } catch (IOException e) {
++            throw new RuntimeException("unable to read file " + englishFile, e);
++        }
++
++        bundle.getKeys().asIterator().forEachRemaining(key -> {
++            String value = bundle.getString(key);
++            value = normalizeValue(key, value);
++            String englishValue = getEnglishValue(key, bundleEnglish);
++            englishValue = normalizeValue(key, englishValue);
++
++            value = santizeAnchors(key, value, englishValue);
++
++            // Only if the English source string contains HTML we also allow HTML in the translation
++            PolicyFactory policy = containsHtml(englishValue) ? POLICY_SOME_HTML : POLICY_NO_HTML;
++            String sanitized = policy.sanitize(value);
++
++            // Sanitizer will escape HTML entities for quotes and also for numberic tags like '<1>'
++            sanitized = org.apache.commons.text.StringEscapeUtils.unescapeHtml4(sanitized);
++            // Sanitizer will add them when there are double curly braces
++            sanitized = sanitized.replace("<!-- -->", "");
++
++            if (!Objects.equals(sanitized, value)) {
++
++                // Strip identical characters from the beginning and the end to show where the difference is
++                int start = 0;
++                while (start < sanitized.length() && start < value.length() && value.charAt(start) == sanitized.charAt(start)) {
++                    start++;
++                }
++                int end = 0;
++                while (end < sanitized.length() && end < value.length() && value.charAt(value.length() - end - 1) == sanitized.charAt(sanitized.length() - end - 1)) {
++                    end++;
++                }
++
++                messages.add("Illegal HTML in key " + key + " for file " + file + ": '" + value.substring(start, value.length() - end) + "' vs. '" + sanitized.substring(start, sanitized.length() - end) + "'");
++            }
++
++        });
++    }
++
++    private String normalizeValue(String key, String value) {
++        if (key.equals("templateHelp")) {
++            // Allow "CLAIM.<NAME>" here
++            value = value.replaceAll("CLAIM\\.<[A-Z]*>", "");
++        } else if (key.equals("optimizeLookupHelp")) {
++            // Allow "<Extensions>" here
++            value = value.replaceAll("<Extensions>", "");
++        } else if (key.startsWith("linkExpirationFormatter.timePeriodUnit") || key.equals("error-invalid-multivalued-size")) {
++            // The problem is the "<" that appears in the choice
++            value = value.replaceAll("\\{[0-9]+,choice,[^}]*}", "...");
++        }
++
++        // Unescape HTML entities, as we later also unescape HTML entities in the sanitized value
++        value = org.apache.commons.text.StringEscapeUtils.unescapeHtml4(value);
++
++        if (file.getAbsolutePath().contains("email")) {
++            // TODO: move the RTL information for emails
++            value = value.replaceAll(Pattern.quote(" style=\"direction: rtl;\""), "");
++        }
++        return value;
++    }
++
++    Pattern HTML_TAGS = Pattern.compile("<[a-z]+[^>]*>");
++
++    private boolean containsHtml(String englishValue) {
++        return HTML_TAGS.matcher(englishValue).find();
++    }
++
++    private static final Pattern ANCHOR_PATTERN = Pattern.compile("</?a[^>]*>");
++
++    /**
++     * Allow only those anchor tags from the source key to also appear in the target key.
++     */
++    private String santizeAnchors(String key, String value, String englishValue) {
++        Matcher matcher = ANCHOR_PATTERN.matcher(value);
++        Matcher englishMatcher = ANCHOR_PATTERN.matcher(englishValue);
++        while (matcher.find()) {
++            if (englishMatcher.find() && Objects.equals(matcher.group(), englishMatcher.group())) {
++                value = value.replaceFirst(Pattern.quote(englishMatcher.group()), "");
++            } else {
++                messages.add("Didn't find anchor tag " + matcher.group() + " in original string");
++                break;
++            }
++        }
++        return value;
++    }
++
++    private static String getEnglishValue(String key, PropertyResourceBundle bundleEnglish) {
++        String englishValue;
++        try {
++            englishValue = bundleEnglish.getString(key);
++        } catch (MissingResourceException ex) {
++            englishValue = "";
++        }
++        return englishValue;
++    }
++
+     private void verifyNoDuplicateKeys(String contents) throws IOException {
+         BufferedReader bufferedReader = new BufferedReader(new StringReader(contents));
+         String line;
+diff --git a/misc/theme-verifier/src/test/java/org/keycloak/themeverifier/VerifyMessagePropertiesTest.java b/misc/theme-verifier/src/test/java/org/keycloak/themeverifier/VerifyMessagePropertiesTest.java
+index 7b48487572f5..9fc08c75ff00 100644
+--- a/misc/theme-verifier/src/test/java/org/keycloak/themeverifier/VerifyMessagePropertiesTest.java
++++ b/misc/theme-verifier/src/test/java/org/keycloak/themeverifier/VerifyMessagePropertiesTest.java
+@@ -29,8 +29,26 @@ class VerifyMessagePropertiesTest {
+ 
+     @Test
+     void verifyDuplicateKeysDetected() throws MojoExecutionException {
+-        List<String> verify = getFile("duplicate_keys.properties").verify();
+-        MatcherAssert.assertThat(verify, Matchers.contains(Matchers.containsString("Duplicate keys in file")));
++        List<String> verify = getFile("duplicateKeys_en.properties").verify();
++        MatcherAssert.assertThat(verify, Matchers.hasItem(Matchers.containsString("Duplicate keys in file")));
++    }
++
++    @Test
++    void verifyIllegalHtmlTagDetected() throws MojoExecutionException {
++        List<String> verify = getFile("illegalHtmlTag_en.properties").verify();
++        MatcherAssert.assertThat(verify, Matchers.hasItem(Matchers.containsString("Illegal HTML")));
++    }
++
++    @Test
++    void verifyNoHtmlAllowed() throws MojoExecutionException {
++        List<String> verify = getFile("noHtml_de.properties").verify();
++        MatcherAssert.assertThat(verify, Matchers.hasItem(Matchers.containsString("Illegal HTML")));
++    }
++
++    @Test
++    void verifyNoChangedAnchors() throws MojoExecutionException {
++        List<String> verify = getFile("changedAnchor_de.properties").verify();
++        MatcherAssert.assertThat(verify, Matchers.hasItem(Matchers.containsString("Didn't find anchor tag")));
+     }
+ 
+     private static VerifyMessageProperties getFile(String fixture) {
+diff --git a/misc/theme-verifier/src/test/resources/changedAnchor_de.properties b/misc/theme-verifier/src/test/resources/changedAnchor_de.properties
+new file mode 100644
+index 000000000000..84b3552a74ee
+--- /dev/null
++++ b/misc/theme-verifier/src/test/resources/changedAnchor_de.properties
+@@ -0,0 +1,17 @@
++#
++# Copyright 2025 Red Hat, Inc. and/or its affiliates
++# and other contributors as indicated by the @author tags.
++#
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++# http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++#
++key=Some <a href="http://malicious.com">link</a>
+\ No newline at end of file
+diff --git a/misc/theme-verifier/src/test/resources/changedAnchor_en.properties b/misc/theme-verifier/src/test/resources/changedAnchor_en.properties
+new file mode 100644
+index 000000000000..84a0c43d36bf
+--- /dev/null
++++ b/misc/theme-verifier/src/test/resources/changedAnchor_en.properties
+@@ -0,0 +1,17 @@
++#
++# Copyright 2025 Red Hat, Inc. and/or its affiliates
++# and other contributors as indicated by the @author tags.
++#
++# Licensed under the Apache License, Version 2.0 (the "License");
++# you may not use this file except in compliance with the License.
++# You may obtain a copy of the License at
++#
++# http://www.apache.org/licenses/LICENSE-2.0
++#
++# Unless required by applicable law or agreed to in writing, software
++# distributed under the License is distributed on an "AS IS" BASIS,
++# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++# See the License for the specific language governing permissions and
++# limitations under the License.
++#
++key=Some <a href="http://example.com">link</a>
+\ No newline at end of file
+diff --git a/misc/theme-verifier/src/test/resources/duplicate_keys.properties b/misc/theme-verifier/src/test/resources/duplicateKeys_en.properties
+... (truncated, 727 more lines)

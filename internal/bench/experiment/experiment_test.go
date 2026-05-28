@@ -14,6 +14,7 @@ import (
 
 	"github.com/mirandaguillaume/forgent/internal/llm"
 	"github.com/mirandaguillaume/forgent/pkg/dag"
+	"github.com/mirandaguillaume/forgent/pkg/schema"
 )
 
 // mockExpProvider returns step-aware responses based on prompt content.
@@ -142,6 +143,200 @@ guardrails:
 	assert.Len(t, tasks[0].Steps, 2)
 	assert.Equal(t, []SlotSpec{{Key: "output1"}}, tasks[0].Steps[0].Produces)
 	assert.Equal(t, []SlotSpec{{Key: "output1"}}, tasks[0].Steps[1].Consumes)
+}
+
+func TestLoadTasksParallelBlock(t *testing.T) {
+	dir := t.TempDir()
+
+	task := `id: parallel-task
+name: Parallel Task
+steps:
+  - id: setup
+    produces: [base]
+  - parallel:
+    - id: agent-a
+      consumes: [base]
+      produces: [result_a]
+    - id: agent-b
+      consumes: [base]
+      produces: [result_b]
+  - id: merge
+    consumes: [result_a, result_b]
+    produces: [final]
+`
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "p.yaml"), []byte(task), 0644))
+
+	tasks, err := LoadTasks(dir)
+	require.NoError(t, err)
+	require.Len(t, tasks, 1)
+
+	steps := tasks[0].Steps
+	assert.Len(t, steps, 4) // setup + agent-a + agent-b + merge (flattened)
+
+	assert.Equal(t, "setup", steps[0].ID)
+	assert.Equal(t, "", steps[0].ParallelGroupID)
+
+	assert.Equal(t, "agent-a", steps[1].ID)
+	assert.Equal(t, "agent-b", steps[2].ID)
+	assert.Equal(t, steps[1].ParallelGroupID, steps[2].ParallelGroupID)
+	assert.NotEmpty(t, steps[1].ParallelGroupID)
+
+	assert.Equal(t, "merge", steps[3].ID)
+	assert.Equal(t, "", steps[3].ParallelGroupID)
+}
+
+func TestValidateParallelGroupDependency(t *testing.T) {
+	cfg := ExperimentConfig{
+		Provider: sampleProvider(),
+		Tasks: []TaskDefinition{
+			{
+				ID: "bad-parallel",
+				Steps: []StepDef{
+					{ID: "a", Produces: []SlotSpec{{Key: "x"}}},
+					{ID: "b", ParallelGroupID: "g0", Consumes: []SlotSpec{{Key: "x"}}, Produces: []SlotSpec{{Key: "y"}}},
+					// c is in the same group and consumes y produced by b — dependency violation
+					{ID: "c", ParallelGroupID: "g0", Consumes: []SlotSpec{{Key: "y"}}, Produces: []SlotSpec{{Key: "z"}}},
+				},
+			},
+		},
+	}
+	err := cfg.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "parallel group")
+	assert.Contains(t, err.Error(), "not independent")
+}
+
+func TestExtractJSONArray(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		want    []any
+		wantErr bool
+	}{
+		{"simple strings", `["a","b","c"]`, []any{"a", "b", "c"}, false},
+		{"with surrounding text", "here is your list:\n[\"x\",\"y\"]\nDone.", []any{"x", "y"}, false},
+		{"empty array", "[]", []any{}, false},
+		{"no array", "just text", nil, true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := extractJSONArray(tc.input)
+			if tc.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestListSchemaProduces(t *testing.T) {
+	prov := &mockExpProvider{
+		responses: map[string]string{
+			"collect": `["issue A","issue B","issue C"]`,
+		},
+		fallback: "done",
+	}
+	task := TaskDefinition{
+		ID:   "list-test",
+		Name: "List Test",
+		Steps: []StepDef{
+			{
+				ID:     "collect",
+				Prompt: "collect issues",
+				Produces: []SlotSpec{{
+					Key:        "issues_list",
+					ListSchema: &schema.FieldSpec{Type: "string"},
+				}},
+			},
+		},
+	}
+	cfg := ExperimentConfig{Tasks: []TaskDefinition{task}, Provider: prov}
+	require.NoError(t, cfg.Validate())
+
+	results, err := RunRuntimeExperiment(cfg)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.True(t, results[0].Completed)
+}
+
+func TestKindMapFilterPipeline(t *testing.T) {
+	// collect → score (kind: map) → filter (kind: filter, deterministic predicate)
+	// The filter does NOT call the LLM — it evaluates "score >= 80" inline.
+	prov := &mockExpProvider{
+		responses: map[string]string{
+			"collect":  `["bug A","false positive","bug B"]`,
+			"bug a":    "bug A | SCORE: 90",
+			"false po": "false positive | SCORE: 20",
+			"bug b":    "bug B | SCORE: 95",
+		},
+		fallback: "no issues",
+	}
+	task := TaskDefinition{
+		ID:   "map-filter-test",
+		Name: "Map Filter Test",
+		Steps: []StepDef{
+			{
+				ID:     "collect",
+				Prompt: "collect issues",
+				Produces: []SlotSpec{{
+					Key:        "issues_list",
+					ListSchema: &schema.FieldSpec{Type: "string"},
+				}},
+			},
+			{
+				ID:     "score-issues",
+				Kind:   StepKindMap,
+				Prompt: "Score this issue",
+				Consumes: []SlotSpec{{Key: "issues_list"}},
+				Produces: []SlotSpec{{Key: "scored_issues"}},
+			},
+			{
+				ID:        "filter-issues",
+				Kind:      StepKindFilter,
+				Predicate: "score >= 80",
+				Consumes:  []SlotSpec{{Key: "scored_issues"}},
+				Produces:  []SlotSpec{{Key: "filtered_issues"}},
+			},
+		},
+	}
+	cfg := ExperimentConfig{Tasks: []TaskDefinition{task}, Provider: prov}
+	require.NoError(t, cfg.Validate())
+
+	results, err := RunRuntimeExperiment(cfg)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.True(t, results[0].Completed)
+}
+
+func TestEvalPredicate(t *testing.T) {
+	tests := []struct {
+		predicate string
+		item      string
+		want      bool
+		wantErr   bool
+	}{
+		{"score >= 80", "bug A | SCORE: 90", true, false},
+		{"score >= 80", "false positive | SCORE: 20", false, false},
+		{"score >= 80", "bug B | SCORE: 80", true, false},
+		{"score > 80", "bug B | SCORE: 80", false, false},
+		{"score <= 50", "minor | SCORE: 50", true, false},
+		{"score < 50", "minor | SCORE: 50", false, false},
+		{"score == 75", "real issue | SCORE: 75", true, false},
+		{"score >= 80", "no score here", false, true},   // missing SCORE: → error
+		{"invalid >= x", "item | SCORE: 90", false, true}, // bad threshold
+		{"contains(foo)", "item", false, true},           // unsupported expression
+	}
+	for _, tc := range tests {
+		got, err := evalPredicate(tc.predicate, tc.item)
+		if tc.wantErr {
+			assert.Error(t, err, "predicate=%q item=%q", tc.predicate, tc.item)
+		} else {
+			require.NoError(t, err, "predicate=%q item=%q", tc.predicate, tc.item)
+			assert.Equal(t, tc.want, got, "predicate=%q item=%q", tc.predicate, tc.item)
+		}
+	}
 }
 
 // ─── Text runner tests ────────────────────────────────────────────────────────
@@ -498,7 +693,7 @@ func TestFileSlotPassing_TaskContextWrittenToSandbox(t *testing.T) {
 	sandbox := NewSandboxFS(nil, nil, SandboxPolicy{})
 	provider := &recordingProvider{response: "analysis done"}
 
-	_, _, err := buildTaskDAG(task, provider, sandbox, NilRetriever{}, nil)
+	_, _, err := buildTaskDAG(task, provider, nil, sandbox, NilRetriever{}, nil)
 	require.NoError(t, err)
 
 	content, err := sandbox.Read("test", "task_context.md")
@@ -518,7 +713,7 @@ func TestFileSlotPassing_PromptListsFilePaths(t *testing.T) {
 	task := multiStepTask()
 	provider := &recordingProvider{response: "bugs found and fixed"}
 
-	result := runRuntimeTask(task, provider, NilRetriever{}, "runtime")
+	result := runRuntimeTask(task, provider, nil, NilRetriever{}, "runtime")
 	require.NoError(t, result.Error)
 
 	require.Len(t, provider.prompts, 2, "expected 2 LLM calls (one per step)")
@@ -538,7 +733,7 @@ func TestFileSlotPassing_TaskContextAlwaysListed(t *testing.T) {
 	task := singleStepTask()
 	provider := &recordingProvider{response: "analysis complete"}
 
-	result := runRuntimeTask(task, provider, NilRetriever{}, "runtime")
+	result := runRuntimeTask(task, provider, nil, NilRetriever{}, "runtime")
 	require.NoError(t, result.Error)
 
 	require.NotEmpty(t, provider.prompts)
@@ -555,7 +750,7 @@ func TestFileSlotPassing_SlotFilesWrittenAfterStep(t *testing.T) {
 	sandbox := NewSandboxFS(nil, nil, SandboxPolicy{})
 	provider := &recordingProvider{response: "step output content"}
 
-	d, _, err := buildTaskDAG(task, provider, sandbox, NilRetriever{}, nil)
+	d, _, err := buildTaskDAG(task, provider, nil, sandbox, NilRetriever{}, nil)
 	require.NoError(t, err)
 
 	_, err = d.Execute(context.Background(), dag.WithInputs(map[string]any{"task_input": task.Input}))
@@ -575,7 +770,7 @@ func TestFileSlotPassing_FileReadAlwaysInAllowedTools(t *testing.T) {
 	task := multiStepTask()
 	provider := &recordingProvider{response: "output"}
 
-	result := runRuntimeTask(task, provider, NilRetriever{}, "runtime")
+	result := runRuntimeTask(task, provider, nil, NilRetriever{}, "runtime")
 	require.NoError(t, result.Error)
 
 	// Prompts should mention file_read as an available tool.
@@ -599,7 +794,7 @@ func TestFileSlotPassing_ReadFileViaToolCall(t *testing.T) {
 		return "analysis: code is clean", nil
 	}}
 
-	d, _, err := buildTaskDAG(task, provider, sandbox, NilRetriever{}, nil)
+	d, _, err := buildTaskDAG(task, provider, nil, sandbox, NilRetriever{}, nil)
 	require.NoError(t, err)
 	_, err = d.Execute(context.Background(), dag.WithInputs(map[string]any{"task_input": task.Input}))
 	require.NoError(t, err)
@@ -633,7 +828,7 @@ func TestFileSlotPassing_ReadOnly_TaskContextPrePopulated(t *testing.T) {
 	}, nil, policy)
 
 	provider := &recordingProvider{response: "analysis complete with analysis keyword"}
-	_, _, err := buildTaskDAG(task, provider, sandboxWithContext, NilRetriever{}, nil)
+	_, _, err := buildTaskDAG(task, provider, nil, sandboxWithContext, NilRetriever{}, nil)
 	require.NoError(t, err)
 
 	// task_context.md must be readable even though sandbox is ReadOnly.
@@ -643,8 +838,10 @@ func TestFileSlotPassing_ReadOnly_TaskContextPrePopulated(t *testing.T) {
 	_ = sandbox
 }
 
-func TestFileSlotPassing_WorkspaceSandbox_TaskContextAlwaysReadable(t *testing.T) {
-	// Simulate a workspace task where buildSandboxFromWorkspace pre-populates task_context.md.
+func TestFileSlotPassing_WorkspaceSandbox_TaskContextNotInjected(t *testing.T) {
+	// Workspace tasks carry their own context in workspace files, so task_context.md
+	// is intentionally NOT pre-populated — this avoids every step reading it
+	// unnecessarily and burning extra tokens.
 	task := TaskDefinition{
 		ID:          "ws-task",
 		Name:        "Workspace Task",
@@ -660,11 +857,14 @@ func TestFileSlotPassing_WorkspaceSandbox_TaskContextAlwaysReadable(t *testing.T
 
 	sandbox := buildSandboxFromWorkspace(task)
 
-	// task_context.md must exist from pre-population (not just from buildTaskDAG Write).
-	content, err := sandbox.Read("test", "task_context.md")
+	// Workspace files are accessible.
+	content, err := sandbox.Read("test", "src/main.go")
 	require.NoError(t, err)
-	assert.Contains(t, string(content), "# Task: Workspace Task")
 	assert.Contains(t, string(content), "package main")
+
+	// task_context.md must NOT be present for workspace tasks.
+	_, err = sandbox.Read("test", "task_context.md")
+	assert.Error(t, err, "task_context.md must not be injected for workspace tasks")
 }
 
 func TestFileSlotPassing_PerStepAllowedPaths_ContextFilesAccessible(t *testing.T) {
@@ -688,7 +888,7 @@ func TestFileSlotPassing_PerStepAllowedPaths_ContextFilesAccessible(t *testing.T
 	sandbox := NewSandboxFS(nil, nil, SandboxPolicy{})
 	provider := &recordingProvider{response: "output text"}
 
-	d, _, err := buildTaskDAG(task, provider, sandbox, NilRetriever{}, nil)
+	d, _, err := buildTaskDAG(task, provider, nil, sandbox, NilRetriever{}, nil)
 	require.NoError(t, err)
 
 	_, err = d.Execute(context.Background(), dag.WithInputs(map[string]any{"task_input": task.Input}))
@@ -718,7 +918,7 @@ func TestFileSlotPassing_DuplicateFileReadNotInPrompt(t *testing.T) {
 	}
 
 	provider := &recordingProvider{response: "done"}
-	result := runRuntimeTask(task, provider, NilRetriever{}, "runtime")
+	result := runRuntimeTask(task, provider, nil, NilRetriever{}, "runtime")
 	require.NoError(t, result.Error)
 
 	require.NotEmpty(t, provider.prompts)
@@ -826,12 +1026,12 @@ func TestRunRuntimeExperiment_WithRankedRetriever_InjectsContext(t *testing.T) {
 	sandbox := NewSandboxFS(nil, nil, SandboxPolicy{})
 	provider := &recordingProvider{response: "output with context"}
 
-	_, _, err := buildTaskDAG(task, provider, sandbox, RankedRetriever{MaxTokens: 500, TopK: 5}, nil)
+	_, _, err := buildTaskDAG(task, provider, nil, sandbox, RankedRetriever{MaxTokens: 500, TopK: 5}, nil)
 	require.NoError(t, err)
 
 	// No execution needed — just verifying DAG builds with ranked retriever.
 	// Execute to trigger prompt building.
-	_, _, err = buildTaskDAG(task, provider, sandbox, RankedRetriever{MaxTokens: 500, TopK: 5}, nil)
+	_, _, err = buildTaskDAG(task, provider, nil, sandbox, RankedRetriever{MaxTokens: 500, TopK: 5}, nil)
 	require.NoError(t, err)
 }
 
@@ -872,4 +1072,103 @@ func TestEndToEnd_TextVsRuntime(t *testing.T) {
 
 	report := FormatReport(cr, ReportOpts{Model: "mock"})
 	assert.Contains(t, report, "Runtime vs Text")
+}
+
+// ─── Agent runner tests ───────────────────────────────────────────────────────
+
+func TestRunAgentExperiment_Basic(t *testing.T) {
+	cfg := ExperimentConfig{
+		Tasks:       sampleTasks(),
+		Provider:    sampleProvider(),
+		RunsPerTask: 1,
+		Condition:   "agent",
+	}
+	results, err := RunAgentExperiment(cfg)
+	require.NoError(t, err)
+	assert.Len(t, results, 2)
+	for _, r := range results {
+		assert.Equal(t, "agent", r.Condition)
+		assert.Nil(t, r.Error)
+		assert.True(t, r.Completed, "task %s should complete", r.TaskID)
+	}
+}
+
+func TestRunAgentExperiment_DeterministicFilter(t *testing.T) {
+	// kind: filter with predicate must not call LLM — provider panics if called
+	// for the filter step.
+	callCount := 0
+	prov := &mockExpProvider{
+		responses: map[string]string{
+			"collect": `["bug A | SCORE: 90", "false positive | SCORE: 20", "bug B | SCORE: 95"]`,
+		},
+		fallback: "no issues",
+	}
+	_ = callCount
+
+	task := TaskDefinition{
+		ID:   "agent-filter-test",
+		Name: "Agent Filter Test",
+		Steps: []StepDef{
+			{
+				ID:     "collect",
+				Prompt: "collect issues",
+				Produces: []SlotSpec{{
+					Key:        "issues_list",
+					ListSchema: &schema.FieldSpec{Type: "string"},
+				}},
+			},
+			{
+				ID:        "filter-issues",
+				Kind:      StepKindFilter,
+				Predicate: "score >= 80",
+				Consumes:  []SlotSpec{{Key: "issues_list"}},
+				Produces:  []SlotSpec{{Key: "filtered_issues"}},
+			},
+		},
+	}
+	cfg := ExperimentConfig{Tasks: []TaskDefinition{task}, Provider: prov, Condition: "agent"}
+	results, err := RunAgentExperiment(cfg)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.True(t, results[0].Completed)
+	// Only 1 LLM call — for "collect"; filter is deterministic.
+	assert.Equal(t, 1, results[0].LLMCalls)
+}
+
+func TestNormalizeDashes(t *testing.T) {
+	assert.Equal(t, "issue collector - aggregate findings", normalizeDashes("issue collector — aggregate findings"))
+	assert.Equal(t, "issue filter - keep score >= 80", normalizeDashes("issue filter – keep score >= 80"))
+	assert.Equal(t, "no dashes here", normalizeDashes("no dashes here"))
+}
+
+func TestStepTextBody_Predicate(t *testing.T) {
+	step := StepDef{Kind: StepKindFilter, Predicate: "score >= 80"}
+	body := stepTextBody(step)
+	assert.Contains(t, body, "score >= 80")
+	assert.Contains(t, body, "Filter")
+}
+
+func TestStepTextBody_FallsBackToPrompt(t *testing.T) {
+	step := StepDef{Prompt: "Do something specific"}
+	body := stepTextBody(step)
+	assert.Equal(t, "Do something specific", body)
+}
+
+func TestEndToEnd_TextVsRuntimeVsAgent(t *testing.T) {
+	cfg := ExperimentConfig{
+		Tasks:       sampleTasks(),
+		Provider:    sampleProvider(),
+		RunsPerTask: 1,
+	}
+	textResults, err := RunTextExperiment(cfg)
+	require.NoError(t, err)
+	runtimeResults, err := RunRuntimeExperiment(cfg)
+	require.NoError(t, err)
+	agentResults, err := RunAgentExperiment(cfg)
+	require.NoError(t, err)
+
+	cr := CompareThree(textResults, runtimeResults, agentResults)
+	assert.NotNil(t, cr)
+	assert.Equal(t, 2, cr.Tasks)
+	assert.Len(t, cr.RankedResults, 2) // RankedResults holds the third condition (agent here)
 }

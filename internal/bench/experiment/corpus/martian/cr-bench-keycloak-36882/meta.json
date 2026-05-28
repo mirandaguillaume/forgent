@@ -1,0 +1,14 @@
+{
+  "id": "cr-bench-keycloak-36882",
+  "source_url": "https://github.com/keycloak/keycloak/pull/36882",
+  "original_url": "https://github.com/keycloak/keycloak/pull/36882",
+  "project": "keycloak",
+  "pr_num": "36882",
+  "title": "Add rolling-updates feature flag and compatibility framework",
+  "golden_comments": [
+    {
+      "comment": "Incorrect method call for exit codes. The picocli.exit() method calls System.exit() directly, which is problematic:",
+      "severity": "Medium"
+    }
+  ]
+}

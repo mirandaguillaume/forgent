@@ -1,3 +1,7 @@
+# Story 10-9: augmented for Epic 10 contract validation
+# - step "threat-model": file_access: read-only + network_policy (threat modeling is read-only analysis)
+# - step "vulnerability-scan": file_access: read-only + network_policy + loop (iterative scan with exit criteria)
+# - step "remediation": file_access: read-only (remediation output is code text, not file writes)
 id: security-audit
 name: Security Audit
 description: Audit a web handler for security vulnerabilities
@@ -16,15 +20,34 @@ steps:
   - id: threat-model
     name: Threat Model
     prompt: Identify the attack surface and potential threat vectors in this handler.
+    file_access: read-only
+    network_policy:
+      forbidden_domains:
+        - "*.com"
+        - "*.net"
+        - "*.org"
+        - "*.io"
     produces: [threats]
   - id: vulnerability-scan
     name: Vulnerability Scan
     prompt: List specific vulnerabilities with CWE references if possible.
+    file_access: read-only
+    network_policy:
+      forbidden_domains:
+        - "*.com"
+        - "*.net"
+        - "*.org"
+        - "*.io"
+    loop:
+      max_iterations: 3
+      exit_when:
+        output_marker: "Recommendation"
     consumes: [threats]
     produces: [vulnerabilities]
   - id: remediation
     name: Remediation
     prompt: Provide specific code fixes for each vulnerability found.
+    file_access: read-only
     consumes: [vulnerabilities]
     produces: [fixes]
 guardrails: []

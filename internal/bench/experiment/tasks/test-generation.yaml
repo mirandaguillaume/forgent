@@ -1,3 +1,6 @@
+# Story 10-9: augmented for Epic 10 contract validation
+# - step "write-table-tests": loop with max_iterations: 5, exit on "func Test" marker
+#   (test writing is iterative; exits when first test function is generated)
 id: test-generation
 name: Test Generation
 description: Generate comprehensive tests for a sorting function
@@ -28,6 +31,10 @@ steps:
   - id: write-table-tests
     name: Write Table-Driven Tests
     prompt: Write Go table-driven tests covering all identified cases.
+    loop:
+      max_iterations: 5
+      exit_when:
+        output_marker: "func Test"
     consumes: [test_cases]
     produces: [test_code]
   - id: add-property-tests

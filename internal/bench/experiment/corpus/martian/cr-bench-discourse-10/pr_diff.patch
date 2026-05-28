@@ -1,0 +1,301 @@
+diff --git a/app/assets/javascripts/admin/adapters/embedding.js.es6 b/app/assets/javascripts/admin/adapters/embedding.js.es6
+new file mode 100644
+index 00000000000..c8985cfdcae
+--- /dev/null
++++ b/app/assets/javascripts/admin/adapters/embedding.js.es6
+@@ -0,0 +1,7 @@
++import RestAdapter from 'discourse/adapters/rest';
++
++export default RestAdapter.extend({
++  pathFor() {
++    return "/admin/customize/embedding";
++  }
++});
+diff --git a/app/assets/javascripts/admin/components/embeddable-host.js.es6 b/app/assets/javascripts/admin/components/embeddable-host.js.es6
+new file mode 100644
+index 00000000000..f33c7509657
+--- /dev/null
++++ b/app/assets/javascripts/admin/components/embeddable-host.js.es6
+@@ -0,0 +1,63 @@
++import { bufferedProperty } from 'discourse/mixins/buffered-content';
++import computed from 'ember-addons/ember-computed-decorators';
++import { on, observes } from 'ember-addons/ember-computed-decorators';
++import { popupAjaxError } from 'discourse/lib/ajax-error';
++
++export default Ember.Component.extend(bufferedProperty('host'), {
++  editToggled: false,
++  tagName: 'tr',
++  categoryId: null,
++
++  editing: Ember.computed.or('host.isNew', 'editToggled'),
++
++  @on('didInsertElement')
++  @observes('editing')
++  _focusOnInput() {
++    Ember.run.schedule('afterRender', () => { this.$('.host-name').focus(); });
++  },
++
++  @computed('buffered.host', 'host.isSaving')
++  cantSave(host, isSaving) {
++    return isSaving || Ember.isEmpty(host);
++  },
++
++  actions: {
++    edit() {
++      this.set('categoryId', this.get('host.category.id'));
++      this.set('editToggled', true);
++    },
++
++    save() {
++      if (this.get('cantSave')) { return; }
++
++      const props = this.get('buffered').getProperties('host');
++      props.category_id = this.get('categoryId');
++
++      const host = this.get('host');
++      host.save(props).then(() => {
++        host.set('category', Discourse.Category.findById(this.get('categoryId')));
++        this.set('editToggled', false);
++      }).catch(popupAjaxError);
++    },
++
++    delete() {
++      bootbox.confirm(I18n.t('admin.embedding.confirm_delete'), (result) => {
++        if (result) {
++          this.get('host').destroyRecord().then(() => {
++            this.sendAction('deleteHost', this.get('host'));
++          });
++        }
++      });
++    },
++
++    cancel() {
++      const host = this.get('host');
++      if (host.get('isNew')) {
++        this.sendAction('deleteHost', host);
++      } else {
++        this.rollbackBuffer();
++        this.set('editToggled', false);
++      }
++    }
++  }
++});
+diff --git a/app/assets/javascripts/admin/controllers/admin-embedding.js.es6 b/app/assets/javascripts/admin/controllers/admin-embedding.js.es6
+new file mode 100644
+index 00000000000..d0e554831af
+--- /dev/null
++++ b/app/assets/javascripts/admin/controllers/admin-embedding.js.es6
+@@ -0,0 +1,18 @@
++export default Ember.Controller.extend({
++  embedding: null,
++
++  actions: {
++    saveChanges() {
++      this.get('embedding').update({});
++    },
++
++    addHost() {
++      const host = this.store.createRecord('embeddable-host');
++      this.get('embedding.embeddable_hosts').pushObject(host);
++    },
++
++    deleteHost(host) {
++      this.get('embedding.embeddable_hosts').removeObject(host);
++    }
++  }
++});
+diff --git a/app/assets/javascripts/admin/routes/admin-embedding.js.es6 b/app/assets/javascripts/admin/routes/admin-embedding.js.es6
+new file mode 100644
+index 00000000000..d9a249c60c9
+--- /dev/null
++++ b/app/assets/javascripts/admin/routes/admin-embedding.js.es6
+@@ -0,0 +1,9 @@
++export default Ember.Route.extend({
++  model() {
++    return this.store.find('embedding');
++  },
++
++  setupController(controller, model) {
++    controller.set('embedding', model);
++  }
++});
+diff --git a/app/assets/javascripts/admin/routes/admin-route-map.js.es6 b/app/assets/javascripts/admin/routes/admin-route-map.js.es6
+index 047e5d51aff..e01d0f8f0d6 100644
+--- a/app/assets/javascripts/admin/routes/admin-route-map.js.es6
++++ b/app/assets/javascripts/admin/routes/admin-route-map.js.es6
+@@ -27,6 +27,7 @@ export default {
+       this.resource('adminUserFields', { path: '/user_fields' });
+       this.resource('adminEmojis', { path: '/emojis' });
+       this.resource('adminPermalinks', { path: '/permalinks' });
++      this.resource('adminEmbedding', { path: '/embedding' });
+     });
+     this.route('api');
+ 
+diff --git a/app/assets/javascripts/admin/templates/components/embeddable-host.hbs b/app/assets/javascripts/admin/templates/components/embeddable-host.hbs
+new file mode 100644
+index 00000000000..c35d40e1d6e
+--- /dev/null
++++ b/app/assets/javascripts/admin/templates/components/embeddable-host.hbs
+@@ -0,0 +1,19 @@
++{{#if editing}}
++  <td>
++    {{input value=buffered.host placeholder="example.com" enter="save" class="host-name"}}
++  </td>
++  <td>
++    {{category-chooser value=categoryId}}
++  </td>
++  <td>
++    {{d-button icon="check" action="save" class="btn-primary" disabled=cantSave}}
++    {{d-button icon="times" action="cancel" class="btn-danger" disabled=host.isSaving}}
++  </td>
++{{else}}
++  <td>{{host.host}}</td>
++  <td>{{category-badge host.category}}</td>
++  <td>
++    {{d-button icon="pencil" action="edit"}}
++    {{d-button icon="trash-o" action="delete" class='btn-danger'}}
++  </td>
++{{/if}}
+diff --git a/app/assets/javascripts/admin/templates/customize.hbs b/app/assets/javascripts/admin/templates/customize.hbs
+index 130b75e0ac6..8ab4c662e74 100644
+--- a/app/assets/javascripts/admin/templates/customize.hbs
++++ b/app/assets/javascripts/admin/templates/customize.hbs
+@@ -5,6 +5,7 @@
+   {{nav-item route='adminUserFields' label='admin.user_fields.title'}}
+   {{nav-item route='adminEmojis' label='admin.emoji.title'}}
+   {{nav-item route='adminPermalinks' label='admin.permalink.title'}}
++  {{nav-item route='adminEmbedding' label='admin.embedding.title'}}
+ {{/admin-nav}}
+ 
+ <div class="admin-container">
+diff --git a/app/assets/javascripts/admin/templates/embedding.hbs b/app/assets/javascripts/admin/templates/embedding.hbs
+new file mode 100644
+index 00000000000..838e3e8e949
+--- /dev/null
++++ b/app/assets/javascripts/admin/templates/embedding.hbs
+@@ -0,0 +1,15 @@
++{{#if embedding.embeddable_hosts}}
++  <table>
++    <tr>
++      <th style='width: 50%'>{{i18n "admin.embedding.host"}}</th>
++      <th style='width: 30%'>{{i18n "admin.embedding.category"}}</th>
++      <th style='width: 20%'>&nbsp;</th>
++    </tr>
++    {{#each embedding.embeddable_hosts as |host|}}
++      {{embeddable-host host=host deleteHost="deleteHost"}}
++    {{/each}}
++  </table>
++{{/if}}
++
++{{d-button label="admin.embedding.add_host" action="addHost" icon="plus" class="btn-primary"}}
++
+diff --git a/app/assets/javascripts/discourse/adapters/rest.js.es6 b/app/assets/javascripts/discourse/adapters/rest.js.es6
+index 5e427a86589..1a9fa032744 100644
+--- a/app/assets/javascripts/discourse/adapters/rest.js.es6
++++ b/app/assets/javascripts/discourse/adapters/rest.js.es6
+@@ -1,4 +1,4 @@
+-const ADMIN_MODELS = ['plugin', 'site-customization'];
++const ADMIN_MODELS = ['plugin', 'site-customization', 'embeddable-host'];
+ 
+ export function Result(payload, responseJson) {
+   this.payload = payload;
+@@ -19,7 +19,7 @@ function rethrow(error) {
+ export default Ember.Object.extend({
+ 
+   basePath(store, type) {
+-    if (ADMIN_MODELS.indexOf(type) !== -1) { return "/admin/"; }
++    if (ADMIN_MODELS.indexOf(type.replace('_', '-')) !== -1) { return "/admin/"; }
+     return "/";
+   },
+ 
+diff --git a/app/assets/javascripts/discourse/models/store.js.es6 b/app/assets/javascripts/discourse/models/store.js.es6
+index a9aa86f294e..dc6acae8226 100644
+--- a/app/assets/javascripts/discourse/models/store.js.es6
++++ b/app/assets/javascripts/discourse/models/store.js.es6
+@@ -189,14 +189,24 @@ export default Ember.Object.extend({
+   _hydrateEmbedded(type, obj, root) {
+     const self = this;
+     Object.keys(obj).forEach(function(k) {
+-      const m = /(.+)\_id$/.exec(k);
++      const m = /(.+)\_id(s?)$/.exec(k);
+       if (m) {
+         const subType = m[1];
+-        const hydrated = self._lookupSubType(subType, type, obj[k], root);
+-        if (hydrated) {
+-          obj[subType] = hydrated;
++
++        if (m[2]) {
++          const hydrated = obj[k].map(function(id) {
++            return self._lookupSubType(subType, type, id, root);
++          });
++          obj[self.pluralize(subType)] = hydrated || [];
+           delete obj[k];
++        } else {
++          const hydrated = self._lookupSubType(subType, type, obj[k], root);
++          if (hydrated) {
++            obj[subType] = hydrated;
++            delete obj[k];
++          }
+         }
++
+       }
+     });
+   },
+diff --git a/app/controllers/admin/embeddable_hosts_controller.rb b/app/controllers/admin/embeddable_hosts_controller.rb
+new file mode 100644
+index 00000000000..2d90d46f2ea
+--- /dev/null
++++ b/app/controllers/admin/embeddable_hosts_controller.rb
+@@ -0,0 +1,34 @@
++class Admin::EmbeddableHostsController < Admin::AdminController
++
++  before_filter :ensure_logged_in, :ensure_staff
++
++  def create
++    save_host(EmbeddableHost.new)
++  end
++
++  def update
++    host = EmbeddableHost.where(id: params[:id]).first
++    save_host(host)
++  end
++
++  def destroy
++    host = EmbeddableHost.where(id: params[:id]).first
++    host.destroy
++    render json: success_json
++  end
++
++  protected
++
++    def save_host(host)
++      host.host = params[:embeddable_host][:host]
++      host.category_id = params[:embeddable_host][:category_id]
++      host.category_id = SiteSetting.uncategorized_category_id if host.category_id.blank?
++
++      if host.save
++        render_serialized(host, EmbeddableHostSerializer, root: 'embeddable_host', rest_serializer: true)
++      else
++        render_json_error(host)
++      end
++    end
++
++end
+diff --git a/app/controllers/admin/embedding_controller.rb b/app/controllers/admin/embedding_controller.rb
+new file mode 100644
+index 00000000000..656ff25af0c
+--- /dev/null
++++ b/app/controllers/admin/embedding_controller.rb
+@@ -0,0 +1,21 @@
++class Admin::EmbeddingController < Admin::AdminController
++
++  before_filter :ensure_logged_in, :ensure_staff, :fetch_embedding
++
++  def show
++    render_serialized(@embedding, EmbeddingSerializer, root: 'embedding', rest_serializer: true)
++  end
++
++  def update
++    render_serialized(@embedding, EmbeddingSerializer, root: 'embedding', rest_serializer: true)
++  end
+... (truncated, 687 more lines)
