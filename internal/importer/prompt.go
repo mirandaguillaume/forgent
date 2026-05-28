@@ -30,7 +30,9 @@ func BuildImportPrompt(source Source, fm AgentFrontmatter, body string, genericT
 	b.WriteString("    - Step one\n")
 	b.WriteString("    - Step two\n")
 	b.WriteString("guardrails:\n")
+	b.WriteString("  - \"never modify files outside the working directory\"\n")
 	b.WriteString("  - timeout: 30s\n")
+	b.WriteString("# IMPORTANT: guardrails MUST be a YAML list (each item starts with '-'). Never use a map.\n")
 	b.WriteString("observability:\n")
 	b.WriteString("  trace_level: minimal\n")
 	b.WriteString("  metrics: []\n")
@@ -41,7 +43,8 @@ func BuildImportPrompt(source Source, fm AgentFrontmatter, body string, genericT
 	b.WriteString("negotiation:\n")
 	b.WriteString("  file_conflicts: yield\n")
 	b.WriteString("  priority: 0\n\n")
-	b.WriteString("Required fields: skill (kebab-case), version (semver), context (consumes/produces/memory), strategy, guardrails, observability, security, negotiation.\n")
+	b.WriteString("ALL fields are REQUIRED. Use these defaults when the source does not specify:\n")
+	b.WriteString("  trace_level: minimal  |  filesystem: none  |  network: none  |  file_conflicts: yield  |  priority: 0\n")
 	b.WriteString("memory: short-term|conversation|long-term — trace_level: minimal|standard|detailed — filesystem: none|read-only|read-write|full — network: none|allowlist|full\n\n")
 
 	// Tool names
