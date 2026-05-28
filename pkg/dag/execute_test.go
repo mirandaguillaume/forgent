@@ -382,3 +382,82 @@ func TestExecute_BoundedCycle_ErrorStopsExecution(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "fail on second pass")
 }
+
+func TestExecute_TrueStreaming(t *testing.T) {
+	// Verify that a node whose only dependency is satisfied starts immediately,
+	// without waiting for a concurrent slow sibling node to finish.
+	// The old layer-based path would have blocked C until both A and B (same layer) completed.
+	var mu sync.Mutex
+	var cStarted, bFinished time.Time
+
+	a := &dag.Node{
+		ID:       "a",
+		Produces: []string{"x"},
+		Run: func(ctx context.Context, _ map[string]any) (map[string]any, error) {
+			return map[string]any{"x": 1}, nil
+		},
+	}
+	b := &dag.Node{
+		ID:       "b",
+		Produces: []string{"y"},
+		Run: func(ctx context.Context, _ map[string]any) (map[string]any, error) {
+			time.Sleep(100 * time.Millisecond)
+			mu.Lock()
+			bFinished = time.Now()
+			mu.Unlock()
+			return map[string]any{"y": 2}, nil
+		},
+	}
+	c := &dag.Node{
+		ID:       "c",
+		Consumes: []string{"x"},
+		Produces: []string{"z"},
+		Run: func(ctx context.Context, _ map[string]any) (map[string]any, error) {
+			mu.Lock()
+			cStarted = time.Now()
+			mu.Unlock()
+			return map[string]any{"z": 3}, nil
+		},
+	}
+
+	d, err := dag.New(a, b, c)
+	require.NoError(t, err)
+	_, err = d.Execute(context.Background())
+	require.NoError(t, err)
+
+	mu.Lock()
+	cs, bf := cStarted, bFinished
+	mu.Unlock()
+
+	assert.True(t, cs.Before(bf),
+		"true streaming: C (ready after A) should start before slow B finishes (C=%v B=%v)", cs, bf)
+}
+
+func TestExecute_EventDriven_KindMap(t *testing.T) {
+	// Regression: KindMap was silently broken when executeEventDriven called
+	// runWithRetry instead of runNode, bypassing the per-item dispatch in runMap.
+	source := &dag.Node{
+		ID:       "source",
+		Produces: []string{"items"},
+		Run: func(ctx context.Context, _ map[string]any) (map[string]any, error) {
+			return map[string]any{"items": []any{1, 2, 3}}, nil
+		},
+	}
+	mapper := &dag.Node{
+		ID:       "mapper",
+		Kind:     dag.KindMap,
+		Consumes: []string{"items"},
+		Produces: []string{"results"},
+		Run: func(ctx context.Context, inputs map[string]any) (map[string]any, error) {
+			v, _ := inputs["items"].(int)
+			return map[string]any{"results": v * 2}, nil
+		},
+	}
+	d, err := dag.New(source, mapper)
+	require.NoError(t, err)
+
+	results, err := d.Execute(context.Background())
+	require.NoError(t, err)
+	got, _ := results["results"].([]any)
+	assert.Equal(t, []any{2, 4, 6}, got)
+}

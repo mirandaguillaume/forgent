@@ -27,49 +27,6 @@ func failHandler(err error) dag.MiddlewareFunc {
 	}
 }
 
-// ─── extractMarkers tests ──────────────────────────────────────────────────
-
-func TestExtractMarkers_Empty(t *testing.T) {
-	assert.Nil(t, extractMarkers(""))
-}
-
-func TestExtractMarkers_Heading(t *testing.T) {
-	markers := extractMarkers("## Bugs\n### Details")
-	assert.Equal(t, []string{"## bugs", "### details"}, markers)
-}
-
-func TestExtractMarkers_BoldListItem(t *testing.T) {
-	markers := extractMarkers("- **location**: description")
-	assert.Equal(t, []string{"- **"}, markers)
-}
-
-func TestExtractMarkers_PlainListItem(t *testing.T) {
-	markers := extractMarkers("- simple item")
-	assert.Equal(t, []string{"- "}, markers)
-}
-
-func TestExtractMarkers_BoldItemTakesPrecedenceOverPlain(t *testing.T) {
-	markers := extractMarkers("- **bold**: first\n- plain item")
-	// "- **" is already recorded; "- " is a superset, not added separately
-	assert.Equal(t, []string{"- **"}, markers)
-}
-
-func TestExtractMarkers_AsteriskListItem(t *testing.T) {
-	markers := extractMarkers("* item")
-	assert.Equal(t, []string{"- "}, markers)
-}
-
-func TestExtractMarkers_Deduplicated(t *testing.T) {
-	markers := extractMarkers("## Bugs\n## Bugs\n- **a**: x\n- **b**: y")
-	assert.Equal(t, []string{"## bugs", "- **"}, markers)
-}
-
-func TestExtractMarkers_FullTemplate(t *testing.T) {
-	tmpl := "## Bugs\n- **location**: description of bug"
-	markers := extractMarkers(tmpl)
-	assert.Equal(t, []string{"## bugs", "- **"}, markers)
-}
-
 // ─── Policy passthrough tests ──────────────────────────────────────────────
 
 func TestNilPolicy_Passthrough(t *testing.T) {
@@ -205,7 +162,6 @@ func TestConsumesTemplate_Fail(t *testing.T) {
 	_, err := mw(context.Background(), inputs, handler(out))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "quality gate")
-	assert.Contains(t, err.Error(), "input")
 }
 
 func TestConsumesTemplate_FailDoesNotCallHandler(t *testing.T) {
@@ -240,7 +196,8 @@ func TestBothTemplates_Pass(t *testing.T) {
 }
 
 func TestProducesTemplate_AsteriskBulletInOutput_Pass(t *testing.T) {
-	// Template uses dash-bullet; LLM responds with asterisk-bullet — must pass.
+	// goldmark parses both "- item" and "* item" as list nodes, so asterisk-bullet
+	// output satisfies a dash-bullet template's needsList constraint.
 	policy := &QualityGatePolicy{
 		ProducesTemplate: "## Bugs\n- **location**: description",
 	}
@@ -252,13 +209,6 @@ func TestProducesTemplate_AsteriskBulletInOutput_Pass(t *testing.T) {
 	got, err := mw(context.Background(), nil, handler(out))
 	require.NoError(t, err)
 	assert.Equal(t, out, got)
-}
-
-func TestExtractMarkers_AsteriskBoldItem_EmitsNormalizedMarker(t *testing.T) {
-	// Template uses * ** style; extractor emits "- **" (normalized).
-	// Validator must accept "* **" in output as equivalent.
-	markers := extractMarkers("* **location**: description")
-	assert.Equal(t, []string{"- **"}, markers)
 }
 
 // ─── Handler error passthrough ─────────────────────────────────────────────
@@ -417,9 +367,14 @@ func TestCollectStrings(t *testing.T) {
 			want:    []string{"hello"},
 		},
 		{
-			name:    "mixed types",
+			name:    "mixed types — non-strings skipped",
 			outputs: map[string]any{"a": "hello", "b": 42, "c": "world"},
 			want:    []string{"hello", "world"},
+		},
+		{
+			name:    "heading in second value stays line-start after join",
+			outputs: map[string]any{"a": "intro text", "b": "## Section\ncontent"},
+			want:    []string{"intro text", "## Section"},
 		},
 	}
 	for _, tt := range tests {
@@ -554,6 +509,31 @@ func TestConcurrentDAGExecution(t *testing.T) {
 	}
 }
 
+
+// ─── Wording regression (telemetry stability) ─────────────────────────────
+
+// Pin the EXACT wording of qualitygate error messages — story 10-6 telemetry
+// parses these strings. A typo or rewording must break these tests.
+func TestQualityGate_ErrorWording_StableForTelemetry(t *testing.T) {
+	t.Run("heading not found in output (AST)", func(t *testing.T) {
+		err := ValidateProduces("## Verdict", "no heading here")
+		require.Error(t, err)
+		assert.Equal(t, `quality gate: heading "## verdict" not found`, err.Error())
+	})
+
+	t.Run("heading not found in input (AST)", func(t *testing.T) {
+		err := ValidateConsumes("## Verdict", "no heading here")
+		require.Error(t, err)
+		assert.Equal(t, `quality gate: heading "## verdict" not found`, err.Error())
+	})
+
+	t.Run("flat template is passthrough — no error", func(t *testing.T) {
+		err := ValidateProduces("- **field**: value", "no structure at all")
+		require.NoError(t, err, "flat templates produce no structural constraint")
+	})
+}
+
+
 // ─── Benchmarks ────────────────────────────────────────────────────────────
 
 func BenchmarkQualityGateMiddleware_NoTemplates(b *testing.B) {
@@ -600,4 +580,63 @@ func BenchmarkQualityGateMiddleware_Template_Fail(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		_, _ = mw(ctx, nil, h)
 	}
+}
+
+// ─── AST integration tests (Story 10-11, T6.1–T6.6) ─────────────────────────
+
+// T6.1 — AC2: heading present but section is empty (no content beneath).
+func TestValidateProduces_AST_EmptySection_Fails(t *testing.T) {
+	tmpl := "## Verdict\n\nDecision text.\n"
+	err := ValidateProduces(tmpl, "## Verdict\n")
+	require.Error(t, err)
+	assert.Equal(t, `quality gate: section "## verdict" is empty`, err.Error())
+}
+
+// T6.2 — AC3: section present but contains no list where template declares one.
+func TestValidateProduces_AST_MissingList_Fails(t *testing.T) {
+	tmpl := "## Issues\n\n- bug one\n- bug two\n"
+	err := ValidateProduces(tmpl, "## Issues\n\nNo issues found in this run.\n")
+	require.Error(t, err)
+	assert.Equal(t, `quality gate: section "## issues" requires a list`, err.Error())
+}
+
+// T6.3 — AC4: required heading entirely absent from output.
+func TestValidateProduces_AST_HeadingAbsent_Fails(t *testing.T) {
+	tmpl := "## Verdict\n\nBody.\n## Summary\n\nMore body.\n"
+	err := ValidateProduces(tmpl, "## Verdict\n\nApproved.\n")
+	require.Error(t, err)
+	assert.Equal(t, `quality gate: heading "## summary" not found`, err.Error())
+}
+
+// T6.4 — HTML comments in template have no validation effect.
+func TestValidateProduces_AST_HTMLCommentsIgnored(t *testing.T) {
+	// Template has heading + HTML comment — comment has no validation effect.
+	tmpl := "## Verdict\n\nDecision.\n<!-- some comment -->\n"
+
+	// Output satisfies the structural check (heading + body) → passes.
+	err := ValidateProduces(tmpl, "## Verdict\n\nApproved.\n")
+	require.NoError(t, err)
+}
+
+// T6.5 — flat templates (no headings) are pass-through — no constraint applied.
+func TestValidateProduces_NoHeadings_Passthrough(t *testing.T) {
+	tmpl := "- **verdict**: ...\n- **severity**: ..."
+	// Any output satisfies a flat template — heading-based AST validation requires headings.
+	err := ValidateProduces(tmpl, "just plain text with no structure")
+	require.NoError(t, err)
+}
+
+// T6.6 — AC1 + full multi-section template: all constraints satisfied → nil.
+func TestValidateProduces_AST_FullTemplate_Passes(t *testing.T) {
+	tmpl := "## Verdict\n\nDecision.\n\n## Issues\n\n- item\n"
+	output := "## Verdict\n\nApproved.\n\n## Issues\n\n- minor style nit\n"
+	err := ValidateProduces(tmpl, output)
+	require.NoError(t, err)
+}
+
+// AC1 additional: heading present with content → nil.
+func TestValidateProduces_AST_HeadingWithContent_Passes(t *testing.T) {
+	tmpl := "## Verdict\n\nSome content"
+	err := ValidateProduces(tmpl, "## Verdict\n\nApproved — no issues found.")
+	require.NoError(t, err)
 }

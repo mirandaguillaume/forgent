@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"sync"
 )
 
@@ -16,6 +15,7 @@ type execConfig struct {
 	inputs         map[string]any
 	concurrency    int
 	onNodeComplete func(nodeID string)
+	onNodeOutput   func(nodeID string, outputs map[string]any)
 }
 
 // WithInputs seeds the data store with initial values before execution begins.
@@ -34,11 +34,16 @@ func WithOnNodeComplete(fn func(nodeID string)) Option {
 	return func(c *execConfig) { c.onNodeComplete = fn }
 }
 
-// Execute runs the graph to completion.
-//
-// For acyclic graphs (no back-edges), uses layer-parallel execution.
-// For graphs with back-edges, uses an event-driven scheduler that tracks
-// per-back-edge iteration counters and re-enqueues cycle nodes.
+// WithNodeOutput registers a callback invoked after each node completes, receiving
+// the node's full output map. Useful for collecting assembled outputs from nodes
+// whose Run function does not call an internal capture (e.g. KindMap, KindFilter).
+func WithNodeOutput(fn func(nodeID string, outputs map[string]any)) Option {
+	return func(c *execConfig) { c.onNodeOutput = fn }
+}
+
+// Execute runs the graph to completion using a streaming event-driven scheduler.
+// Each node starts as soon as all its forward predecessors are done, enabling
+// true per-node parallelism without synchronisation barriers between layers.
 //
 // Nodes with nil Run are skipped (used for analysis-only nodes).
 func (d *DAG) Execute(ctx context.Context, opts ...Option) (map[string]any, error) {
@@ -54,102 +59,10 @@ func (d *DAG) Execute(ctx context.Context, opts ...Option) (map[string]any, erro
 		}
 	}
 
-	var err error
-	if d.HasBackEdges() {
-		err = d.executeEventDriven(ctx, store, cfg)
-	} else {
-		err = d.executeLayerBased(ctx, store, cfg)
-	}
-	if err != nil {
+	if err := d.executeEventDriven(ctx, store, cfg); err != nil {
 		return nil, err
 	}
 	return store.terminalOutputs(d), nil
-}
-
-// executeLayerBased runs the graph layer-by-layer (fast path for acyclic graphs).
-func (d *DAG) executeLayerBased(ctx context.Context, store *dataStore, cfg *execConfig) error {
-	layers := d.Layers()
-	deactivated := make(map[string]bool)
-
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	for _, layer := range layers {
-		active := make([]string, 0, len(layer))
-		for _, id := range layer {
-			if !deactivated[id] {
-				active = append(active, id)
-			}
-		}
-		if len(active) == 0 {
-			continue
-		}
-
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
-
-		var wg sync.WaitGroup
-		errCh := make(chan error, len(active))
-		sem := makeSem(cfg.concurrency)
-
-		var deMu sync.Mutex
-		layerDeactivations := make(map[string]bool)
-
-		for _, id := range active {
-			wg.Add(1)
-			go func(nodeID string) {
-				defer wg.Done()
-
-				if sem != nil {
-					sem <- struct{}{}
-					defer func() { <-sem }()
-				}
-
-				n := d.nodes[nodeID]
-				inputs := store.gather(n.Consumes)
-				out, err := runNode(ctx, d, n, inputs)
-				if err != nil {
-					errCh <- fmt.Errorf("node %q: %w", nodeID, err)
-					cancel()
-					return
-				}
-				store.putAll(out)
-
-				if n.Kind == KindRouter {
-					chosen, _ := out["__route"].(string)
-					deMu.Lock()
-					for _, e := range d.adj[nodeID] {
-						if e.To != chosen {
-							layerDeactivations[e.To] = true
-						}
-					}
-					deMu.Unlock()
-				}
-
-				if cfg.onNodeComplete != nil {
-					cfg.onNodeComplete(nodeID)
-				}
-			}(id)
-		}
-
-		wg.Wait()
-		close(errCh)
-
-		var errs []error
-		for e := range errCh {
-			errs = append(errs, e)
-		}
-		if len(errs) > 0 {
-			return errors.Join(errs...)
-		}
-
-		for id := range layerDeactivations {
-			deactivated[id] = true
-		}
-	}
-
-	return nil
 }
 
 // nodeState tracks execution state in the event-driven scheduler.
@@ -161,15 +74,12 @@ const (
 	stateDone
 )
 
-// executeEventDriven runs graphs with back-edges using a ready-node scheduler.
+// executeEventDriven runs graphs using a goroutine-per-node streaming scheduler.
 //
-// Algorithm:
-//  1. All nodes start as pending
-//  2. Nodes with all forward predecessors done are ready
-//  3. Run all ready nodes concurrently
-//  4. When a back-edge source completes and iterations < MaxIterations,
-//     reset all nodes in the cycle path to pending for re-execution
-//  5. Repeat until no more ready nodes
+// Each node starts its own goroutine the moment all its forward predecessors are
+// done — no layer barriers, no outer polling loop. tryStartLocked is called with
+// mu held; it checks readiness and launches a goroutine that, on completion,
+// acquires mu to update state and trigger all adjacent nodes.
 func (d *DAG) executeEventDriven(ctx context.Context, store *dataStore, cfg *execConfig) error {
 	states := make(map[string]nodeState, len(d.nodes))
 	for id := range d.nodes {
@@ -178,118 +88,106 @@ func (d *DAG) executeEventDriven(ctx context.Context, store *dataStore, cfg *exe
 	iterations := make(map[EdgeKey]int)
 	deactivated := make(map[string]bool)
 
-	sem := makeSem(cfg.concurrency)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 
+	sem := makeSem(cfg.concurrency)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	for {
-		if ctx.Err() != nil {
-			return ctx.Err()
-		}
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	errCh := make(chan error, len(d.nodes))
 
-		// Find ready nodes: pending, not deactivated, all forward predecessors done
-		var ready []string
-		for id := range d.nodes {
-			if states[id] != statePending || deactivated[id] {
+	var tryStartLocked func(nodeID string)
+	tryStartLocked = func(nodeID string) {
+		if ctx.Err() != nil {
+			return
+		}
+		if states[nodeID] != statePending || deactivated[nodeID] {
+			return
+		}
+		for _, e := range d.rev[nodeID] {
+			if e.IsBackEdge() {
 				continue
 			}
-			allReady := true
-			for _, e := range d.rev[id] {
-				if e.IsBackEdge() {
-					continue
-				}
-				if states[e.From] != stateDone {
-					allReady = false
-					break
-				}
-			}
-			if allReady {
-				ready = append(ready, id)
+			if states[e.From] != stateDone {
+				return
 			}
 		}
+		states[nodeID] = stateRunning
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 
-		if len(ready) == 0 {
-			break
-		}
+			if sem != nil {
+				sem <- struct{}{}
+				defer func() { <-sem }()
+			}
 
-		sort.Strings(ready) // deterministic ordering
+			n := d.nodes[nodeID]
+			inputs := store.gather(n.Consumes)
+			out, err := runNode(ctx, d, n, inputs)
+			if err != nil {
+				errCh <- fmt.Errorf("node %q: %w", nodeID, err)
+				cancel()
+				return
+			}
+			store.putAll(out)
 
-		for _, id := range ready {
-			states[id] = stateRunning
-		}
+			mu.Lock()
+			states[nodeID] = stateDone
 
-		var wg sync.WaitGroup
-		errCh := make(chan error, len(ready))
-		var mu sync.Mutex
-
-		for _, id := range ready {
-			wg.Add(1)
-			go func(nodeID string) {
-				defer wg.Done()
-
-				if sem != nil {
-					sem <- struct{}{}
-					defer func() { <-sem }()
-				}
-
-				n := d.nodes[nodeID]
-				inputs := store.gather(n.Consumes)
-				out, err := runWithRetry(ctx, n, inputs)
-				if err != nil {
-					errCh <- fmt.Errorf("node %q: %w", nodeID, err)
-					cancel()
-					return
-				}
-				store.putAll(out)
-
-				mu.Lock()
-				states[nodeID] = stateDone
-
-				if n.Kind == KindRouter {
-					chosen, _ := out["__route"].(string)
-					for _, e := range d.adj[nodeID] {
-						if e.To != chosen {
-							deactivated[e.To] = true
-						}
-					}
-				}
-
-				// Back-edge re-enqueue: reset cycle nodes to pending
+			if n.Kind == KindRouter {
+				chosen, _ := out["__route"].(string)
 				for _, e := range d.adj[nodeID] {
-					if !e.IsBackEdge() {
-						continue
+					if e.To != chosen {
+						deactivated[e.To] = true
 					}
+				}
+			}
+
+			for _, e := range d.adj[nodeID] {
+				if e.IsBackEdge() {
 					key := EdgeKey{From: e.From, To: e.To}
 					if iterations[key] < e.MaxIterations {
 						iterations[key]++
-						path := d.forwardPath(e.To, e.From)
-						for _, pid := range path {
+						for _, pid := range d.forwardPath(e.To, e.From) {
 							states[pid] = statePending
 						}
 					}
 				}
-				mu.Unlock()
+			}
 
-				if cfg.onNodeComplete != nil {
-					cfg.onNodeComplete(nodeID)
-				}
-			}(id)
-		}
+			for _, e := range d.adj[nodeID] {
+				tryStartLocked(e.To)
+			}
+			mu.Unlock()
 
-		wg.Wait()
-		close(errCh)
-
-		var errs []error
-		for e := range errCh {
-			errs = append(errs, e)
-		}
-		if len(errs) > 0 {
-			return errors.Join(errs...)
-		}
+			if cfg.onNodeOutput != nil {
+				cfg.onNodeOutput(nodeID, out)
+			}
+			if cfg.onNodeComplete != nil {
+				cfg.onNodeComplete(nodeID)
+			}
+		}()
 	}
 
-	return nil
+	mu.Lock()
+	for id := range d.nodes {
+		tryStartLocked(id)
+	}
+	mu.Unlock()
+
+	wg.Wait()
+	close(errCh)
+
+	var errs []error
+	for e := range errCh {
+		errs = append(errs, e)
+	}
+	return errors.Join(errs...)
 }
 
 // runWithRetry executes a node's Run function, retrying up to n.MaxRetries times on error.
