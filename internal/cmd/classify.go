@@ -12,7 +12,9 @@ import (
 )
 
 func init() {
-	var jsonOut bool
+	var jsonOut, quick bool
+	var providerFlag string
+	modelFlag := "claude-haiku-4-5-20251001" // smallest Anthropic model — sufficient for label classification
 
 	classifyCmd := &cobra.Command{
 		Use:   "classify <file>",
@@ -21,29 +23,51 @@ func init() {
 Forgent YAML, etc.) and maps each instruction to one of the five Forgent facets:
 context, strategy, guardrails, observability, security.
 
+Uses an LLM by default for semantic accuracy. Use --quick for instant static analysis.
 Useful before 'forgent import' to understand what's present and what's missing.`,
 		Args: cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			runClassify(args[0], jsonOut)
+			runClassify(args[0], providerFlag, modelFlag, jsonOut, quick)
 		},
 	}
 
 	classifyCmd.Flags().BoolVar(&jsonOut, "json", false, "output as JSON")
+	classifyCmd.Flags().BoolVar(&quick, "quick", false, "static analysis only — no LLM, instant results")
+	classifyCmd.Flags().StringVar(&providerFlag, "provider", "", "LLM provider (ollama, openrouter, anthropic)")
+	classifyCmd.Flags().StringVar(&modelFlag, "model", modelFlag, "LLM model name (default: claude-haiku-4-5)")
 
 	rootCmd.AddCommand(classifyCmd)
 }
 
-func runClassify(filePath string, jsonOut bool) {
+func runClassify(filePath, providerFlag, modelFlag string, jsonOut, quick bool) {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		fmt.Println(color.RedString("Error: %v", err))
 		os.Exit(1)
 	}
 
-	// Detect format using existing doctor parser infrastructure.
 	format := detectFormat(filePath, string(content))
 
-	result := classifier.Classify(string(content), format)
+	var result classifier.Result
+
+	if quick {
+		result = classifier.Classify(string(content), format)
+	} else {
+		provider, providerName, err := selectProvider(providerFlag, modelFlag, false)
+		if err != nil {
+			fmt.Println(color.RedString("Error: %v", err))
+			fmt.Println(color.YellowString("Tip: use --quick for static analysis without an LLM."))
+			os.Exit(1)
+		}
+		if !jsonOut {
+			fmt.Printf("Using provider: %s\n\n", color.CyanString(providerName))
+		}
+		result, err = classifier.ClassifyLLM(string(content), format, provider)
+		if err != nil {
+			fmt.Println(color.RedString("Error: %v", err))
+			os.Exit(1)
+		}
+	}
 
 	if jsonOut {
 		printClassifyJSON(result)

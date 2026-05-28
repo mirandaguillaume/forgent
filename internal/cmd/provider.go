@@ -14,11 +14,14 @@ import (
 // selectProvider chooses an LLM provider using the fallback chain:
 // 1. Explicit --provider flag
 // 2. Ollama (if running locally)
-// 3. OPENROUTER_API_KEY env var
-// 4. ANTHROPIC_API_KEY env var
-// 5. Error (no provider available)
+// 3. FORGENT_ANTHROPIC env var  → anthropic
+// 4. OPENROUTER_API_KEY env var → openrouter
+// 5. ANTHROPIC_API_KEY env var  → anthropic
+// 6. FORGENT_API_KEY env var    → anthropic
+// 7. Error (no provider available)
 func selectProvider(providerFlag, modelFlag string, debug bool) (llm.Provider, string, error) {
 	forgentKey := os.Getenv("FORGENT_API_KEY")
+	forgentAnthropic := os.Getenv("FORGENT_ANTHROPIC")
 
 	if providerFlag != "" {
 		apiKey := ""
@@ -31,9 +34,9 @@ func selectProvider(providerFlag, modelFlag string, debug bool) (llm.Provider, s
 				return nil, "", fmt.Errorf("OPENROUTER_API_KEY not set")
 			}
 		case "anthropic":
-			apiKey = firstNonEmpty(os.Getenv("ANTHROPIC_API_KEY"), forgentKey)
+			apiKey = firstNonEmpty(forgentAnthropic, os.Getenv("ANTHROPIC_API_KEY"), forgentKey)
 			if apiKey == "" {
-				return nil, "", fmt.Errorf("ANTHROPIC_API_KEY not set")
+				return nil, "", fmt.Errorf("ANTHROPIC_API_KEY or FORGENT_ANTHROPIC not set")
 			}
 		default:
 			return nil, "", fmt.Errorf("unknown provider %q (available: ollama, openrouter, anthropic)", providerFlag)
@@ -52,6 +55,13 @@ func selectProvider(providerFlag, modelFlag string, debug bool) (llm.Provider, s
 		}
 	}
 
+	if forgentAnthropic != "" {
+		p, err := llm.GetProvider("anthropic", forgentAnthropic)
+		if err == nil {
+			return p, "anthropic (via FORGENT_ANTHROPIC)", nil
+		}
+	}
+
 	if key := firstNonEmpty(os.Getenv("OPENROUTER_API_KEY"), forgentKey); key != "" {
 		p, err := llm.GetProvider("openrouter", key)
 		if err == nil {
@@ -66,7 +76,7 @@ func selectProvider(providerFlag, modelFlag string, debug bool) (llm.Provider, s
 		}
 	}
 
-	return nil, "", fmt.Errorf("no LLM provider available. Install Ollama or set OPENROUTER_API_KEY / ANTHROPIC_API_KEY")
+	return nil, "", fmt.Errorf("no LLM provider available. Install Ollama or set FORGENT_ANTHROPIC / OPENROUTER_API_KEY / ANTHROPIC_API_KEY")
 }
 
 func ollamaRunning(debug bool) bool {
