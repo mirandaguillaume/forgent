@@ -45,7 +45,7 @@ func TestOllamaProvider_Complete_ConnectionRefused(t *testing.T) {
 	p := &OllamaProvider{baseURL: "http://localhost:1", model: "llama3", timeout: 2 * time.Second}
 	_, err := p.Complete("test")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "Ollama not running")
+	assert.Contains(t, err.Error(), "ollama not running")
 	assert.Contains(t, err.Error(), "ollama serve")
 }
 
@@ -59,7 +59,7 @@ func TestOllamaProvider_Complete_ModelNotFound(t *testing.T) {
 	p := &OllamaProvider{baseURL: server.URL, model: "nonexistent", timeout: 5 * time.Second}
 	_, err := p.Complete("test")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "Model not available")
+	assert.Contains(t, err.Error(), "model not available")
 	assert.Contains(t, err.Error(), "ollama pull")
 }
 

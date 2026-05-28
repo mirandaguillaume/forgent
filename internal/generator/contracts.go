@@ -28,9 +28,7 @@ func LoadContracts(contractsDir string) map[string]string {
 		}
 		name := entry.Name()
 		name = strings.TrimSuffix(name, ".template.md")
-		if strings.HasSuffix(name, ".md") {
-			name = strings.TrimSuffix(name, ".md")
-		}
+		name = strings.TrimSuffix(name, ".md")
 		contracts[name] = strings.TrimSpace(string(data))
 	}
 
