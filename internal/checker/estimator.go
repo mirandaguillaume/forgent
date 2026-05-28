@@ -6,104 +6,107 @@ import (
 	"github.com/mirandaguillaume/forgent/internal/classifier"
 )
 
-// EstimateCompliance returns a 0.0-1.0 compliance estimate for one instruction
-// on a given harness. The model is additive and transparent:
-//
-//   base(facet) + position_modifier + framing_modifier + verifiability_modifier
-//   + harness_modifier
-//
-// References:
-//   - Position: Liu et al. 2023 "Lost in the Middle" + Veseli et al. 2025
-//   - Negation: IFEval benchmark (Zhou et al. 2023) + empirical community data
-//   - Harness deltas: empirical observation, labeled as estimates
-func EstimateCompliance(ir InstructionResult, harness string) float64 {
-	score := baseScore(ir.Facet)
-	score += positionModifier(ir.Position)
-	score += framingModifier(ir.IsNegative)
-	score += verifiabilityModifier(ir.IsVerifiable)
-	score += harnessModifier(ir, harness)
-	return clamp(score)
-}
+// RiskLevel is a qualitative compliance risk for one instruction on one harness.
+type RiskLevel int
 
-// baseScore by facet — how inherently followable each instruction type is.
-func baseScore(facet classifier.Facet) float64 {
-	switch facet {
-	case classifier.FacetSecurity:
-		return 0.82 // enforced at tool-call level, high reliability
-	case classifier.FacetContext:
-		return 0.78 // passive background knowledge, low violation risk
-	case classifier.FacetStrategy:
-		return 0.72 // behavioral, requires active application
-	case classifier.FacetGuardrails:
-		return 0.68 // prohibitions are harder to follow than prescriptions
-	case classifier.FacetObservability:
-		return 0.65 // often omitted under time pressure
+const (
+	RiskLow    RiskLevel = iota // likely followed
+	RiskMedium                  // one concern
+	RiskHigh                    // multiple concerns, likely ignored
+)
+
+func (r RiskLevel) String() string {
+	switch r {
+	case RiskLow:
+		return "low"
+	case RiskMedium:
+		return "medium"
+	case RiskHigh:
+		return "high"
 	default:
-		return 0.70
+		return "unknown"
 	}
 }
 
-// positionModifier applies the "Lost in the Middle" effect.
-// Instructions in the first or last 25% of the file benefit from primacy/recency.
-// Veseli et al. 2025: effect strongest when context < 50% of window.
-func positionModifier(pos float64) float64 {
-	if pos <= 0.25 {
-		return 0.08 // primacy zone
-	}
-	if pos >= 0.75 {
-		return 0.04 // recency zone (weaker than primacy)
-	}
-	return -0.06 // "lost in the middle"
+// RiskFactors lists the evidence-backed reasons behind a risk level.
+// Each factor maps to a published finding or documented observation.
+type RiskFactors struct {
+	NegativeFraming    bool // IFEval (Zhou et al. 2023): "do not X" harder than "always Y"
+	MiddlePosition     bool // Liu et al. 2023 "Lost in the Middle" + Veseli et al. 2025
+	SemanticConstraint bool // Not statically verifiable → harder to enforce automatically
+	HarnessWeakness    bool // Observed weaker point for this specific harness (empirical, not peer-reviewed)
 }
 
-// framingModifier penalises negative instructions.
-// IFEval shows models handle "do not use X" worse than "always use Y instead".
-// Empirical delta from community benchmarks: ~12-18%.
-func framingModifier(isNegative bool) float64 {
-	if isNegative {
-		return -0.14
+// ActiveFactors returns the list of active risk factor descriptions.
+func (f RiskFactors) ActiveFactors() []string {
+	var out []string
+	if f.NegativeFraming {
+		out = append(out, "negative framing (IFEval, Zhou 2023)")
 	}
-	return 0.0
+	if f.MiddlePosition {
+		out = append(out, "middle of file (Lost in the Middle, Liu 2023)")
+	}
+	if f.SemanticConstraint {
+		out = append(out, "semantic — not statically verifiable")
+	}
+	if f.HarnessWeakness {
+		out = append(out, "empirically weaker on this harness (community observation)")
+	}
+	return out
 }
 
-// verifiabilityModifier rewards instructions that can be checked statically.
-// Verifiable constraints have higher compliance because they are unambiguous.
-func verifiabilityModifier(isVerifiable bool) float64 {
-	if isVerifiable {
-		return 0.08
+// Count returns the number of active risk factors.
+func (f RiskFactors) Count() int {
+	n := 0
+	if f.NegativeFraming {
+		n++
 	}
-	return 0.0
+	if f.MiddlePosition {
+		n++
+	}
+	if f.SemanticConstraint {
+		n++
+	}
+	if f.HarnessWeakness {
+		n++
+	}
+	return n
 }
 
-// harnessModifier applies per-harness adjustments.
-// These are empirical estimates, clearly labeled as such.
-func harnessModifier(ir InstructionResult, harness string) float64 {
+// AssessRisk derives a qualitative risk level from the instruction properties.
+func AssessRisk(ir InstructionResult, harness string) (RiskLevel, RiskFactors) {
+	factors := RiskFactors{
+		NegativeFraming:    ir.IsNegative,
+		MiddlePosition:     ir.Position > 0.25 && ir.Position < 0.75,
+		SemanticConstraint: !ir.IsVerifiable && ir.Facet != classifier.FacetContext,
+		HarnessWeakness:    harnessWeakness(ir, harness),
+	}
+
+	switch factors.Count() {
+	case 0:
+		return RiskLow, factors
+	case 1:
+		return RiskMedium, factors
+	default:
+		return RiskHigh, factors
+	}
+}
+
+// harnessWeakness returns true when this instruction type is an observed
+// weak point for the harness. Labeled as empirical community observation,
+// not peer-reviewed.
+func harnessWeakness(ir InstructionResult, harness string) bool {
 	switch harness {
 	case "copilot":
-		delta := 0.0
-		// Copilot (GPT-based by default) handles negation worse than Claude-based tools.
-		if ir.IsNegative {
-			delta -= 0.08
-		}
-		// Copilot instructions are always-on (no conditional loading like Cursor globs).
-		// Long files dilute individual instruction weight.
-		if ir.Position > 0.5 {
-			delta -= 0.04
-		}
-		return delta
+		// Copilot (GPT-based by default) reported by community as less reliable
+		// on negative constraints and instructions buried in long files.
+		return ir.IsNegative || (ir.Position > 0.5 && ir.Facet == classifier.FacetGuardrails)
 	case "cursor":
-		// Cursor uses Claude or GPT depending on user config.
-		// With Claude: similar to claude-code. We assume mixed fleet → slight discount.
-		if ir.IsNegative {
-			delta := -0.04
-			return delta
-		}
-		return 0.02 // glob filtering means rules are loaded contextually → slight +
-	case "claude-code":
-		// Claude Code with structured CLAUDE.md: baseline, no adjustment.
-		return 0.0
+		// Cursor behavior depends on configured model (Claude or GPT).
+		// Negative constraints flagged as medium concern for non-Claude configs.
+		return ir.IsNegative
 	default:
-		return 0.0
+		return false
 	}
 }
 
@@ -122,11 +125,9 @@ func isNegativeInstruction(text string) bool {
 // isVerifiableInstruction detects statically checkable instructions.
 func isVerifiableInstruction(text string, facet classifier.Facet) bool {
 	t := strings.ToLower(text)
-	// Security constraints are often tool-level verifiable.
 	if facet == classifier.FacetSecurity {
 		return true
 	}
-	// Syntax/format constraints are statically checkable.
 	verifiableKeywords := []string{
 		"tab", "space", "indent", "quote", "semicolon", "comma",
 		"header", "copyright", "import", "export", "type ", "interface",
@@ -140,43 +141,32 @@ func isVerifiableInstruction(text string, facet classifier.Facet) bool {
 	return false
 }
 
-// buildSuggestions generates improvement suggestions for low-compliance instructions.
+// buildSuggestions generates improvement suggestions for risky instructions.
 func buildSuggestions(ir InstructionResult, targets []string) []string {
 	var suggestions []string
 
-	// Suggest positive reframing for negative instructions with low scores.
 	if ir.IsNegative {
 		for _, h := range targets {
-			if score, ok := ir.Scores[h]; ok && score < 0.60 {
+			level, _ := AssessRisk(ir, h)
+			if level >= RiskHigh {
 				suggestions = append(suggestions,
-					"Reframe as positive: \"always use X\" instead of \"never use Y\" (+~14% compliance)")
+					`Reframe as positive — "always do X" instead of "never do Y" (IFEval shows better compliance)`)
 				break
 			}
 		}
 	}
 
-	// Suggest moving critical instructions earlier.
 	if ir.Position > 0.50 && ir.Facet == classifier.FacetGuardrails {
 		suggestions = append(suggestions,
-			"Move to top 25% of file — guardrails in the middle lose compliance (Lost in the Middle, Liu 2023)")
+			"Move to top 25% of file — critical instructions in the middle are less followed (Liu 2023)")
 	}
 
 	return dedupe(suggestions)
 }
 
-func clamp(v float64) float64 {
-	if v < 0.0 {
-		return 0.0
-	}
-	if v > 1.0 {
-		return 1.0
-	}
-	return v
-}
-
 func dedupe(ss []string) []string {
 	seen := make(map[string]bool)
-	out := ss[:0]
+	var out []string
 	for _, s := range ss {
 		if !seen[s] {
 			seen[s] = true
