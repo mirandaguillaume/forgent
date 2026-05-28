@@ -141,8 +141,12 @@ func RunImport(opts ImportOptions) ImportResult {
 // Returns skills, agent, all raw YAML strings (skills first, then agent if
 // present), contracts map, and any error.
 func parseLLMResponse(response string) ([]model.SkillBehavior, *model.AgentComposition, []string, map[string]string, error) {
+	// Strip <think>...</think> blocks (Qwen3 and other chain-of-thought models).
+	cleaned := stripThinkingBlocks(response)
 	// Strip markdown fences.
-	cleaned := stripMarkdownFences(response)
+	cleaned = stripMarkdownFences(cleaned)
+	// Extract JSON object from response — local models often prepend prose.
+	cleaned = extractJSON(cleaned)
 
 	var resp llmResponse
 	if err := json.Unmarshal([]byte(cleaned), &resp); err != nil {
@@ -174,6 +178,38 @@ func parseLLMResponse(response string) ([]model.SkillBehavior, *model.AgentCompo
 	return skills, agent, rawYAMLs, resp.Contracts, nil
 }
 
+// extractJSON finds the outermost JSON object in s, tolerating prose
+// that local models prepend or append before/after the JSON.
+func extractJSON(s string) string {
+	start := strings.Index(s, "{")
+	if start == -1 {
+		return s
+	}
+	end := strings.LastIndex(s, "}")
+	if end == -1 || end < start {
+		return s
+	}
+	return s[start : end+1]
+}
+
+// stripThinkingBlocks removes <think>...</think> blocks emitted by
+// chain-of-thought models (e.g. Qwen3) before the actual response.
+func stripThinkingBlocks(s string) string {
+	for {
+		start := strings.Index(s, "<think>")
+		if start == -1 {
+			break
+		}
+		end := strings.Index(s, "</think>")
+		if end == -1 {
+			s = s[:start]
+			break
+		}
+		s = s[:start] + s[end+len("</think>"):]
+	}
+	return strings.TrimSpace(s)
+}
+
 // stripMarkdownFences removes markdown code fences from a string, handling
 // both ```json and bare ``` markers.
 func stripMarkdownFences(s string) string {
@@ -185,10 +221,7 @@ func stripMarkdownFences(s string) string {
 			s = s[idx+1:]
 		}
 	}
-	// Remove closing fence.
-	if strings.HasSuffix(s, "```") {
-		s = s[:len(s)-3]
-	}
+	s = strings.TrimSuffix(s, "```")
 	return strings.TrimSpace(s)
 }
 
@@ -291,9 +324,7 @@ func collectFeedback(result ImportResult, minScore int) []string {
 		}
 	}
 
-	for _, w := range result.Warnings {
-		feedback = append(feedback, w)
-	}
+	feedback = append(feedback, result.Warnings...)
 
 	return feedback
 }
