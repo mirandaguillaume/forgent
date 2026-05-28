@@ -674,6 +674,10 @@ TTY-aware — detect environment and adapt:
 - **FR52:** Developer can run a controlled runtime-vs-text experiment with reproducible results
 - **FR53:** Contributor can run format fidelity tests for their target generator against a standard test corpus
 
+### External Benchmark Validation
+
+- **FR-SWE:** Forgent-generated agents demonstrate a measurable delta between execution modes (text < runtime ≤ specialists) on SWE-bench, establishing framework value independent of absolute score. Forgent-runtime and Forgent-specialists outperform Forgent-text on SWE-bench by +5-10 pp resolve rate — the delta between conditions proves that structural enforcement (DAG execution, typed I/O contracts, loop bounds, output validation) improves agent effectiveness beyond prompt engineering alone. Measurement: `--level swebench-experiment` in `forgent-bench`, 300 tasks × 3 conditions × bootstrap 95% CI.
+
 ### Ecosystem & Extensibility
 
 - **FR54:** Contributor can add a new target generator by implementing `pkg/spec.TargetGenerator` and registering via `init()`
