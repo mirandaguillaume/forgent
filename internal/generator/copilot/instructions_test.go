@@ -41,7 +41,7 @@ func TestGenerateCopilotInstructions_WithSkills(t *testing.T) {
 	assert.Contains(t, result, "# Project Instructions")
 	assert.Contains(t, result, "## Available Skills")
 	assert.Contains(t, result, "**Code Review**")
-	assert.Contains(t, result, "analytical-based skill")
+	assert.Contains(t, result, "analytical")
 }
 
 func TestGenerateCopilotInstructions_WithAgents(t *testing.T) {

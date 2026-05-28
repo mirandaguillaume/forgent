@@ -47,7 +47,7 @@ func testSkill() model.SkillBehavior {
 func TestGenerateCopilotSkillMd_Frontmatter(t *testing.T) {
 	md := copilot.GenerateCopilotSkillMd(testSkill(), nil)
 	assert.Contains(t, md, "---\nname: code-review\n")
-	assert.Contains(t, md, "description: analytical-based skill")
+	assert.Contains(t, md, "description: analytical")
 }
 
 func TestGenerateCopilotSkillMd_Title(t *testing.T) {
@@ -111,13 +111,8 @@ func TestGenerateCopilotSkillMd_NoGuardrails(t *testing.T) {
 
 func TestGenerateCopilotSkillMd_DescriptionTruncation(t *testing.T) {
 	skill := testSkill()
-	// Create a skill whose description will exceed 1024 chars
-	longItems := make([]string, 200)
-	for i := range longItems {
-		longItems[i] = strings.Repeat("x", 10)
-	}
-	skill.Context.Consumes = longItems
-	skill.Context.Produces = longItems
+	// Create a skill whose approach description exceeds 1024 chars
+	skill.Strategy.Approach = strings.Repeat("a very long approach description ", 40)
 	md := copilot.GenerateCopilotSkillMd(skill, nil)
 
 	// Extract the description from frontmatter
