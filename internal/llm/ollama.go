@@ -17,7 +17,7 @@ import (
 const (
 	ollamaDefaultBaseURL = "http://localhost:11434"
 	ollamaDefaultModel   = "llama3.1:8b-instruct-q5_K_M"
-	ollamaDefaultTimeout = 120 * time.Second
+	ollamaDefaultTimeout = 300 * time.Second
 	ollamaMaxTokens      = 2048
 	ollamaTemperature    = 0.1
 )
@@ -39,6 +39,7 @@ type ollamaRequest struct {
 type ollamaOptions struct {
 	Temperature float64 `json:"temperature"`
 	NumPredict  int     `json:"num_predict"`
+	Think       *bool   `json:"think,omitempty"`
 }
 
 type ollamaResponse struct {
@@ -82,10 +83,10 @@ func (p *OllamaProvider) Complete(prompt string) (string, error) {
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		if isConnectionRefused(err) {
-			return "", fmt.Errorf("Ollama not running. Start with `ollama serve` or use `--provider anthropic`")
+			return "", fmt.Errorf("ollama not running. Start with `ollama serve` or use `--provider anthropic`")
 		}
 		if errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
-			return "", fmt.Errorf("Analysis timed out. Try a smaller model or use `--provider anthropic`")
+			return "", fmt.Errorf("analysis timed out. Try a smaller model or use `--provider anthropic`")
 		}
 		return "", fmt.Errorf("send request: %w", err)
 	}
@@ -97,7 +98,7 @@ func (p *OllamaProvider) Complete(prompt string) (string, error) {
 	}
 
 	if resp.StatusCode == http.StatusNotFound {
-		return "", fmt.Errorf("Model not available. Run `ollama pull %s` or use `--model <available_model>`", p.model)
+		return "", fmt.Errorf("model not available. Run `ollama pull %s` or use `--model <available_model>`", p.model)
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -106,18 +107,18 @@ func (p *OllamaProvider) Complete(prompt string) (string, error) {
 
 	var result ollamaResponse
 	if err := json.Unmarshal(respBody, &result); err != nil {
-		return "", fmt.Errorf("Ollama returned invalid response. Try a different model or use `--provider anthropic`")
+		return "", fmt.Errorf("ollama returned invalid response. Try a different model or use `--provider anthropic`")
 	}
 
 	if result.Error != "" {
 		if strings.Contains(result.Error, "not found") {
-			return "", fmt.Errorf("Model not available. Run `ollama pull %s` or use `--model <available_model>`", p.model)
+			return "", fmt.Errorf("model not available. Run `ollama pull %s` or use `--model <available_model>`", p.model)
 		}
-		return "", fmt.Errorf("Ollama error: %s", result.Error)
+		return "", fmt.Errorf("ollama error: %s", result.Error)
 	}
 
 	if result.Response == "" {
-		return "", fmt.Errorf("Ollama returned empty response. Try a different model or use `--provider anthropic`")
+		return "", fmt.Errorf("ollama returned empty response. Try a different model or use `--provider anthropic`")
 	}
 
 	return result.Response, nil
