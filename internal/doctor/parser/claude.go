@@ -83,15 +83,13 @@ func (p *claudeParser) Validate(original, rewritten []byte) error {
 	}
 
 	// Check all original frontmatter fields are preserved (key + value)
-	if origFM != nil {
-		for key, origVal := range origFM {
-			newVal, ok := newFM[key]
-			if !ok {
-				return fmt.Errorf("rewritten file lost frontmatter field: %s", key)
-			}
-			if fmt.Sprintf("%v", origVal) != fmt.Sprintf("%v", newVal) {
-				return fmt.Errorf("rewritten file changed frontmatter field %s: %v → %v", key, origVal, newVal)
-			}
+	for key, origVal := range origFM {
+		newVal, ok := newFM[key]
+		if !ok {
+			return fmt.Errorf("rewritten file lost frontmatter field: %s", key)
+		}
+		if fmt.Sprintf("%v", origVal) != fmt.Sprintf("%v", newVal) {
+			return fmt.Errorf("rewritten file changed frontmatter field %s: %v → %v", key, origVal, newVal)
 		}
 	}
 

@@ -173,7 +173,11 @@ func generateIndex(analysis *parser.AgentAnalysis, ctx *scanner.CodebaseContext)
 	}
 	if ctx != nil {
 		for _, cmd := range ctx.Commands {
-			b.WriteString(fmt.Sprintf("- **%s:** `%s`\n", strings.Title(cmd.Name), cmd.Command))
+			name := cmd.Name
+			if len(name) > 0 {
+				name = strings.ToUpper(name[:1]) + name[1:]
+			}
+			b.WriteString(fmt.Sprintf("- **%s:** `%s`\n", name, cmd.Command))
 		}
 	}
 	if ctx == nil || (len(ctx.Stack.Languages) == 0 && len(ctx.Commands) == 0) {

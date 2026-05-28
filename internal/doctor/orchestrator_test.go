@@ -11,6 +11,7 @@ import (
 
 	"github.com/mirandaguillaume/forgent/internal/doctor/registry"
 	"github.com/mirandaguillaume/forgent/internal/llm"
+	"github.com/mirandaguillaume/forgent/pkg/dag"
 )
 
 func TestBuildDAG_NodeCount(t *testing.T) {
@@ -281,6 +282,56 @@ You are a test agent.
 	require.NoError(t, err, "DAG should succeed after retry")
 	assert.NotNil(t, result)
 	assert.GreaterOrEqual(t, provider.calls, 2, "provider should be called at least twice (retry happened)")
+}
+
+// TestRunDAG_NamedExtractionFromOutputMap — Story 10-4 T5.8 (AC #6).
+// RunDAG extracts the recommendations result by NAME from the terminal
+// output map. Pinning this contract prevents a future refactor from reverting
+// to a positional/last-step pattern (which would silently emit the wrong
+// recommendation if a sibling terminal node were added).
+//
+// The test feeds a custom DAG whose terminal node produces "recommendations"
+// and proves RunDAG returns that specific value. The "no len(steps)-1"
+// invariant is the guarantee.
+func TestRunDAG_NamedExtractionFromOutputMap(t *testing.T) {
+	want := &DoctorResult{Format: "test-format", LLMFindings: nil}
+
+	customNode := &dag.Node{
+		ID:       "recommendation-builder",
+		Kind:     dag.KindTask,
+		Produces: []string{"recommendations"},
+		Run: func(ctx context.Context, inputs map[string]any) (map[string]any, error) {
+			return map[string]any{"recommendations": want}, nil
+		},
+	}
+	d, err := dag.New(customNode)
+	require.NoError(t, err)
+
+	got, err := RunDAG(context.Background(), d, DoctorInput{}, 0)
+	require.NoError(t, err)
+	assert.Same(t, want, got, "RunDAG must return the *DoctorResult stored under the 'recommendations' key, by name")
+}
+
+// TestRunDAG_MissingNamedKey_ReturnsError — Story 10-4 T5.9 (AC #6).
+// A builder node that produces a different key (typo, bad refactor) must
+// cause RunDAG to surface an explicit error referencing the missing
+// "recommendations" key — NOT silently fall back to "last value" or empty.
+func TestRunDAG_MissingNamedKey_ReturnsError(t *testing.T) {
+	customNode := &dag.Node{
+		ID:       "recommendation-builder",
+		Kind:     dag.KindTask,
+		Produces: []string{"recs"}, // wrong key on purpose
+		Run: func(ctx context.Context, inputs map[string]any) (map[string]any, error) {
+			return map[string]any{"recs": &DoctorResult{}}, nil
+		},
+	}
+	d, err := dag.New(customNode)
+	require.NoError(t, err)
+
+	_, err = RunDAG(context.Background(), d, DoctorInput{}, 0)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "recommendations", "error must name the expected key so the failure mode is debuggable")
+	assert.Contains(t, err.Error(), "missing", "error must signal the missing-key contract violation explicitly")
 }
 
 func TestRunDAG_ExhaustsRetries_ReturnsNodeError(t *testing.T) {
