@@ -1,0 +1,12 @@
+# History for pkg/api/webassets/webassets.go
+commit 2d4f3333: React 19: Build assets with React 19 (#118457) (2026-02-20)
+commit 45438043: FS: Get CDN prefix from configuration (#110615) (2025-09-08)
+commit 8f79e488: Replace usage of http.DefaultClient and http.DefaultTransport (#104135) (2025-05-09)
+commit 759aa12d: Revert "Build swagger ui in seperate webpack build" (#104580) (2025-04-25)
+commit 314e337d: Build swagger ui in seperate webpack build (#102046) (2025-04-25)
+commit cfb46c80: Frontend: Extract CSS imports into files (#94655) (2024-10-16)
+commit 80a69319: WebAssets: improve checks and error messages on dtos (#92093) (2024-08-20)
+commit 427dad26: Swagger: Add a custom swagger/api page (#91785) (2024-08-14)
+commit 95000f9f: fix data race in GetWebAssets (#90939) (2024-07-25)
+commit e9246276: Frontend: Reload the browser when backend configuration/assets change (#79057) (2024-01-04)
+commit ed128ea9: Frontend: Foundations for multi tenant frontend (#78815) (2023-12-05)

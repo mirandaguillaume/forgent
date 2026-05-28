@@ -6,21 +6,33 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/mirandaguillaume/forgent/pkg/schema"
 	"gopkg.in/yaml.v3"
 )
 
 // SlotSpec defines a named data slot in a step's consumes/produces contract.
-// It carries an optional format template that the QualityGate uses to validate
-// that outputs conform to the declared structure.
+// It carries an optional format template or typed schema:
+//
+//   - template / template_file: Markdown structural validation for human-facing outputs.
+//   - schema: Typed field contract for inter-node structured outputs (AC7, NFR40).
+//     When Schema is non-empty the runtime uses ValidateTyped + constrained decoding
+//     instead of the Markdown path; the slot file is written as slots/<key>.json.
+//   - list_schema: Declares that this slot's value is a JSON array ([]any). Each element
+//     must satisfy the FieldSpec. Mutually exclusive with schema. Used by kind: map and
+//     kind: filter steps as their input type; also used by aggregation steps that need
+//     to produce a list for downstream map/filter consumption.
+//     The LLM is instructed to output a JSON array; runtime extracts via extractJSONArray.
 //
 // YAML supports two forms:
 //
 //	shorthand: produces: [bugs]             → SlotSpec{Key: "bugs"}
 //	full form: produces: [{key: bugs, template: "## Bugs\n..."}]
 type SlotSpec struct {
-	Key          string `yaml:"key"`
-	Template     string `yaml:"template,omitempty"`      // inline format template
-	TemplateFile string `yaml:"template_file,omitempty"` // path relative to task file dir
+	Key          string             `yaml:"key"`
+	Template     string             `yaml:"template,omitempty"`      // inline format template
+	TemplateFile string             `yaml:"template_file,omitempty"` // path relative to task file dir
+	Schema       schema.FieldSchema `yaml:"schema,omitempty"`        // typed inter-node schema (object)
+	ListSchema   *schema.FieldSpec  `yaml:"list_schema,omitempty"`   // typed inter-node schema (array)
 }
 
 // UnmarshalYAML supports both shorthand (string) and full-form (map) YAML.
@@ -33,6 +45,8 @@ func (s *SlotSpec) UnmarshalYAML(value *yaml.Node) error {
 		s.Key = value.Value
 		return nil
 	case yaml.MappingNode:
+		// slotAlias avoids infinite recursion; schema.FieldSchema (map type)
+		// is decoded natively by the yaml library.
 		type slotAlias SlotSpec
 		var alias slotAlias
 		if err := value.Decode(&alias); err != nil {

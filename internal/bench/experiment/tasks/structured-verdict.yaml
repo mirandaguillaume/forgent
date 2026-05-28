@@ -1,0 +1,36 @@
+id: structured-verdict
+name: Structured Code Verdict
+description: Review a function and produce a typed structured verdict for downstream processing
+category: code-review
+input: |
+  func divide(a, b int) int {
+    return a / b
+  }
+steps:
+  - id: analyze
+    name: Analyze
+    prompt: |
+      Analyze this Go function. Return a JSON object with:
+      - "ruling": one of "approved", "rejected", "needs-changes"
+      - "severity": one of "low", "medium", "high", "critical"
+      - "rationale": a brief explanation of your decision
+    produces:
+      - key: verdict
+        schema:
+          ruling:
+            type: string
+            enum: [approved, rejected, needs-changes]
+          severity:
+            type: string
+            enum: [low, medium, high, critical]
+          rationale:
+            type: string
+            min_length: 10
+            description: "Brief explanation of the ruling"
+  - id: report
+    name: Report
+    prompt: |
+      Based on the structured verdict, write a human-readable summary report.
+    consumes: [verdict]
+    produces: [report]
+guardrails: []

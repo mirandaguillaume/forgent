@@ -1,0 +1,301 @@
+diff --git a/app/assets/javascripts/admin/controllers/admin-group.js.es6 b/app/assets/javascripts/admin/controllers/admin-group.js.es6
+index 10cee82d99a..6bd8eda6bf3 100644
+--- a/app/assets/javascripts/admin/controllers/admin-group.js.es6
++++ b/app/assets/javascripts/admin/controllers/admin-group.js.es6
+@@ -1,34 +1,69 @@
+ export default Em.ObjectController.extend({
+   needs: ['adminGroups'],
+-  members: null,
+   disableSave: false,
++  usernames: null,
++
++  currentPage: function() {
++    if (this.get("user_count") == 0) { return 0; }
++    return Math.floor(this.get("offset") / this.get("limit")) + 1;
++  }.property("limit", "offset", "user_count"),
++
++  totalPages: function() {
++    if (this.get("user_count") == 0) { return 0; }
++    return Math.floor(this.get("user_count") / this.get("limit")) + 1;
++  }.property("limit", "user_count"),
++
++  showingFirst: Em.computed.lte("currentPage", 1),
++  showingLast: Discourse.computed.propertyEqual("currentPage", "totalPages"),
+ 
+   aliasLevelOptions: function() {
+     return [
+-      { name: I18n.t("groups.alias_levels.nobody"), value: 0},
+-      { name: I18n.t("groups.alias_levels.mods_and_admins"), value: 2},
+-      { name: I18n.t("groups.alias_levels.members_mods_and_admins"), value: 3},
+-      { name: I18n.t("groups.alias_levels.everyone"), value: 99}
++      { name: I18n.t("groups.alias_levels.nobody"), value: 0 },
++      { name: I18n.t("groups.alias_levels.mods_and_admins"), value: 2 },
++      { name: I18n.t("groups.alias_levels.members_mods_and_admins"), value: 3 },
++      { name: I18n.t("groups.alias_levels.everyone"), value: 99 }
+     ];
+   }.property(),
+ 
+-  usernames: function(key, value) {
+-    var members = this.get('members');
+-    if (arguments.length > 1) {
+-      this.set('_usernames', value);
+-    } else {
+-      var usernames;
+-      if(members) {
+-        usernames = members.map(function(user) {
+-          return user.get('username');
+-        }).join(',');
+-      }
+-      this.set('_usernames', usernames);
+-    }
+-    return this.get('_usernames');
+-  }.property('members.@each.username'),
+-
+   actions: {
++    next: function() {
++      if (this.get("showingLast")) { return; }
++
++      var group = this.get("model"),
++          offset = Math.min(group.get("offset") + group.get("limit"), group.get("user_count"));
++
++      group.set("offset", offset);
++
++      return group.findMembers();
++    },
++
++    previous: function() {
++      if (this.get("showingFirst")) { return; }
++
++      var group = this.get("model"),
++          offset = Math.max(group.get("offset") - group.get("limit"), 0);
++
++      group.set("offset", offset);
++
++      return group.findMembers();
++    },
++
++    removeMember: function(member) {
++      var self = this,
++          message = I18n.t("admin.groups.delete_member_confirm", { username: member.get("username"), group: this.get("name") });
++      return bootbox.confirm(message, I18n.t("no_value"), I18n.t("yes_value"), function(confirm) {
++        if (confirm) {
++          self.get("model").removeMember(member);
++        }
++      });
++    },
++
++    addMembers: function() {
++      // TODO: should clear the input
++      if (Em.isEmpty(this.get("usernames"))) { return; }
++      this.get("model").addMembers(this.get("usernames"));
++    },
++
+     save: function() {
+       var self = this,
+           group = this.get('model');
+@@ -37,9 +72,9 @@ export default Em.ObjectController.extend({
+ 
+       var promise;
+       if (group.get('id')) {
+-        promise = group.saveWithUsernames(this.get('usernames'));
++        promise = group.save();
+       } else {
+-        promise = group.createWithUsernames(this.get('usernames')).then(function() {
++        promise = group.create().then(function() {
+           var groupsController = self.get('controllers.adminGroups');
+           groupsController.addObject(group);
+         });
+diff --git a/app/assets/javascripts/admin/routes/admin_group_route.js b/app/assets/javascripts/admin/routes/admin_group_route.js
+index 3de37b38e48..89388e1c323 100644
+--- a/app/assets/javascripts/admin/routes/admin_group_route.js
++++ b/app/assets/javascripts/admin/routes/admin_group_route.js
+@@ -8,16 +8,10 @@ Discourse.AdminGroupRoute = Discourse.Route.extend({
+     return group;
+   },
+ 
+-  afterModel: function(model) {
+-    var self = this;
+-    return model.findMembers().then(function(members) {
+-      self.set('_members', members);
+-    });
+-  },
+-
+   setupController: function(controller, model) {
+-    controller.set('model', model);
+-    controller.set('members', this.get('_members'));
++    controller.set("model", model);
++    model.findMembers();
+   }
++
+ });
+ 
+diff --git a/app/assets/javascripts/admin/templates/group.hbs b/app/assets/javascripts/admin/templates/group.hbs
+index e37eb39a7d0..03d9d697e67 100644
+--- a/app/assets/javascripts/admin/templates/group.hbs
++++ b/app/assets/javascripts/admin/templates/group.hbs
+@@ -1,29 +1,53 @@
+-{{#if automatic}}
+-  <h3>{{name}}</h3>
+-{{else}}
+-  {{text-field value=name placeholderKey="admin.groups.name_placeholder"}}
+-{{/if}}
++<form class="form-horizontal">
+ 
+-<div class="control-group">
+-  <label class="control-label">{{i18n 'admin.groups.group_members'}}</label>
+-  <div class="controls">
+-    {{user-selector usernames=usernames id="group-users" placeholderKey="admin.groups.selector_placeholder" tabindex="1" disabled=automatic}}
++  <div>
++    {{#if automatic}}
++      <h3>{{name}}</h3>
++    {{else}}
++      <label for="name">{{i18n 'admin.groups.name'}}</label>
++      {{text-field name="name" value=name placeholderKey="admin.groups.name_placeholder"}}
++    {{/if}}
+   </div>
+-</div>
+-<div class="control-group">
+-  <div class="controls">
+-    {{input type="checkbox" checked=visible}} {{i18n 'groups.visible'}}
++
++  {{#if id}}
++    <div>
++      <label>{{i18n 'admin.groups.group_members'}} ({{user_count}})</label>
++      <div>
++        <a {{bind-attr class=":previous showingFirst:disabled"}} {{action "previous"}}>{{fa-icon "fast-backward"}}</a>
++        {{currentPage}}/{{totalPages}}
++        <a {{bind-attr class=":next showingLast:disabled"}} {{action "next"}}>{{fa-icon "fast-forward"}}</a>
++      </div>
++      <div class="ac-wrap clearfix">
++        {{each member in members itemView="group-member"}}
++      </div>
++    </div>
++
++    {{#unless automatic}}
++      <div>
++        <label for="user-selector">{{i18n 'admin.groups.add_members'}}</label>
++        {{user-selector usernames=usernames placeholderKey="admin.groups.selector_placeholder" id="user-selector"}}
++        <button {{action "addMembers"}} class='btn add'>{{fa-icon "plus"}} {{i18n 'admin.groups.add'}}</button>
++      </div>
++    {{/unless}}
++  {{/if}}
++
++  <div>
++    <label>
++      {{input type="checkbox" checked=visible}}
++      {{i18n 'groups.visible'}}
++    </label>
+   </div>
+-</div>
+-<div class="control-group">
+-  <label class="control-label">{{i18n 'groups.alias_levels.title'}}</label>
+-  <div class="controls">
+-    {{combo-box valueAttribute="value" value=alias_level content=aliasLevelOptions}}
++
++  <div>
++    <label for="alias">{{i18n 'groups.alias_levels.title'}}</label>
++    {{combo-box name="alias" valueAttribute="value" value=alias_level content=aliasLevelOptions}}
+   </div>
+-</div>
+-<div class='controls'>
+-  <button {{action "save"}} {{bind-attr disabled="disableSave"}} class='btn'>{{i18n 'admin.customize.save'}}</button>
+-  {{#unless automatic}}
+-    <button {{action "destroy"}} class='btn btn-danger'><i class="fa fa-trash-o"></i>{{i18n 'admin.customize.delete'}}</button>
+-  {{/unless}}
+-</div>
++
++  <div class='buttons'>
++    <button {{action "save"}} {{bind-attr disabled="disableSave"}} class='btn btn-primary'>{{i18n 'admin.customize.save'}}</button>
++    {{#unless automatic}}
++      <button {{action "destroy"}} class='btn btn-danger'>{{fa-icon "trash-o"}}{{i18n 'admin.customize.delete'}}</button>
++    {{/unless}}
++  </div>
++
++</form>
+diff --git a/app/assets/javascripts/admin/templates/group_member.hbs b/app/assets/javascripts/admin/templates/group_member.hbs
+new file mode 100644
+index 00000000000..d94f2ebe850
+--- /dev/null
++++ b/app/assets/javascripts/admin/templates/group_member.hbs
+@@ -0,0 +1 @@
++{{avatar member imageSize="small"}} {{member.username}} {{#unless automatic}}<a class='remove' {{action "removeMember" member}}>{{fa-icon "times"}}</a>{{/unless}}
+diff --git a/app/assets/javascripts/admin/views/group-member.js.es6 b/app/assets/javascripts/admin/views/group-member.js.es6
+new file mode 100644
+index 00000000000..7889fd59cf7
+--- /dev/null
++++ b/app/assets/javascripts/admin/views/group-member.js.es6
+@@ -0,0 +1,4 @@
++export default Discourse.View.extend({
++  classNames: ["item"],
++  templateName: "admin/templates/group_member"
++});
+diff --git a/app/assets/javascripts/discourse/models/group.js b/app/assets/javascripts/discourse/models/group.js
+index 669c8f698f8..94930b291e3 100644
+--- a/app/assets/javascripts/discourse/models/group.js
++++ b/app/assets/javascripts/discourse/models/group.js
+@@ -7,53 +7,80 @@
+   @module Discourse
+ **/
+ Discourse.Group = Discourse.Model.extend({
++  limit: 50,
++  offset: 0,
++  user_count: 0,
+ 
+   userCountDisplay: function(){
+     var c = this.get('user_count');
+     // don't display zero its ugly
+-    if(c > 0) {
+-      return c;
+-    }
++    if (c > 0) { return c; }
+   }.property('user_count'),
+ 
+   findMembers: function() {
+-    if (Em.isEmpty(this.get('name'))) { return Ember.RSVP.resolve([]); }
++    if (Em.isEmpty(this.get('name'))) { return ; }
+ 
+-    return Discourse.ajax('/groups/' + this.get('name') + '/members').then(function(result) {
+-      return result.map(function(u) { return Discourse.User.create(u) });
++    var self = this, offset = Math.min(this.get("user_count"), Math.max(this.get("offset"), 0));
++
++    return Discourse.ajax('/groups/' + this.get('name') + '/members.json', {
++      data: {
++        limit: this.get("limit"),
++        offset: offset
++      }
++    }).then(function(result) {
++      self.setProperties({
++        user_count: result.meta.total,
++        limit: result.meta.limit,
++        offset: result.meta.offset,
++        members: result.members.map(function(member) { return Discourse.User.create(member); })
++      });
+     });
+   },
+ 
+-  destroy: function(){
+-    if(!this.get('id')) return;
+-    return Discourse.ajax("/admin/groups/" + this.get('id'), {type: "DELETE"});
++  removeMember: function(member) {
++    var self = this;
++    return Discourse.ajax('/admin/groups/' + this.get('id') + '/members.json', {
++      type: "DELETE",
++      data: { user_id: member.get("id") }
++    }).then(function() {
++      // reload member list
++      self.findMembers();
++    });
+   },
+ 
+-  asJSON: function() {
+-    return { group: {
+-             name: this.get('name'),
+-             alias_level: this.get('alias_level'),
+-             visible: !!this.get('visible'),
+-             usernames: this.get('usernames') } };
++  addMembers: function(usernames) {
++    var self = this;
++    return Discourse.ajax('/admin/groups/' + this.get('id') + '/members.json', {
++      type: "PUT",
++      data: { usernames: usernames }
+... (truncated, 671 more lines)

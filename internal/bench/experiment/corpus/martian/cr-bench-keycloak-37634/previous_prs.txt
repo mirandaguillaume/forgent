@@ -1,0 +1,21 @@
+PR #48560: [quarkus-next] Model tests fail due to ByteBuddy removal from Hiberna…
+  review: LGTM
+PR #48558: Show Groups tab in the account console when user is part of any group
+  review: lgtm
+PR #48544: Ensure read-only multivalued UP attribute is not editable (grayed out…
+  review: Unreported flaky test detected, please review
+  review: Unreported flaky test detected, please review
+PR #48541: [OID4VCI] Move CredentialBuilderTest.java, JwtCredentialBuilderTest.java, SdJwtCredentialBuilderTest.java to the new testsuite
+  review: @pskopek Thanks!
+PR #48538: Block shutdown if the Infinispan cluster is not stable
+  review: Unreported flaky test detected, please review
+PR #48523: Start Keycloak sequentially in model tests
+  review: Unreported flaky test detected, please review
+PR #48520: Move LoginTest to the new testsuite
+  review: Unreported flaky test detected, please review
+PR #48513: Make acceptable AAGUID ckeck in WebAuthn stricter (26.6)
+  review: Unreported flaky test detected, please review
+PR #48512: Conditional modal for passkeys platform authenticator
+  review: Unreported flaky test detected, please review
+  review: 👍 LGTM, I just added one comment
+  review: Thanks @mabartos! Good addition! LGTM! Re-run the failed tests and it' OK to me.

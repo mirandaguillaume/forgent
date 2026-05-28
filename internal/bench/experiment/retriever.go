@@ -44,7 +44,11 @@ func (r PrefixRetriever) Retrieve(step StepDef, sandbox *SandboxFS, consumed []S
 		}
 		data, err := sandbox.Read(step.ID, fmt.Sprintf("slots/%s.md", slot.Key))
 		if err != nil {
-			continue
+			// Typed slots are written as .json — fall back transparently.
+			data, err = sandbox.Read(step.ID, fmt.Sprintf("slots/%s.json", slot.Key))
+			if err != nil {
+				continue
+			}
 		}
 		content := string(data)
 		runes := []rune(content)
@@ -86,7 +90,10 @@ func (r RankedRetriever) Retrieve(step StepDef, sandbox *SandboxFS, consumed []S
 		}
 		data, err := sandbox.Read(step.ID, fmt.Sprintf("slots/%s.md", slot.Key))
 		if err != nil {
-			continue
+			data, err = sandbox.Read(step.ID, fmt.Sprintf("slots/%s.json", slot.Key))
+			if err != nil {
+				continue
+			}
 		}
 		for _, c := range splitChunks(string(data)) {
 			chunks = append(chunks, chunk{slotKey: slot.Key, text: c})

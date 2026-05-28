@@ -1,0 +1,301 @@
+diff --git a/packages/features/bookings/lib/handleCancelBooking.ts b/packages/features/bookings/lib/handleCancelBooking.ts
+index 2e53fd2b46366f..acd85d3d12866d 100644
+--- a/packages/features/bookings/lib/handleCancelBooking.ts
++++ b/packages/features/bookings/lib/handleCancelBooking.ts
+@@ -1,8 +1,6 @@
+ import {
+   BookingStatus,
+   MembershipRole,
+-  Prisma,
+-  PrismaPromise,
+   WebhookTriggerEvents,
+   WorkflowMethods,
+   WorkflowReminder,
+@@ -483,29 +481,18 @@ async function handler(req: NextApiRequest & { userId?: number }) {
+     cancelScheduledJobs(booking);
+   });
+ 
+-  //Workflows - delete all reminders for bookings
+-  const remindersToDelete: PrismaPromise<Prisma.BatchPayload>[] = [];
++  //Workflows - cancel all reminders for cancelled bookings
+   updatedBookings.forEach((booking) => {
+     booking.workflowReminders.forEach((reminder) => {
+-      if (reminder.scheduled && reminder.referenceId) {
+-        if (reminder.method === WorkflowMethods.EMAIL) {
+-          deleteScheduledEmailReminder(reminder.referenceId);
+-        } else if (reminder.method === WorkflowMethods.SMS) {
+-          deleteScheduledSMSReminder(reminder.referenceId);
+-        }
++      if (reminder.method === WorkflowMethods.EMAIL) {
++        deleteScheduledEmailReminder(reminder.id, reminder.referenceId);
++      } else if (reminder.method === WorkflowMethods.SMS) {
++        deleteScheduledSMSReminder(reminder.id, reminder.referenceId);
+       }
+-      const reminderToDelete = prisma.workflowReminder.deleteMany({
+-        where: {
+-          id: reminder.id,
+-        },
+-      });
+-      remindersToDelete.push(reminderToDelete);
+     });
+   });
+ 
+-  const prismaPromises: Promise<unknown>[] = [attendeeDeletes, bookingReferenceDeletes].concat(
+-    remindersToDelete
+-  );
++  const prismaPromises: Promise<unknown>[] = [attendeeDeletes, bookingReferenceDeletes];
+ 
+   await Promise.all(prismaPromises.concat(apiDeletes));
+ 
+diff --git a/packages/features/bookings/lib/handleNewBooking.ts b/packages/features/bookings/lib/handleNewBooking.ts
+index 2149b8395d1857..58b7ea4483e141 100644
+--- a/packages/features/bookings/lib/handleNewBooking.ts
++++ b/packages/features/bookings/lib/handleNewBooking.ts
+@@ -1,5 +1,13 @@
+-import type { App, Credential, EventTypeCustomInput, Prisma } from "@prisma/client";
+-import { BookingStatus, SchedulingType, WebhookTriggerEvents } from "@prisma/client";
++import {
++  App,
++  BookingStatus,
++  Credential,
++  EventTypeCustomInput,
++  Prisma,
++  SchedulingType,
++  WebhookTriggerEvents,
++  WorkflowMethods,
++} from "@prisma/client";
+ import async from "async";
+ import { isValidPhoneNumber } from "libphonenumber-js";
+ import { cloneDeep } from "lodash";
+@@ -28,7 +36,9 @@ import {
+   sendScheduledEmails,
+   sendScheduledSeatsEmails,
+ } from "@calcom/emails";
++import { deleteScheduledEmailReminder } from "@calcom/features/ee/workflows/lib/reminders/emailReminderManager";
+ import { scheduleWorkflowReminders } from "@calcom/features/ee/workflows/lib/reminders/reminderScheduler";
++import { deleteScheduledSMSReminder } from "@calcom/features/ee/workflows/lib/reminders/smsReminderManager";
+ import getWebhooks from "@calcom/features/webhooks/lib/getWebhooks";
+ import { isPrismaObjOrUndefined, parseRecurringEvent } from "@calcom/lib";
+ import { getVideoCallUrl } from "@calcom/lib/CalEventParser";
+@@ -759,6 +769,7 @@ async function handler(req: NextApiRequest & { userId?: number | undefined }) {
+           },
+         },
+         payment: true,
++        workflowReminders: true,
+       },
+     });
+   }
+@@ -950,6 +961,19 @@ async function handler(req: NextApiRequest & { userId?: number | undefined }) {
+   let videoCallUrl;
+ 
+   if (originalRescheduledBooking?.uid) {
++    try {
++      // cancel workflow reminders from previous rescheduled booking
++      originalRescheduledBooking.workflowReminders.forEach((reminder) => {
++        if (reminder.method === WorkflowMethods.EMAIL) {
++          deleteScheduledEmailReminder(reminder.id, reminder.referenceId, true);
++        } else if (reminder.method === WorkflowMethods.SMS) {
++          deleteScheduledSMSReminder(reminder.id, reminder.referenceId);
++        }
++      });
++    } catch (error) {
++      log.error("Error while canceling scheduled workflow reminders", error);
++    }
++
+     // Use EventManager to conditionally use all needed integrations.
+     const updateManager = await eventManager.reschedule(
+       evt,
+diff --git a/packages/features/ee/workflows/api/scheduleEmailReminders.ts b/packages/features/ee/workflows/api/scheduleEmailReminders.ts
+index b1ef72f1f43e0a..5125c9fb1b2ddf 100644
+--- a/packages/features/ee/workflows/api/scheduleEmailReminders.ts
++++ b/packages/features/ee/workflows/api/scheduleEmailReminders.ts
+@@ -7,6 +7,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
+ import dayjs from "@calcom/dayjs";
+ import { defaultHandler } from "@calcom/lib/server";
+ import prisma from "@calcom/prisma";
++import { Prisma, WorkflowReminder } from "@calcom/prisma/client";
+ import { bookingMetadataSchema } from "@calcom/prisma/zod-utils";
+ 
+ import customTemplate, { VariablesType } from "../lib/reminders/templates/customTemplate";
+@@ -39,6 +40,42 @@ async function handler(req: NextApiRequest, res: NextApiResponse) {
+     },
+   });
+ 
++  //cancel reminders for cancelled/rescheduled bookings that are scheduled within the next hour
++  const remindersToCancel = await prisma.workflowReminder.findMany({
++    where: {
++      cancelled: true,
++      scheduledDate: {
++        lte: dayjs().add(1, "hour").toISOString(),
++      },
++    },
++  });
++
++  try {
++    const workflowRemindersToDelete: Prisma.Prisma__WorkflowReminderClient<WorkflowReminder, never>[] = [];
++
++    for (const reminder of remindersToCancel) {
++      await client.request({
++        url: "/v3/user/scheduled_sends",
++        method: "POST",
++        body: {
++          batch_id: reminder.referenceId,
++          status: "cancel",
++        },
++      });
++
++      const workflowReminderToDelete = prisma.workflowReminder.delete({
++        where: {
++          id: reminder.id,
++        },
++      });
++
++      workflowRemindersToDelete.push(workflowReminderToDelete);
++    }
++    await Promise.all(workflowRemindersToDelete);
++  } catch (error) {
++    console.log(`Error cancelling scheduled Emails: ${error}`);
++  }
++
+   //find all unscheduled Email reminders
+   const unscheduledReminders = await prisma.workflowReminder.findMany({
+     where: {
+diff --git a/packages/features/ee/workflows/components/WorkflowStepContainer.tsx b/packages/features/ee/workflows/components/WorkflowStepContainer.tsx
+index 3fd3e6f7f85109..3b13904cdb77e5 100644
+--- a/packages/features/ee/workflows/components/WorkflowStepContainer.tsx
++++ b/packages/features/ee/workflows/components/WorkflowStepContainer.tsx
+@@ -387,81 +387,75 @@ export default function WorkflowStepContainer(props: WorkflowStepProps) {
+                   }}
+                 />
+               </div>
+-              {(isPhoneNumberNeeded || isSenderIdNeeded) && (
++              {isPhoneNumberNeeded && (
+                 <div className="mt-2 rounded-md bg-gray-50 p-4 pt-0">
+-                  {isPhoneNumberNeeded && (
++                  <Label className="pt-4">{t("custom_phone_number")}</Label>
++                  <div className="block sm:flex">
++                    <PhoneInput<FormValues>
++                      control={form.control}
++                      name={`steps.${step.stepNumber - 1}.sendTo`}
++                      placeholder={t("phone_number")}
++                      id={`steps.${step.stepNumber - 1}.sendTo`}
++                      className="min-w-fit sm:rounded-tl-md sm:rounded-bl-md sm:border-r-transparent"
++                      required
++                      onChange={() => {
++                        const isAlreadyVerified = !!verifiedNumbers
++                          ?.concat([])
++                          .find((number) => number === form.getValues(`steps.${step.stepNumber - 1}.sendTo`));
++                        setNumberVerified(isAlreadyVerified);
++                      }}
++                    />
++                    <Button
++                      color="secondary"
++                      disabled={numberVerified || false}
++                      className={classNames(
++                        "-ml-[3px] h-[40px] min-w-fit sm:block sm:rounded-tl-none sm:rounded-bl-none ",
++                        numberVerified ? "hidden" : "mt-3 sm:mt-0"
++                      )}
++                      onClick={() =>
++                        sendVerificationCodeMutation.mutate({
++                          phoneNumber: form.getValues(`steps.${step.stepNumber - 1}.sendTo`) || "",
++                        })
++                      }>
++                      {t("send_code")}
++                    </Button>
++                  </div>
++
++                  {form.formState.errors.steps &&
++                    form.formState?.errors?.steps[step.stepNumber - 1]?.sendTo && (
++                      <p className="mt-1 text-xs text-red-500">
++                        {form.formState?.errors?.steps[step.stepNumber - 1]?.sendTo?.message || ""}
++                      </p>
++                    )}
++                  {numberVerified ? (
++                    <div className="mt-1">
++                      <Badge variant="green">{t("number_verified")}</Badge>
++                    </div>
++                  ) : (
+                     <>
+-                      <Label className="pt-4">{t("custom_phone_number")}</Label>
+-                      <div className="block sm:flex">
+-                        <PhoneInput<FormValues>
+-                          control={form.control}
+-                          name={`steps.${step.stepNumber - 1}.sendTo`}
+-                          placeholder={t("phone_number")}
+-                          id={`steps.${step.stepNumber - 1}.sendTo`}
+-                          className="min-w-fit sm:rounded-tl-md sm:rounded-bl-md sm:border-r-transparent"
+-                          required
+-                          onChange={() => {
+-                            const isAlreadyVerified = !!verifiedNumbers
+-                              ?.concat([])
+-                              .find(
+-                                (number) => number === form.getValues(`steps.${step.stepNumber - 1}.sendTo`)
+-                              );
+-                            setNumberVerified(isAlreadyVerified);
++                      <div className="mt-3 flex">
++                        <TextField
++                          className=" border-r-transparent"
++                          placeholder="Verification code"
++                          value={verificationCode}
++                          onChange={(e) => {
++                            setVerificationCode(e.target.value);
+                           }}
++                          required
+                         />
+                         <Button
+                           color="secondary"
+-                          disabled={numberVerified || false}
+-                          className={classNames(
+-                            "-ml-[3px] h-[40px] min-w-fit sm:block sm:rounded-tl-none sm:rounded-bl-none ",
+-                            numberVerified ? "hidden" : "mt-3 sm:mt-0"
+-                          )}
+-                          onClick={() =>
+-                            sendVerificationCodeMutation.mutate({
++                          className="-ml-[3px] rounded-tl-none rounded-bl-none "
++                          disabled={verifyPhoneNumberMutation.isLoading}
++                          onClick={() => {
++                            verifyPhoneNumberMutation.mutate({
+                               phoneNumber: form.getValues(`steps.${step.stepNumber - 1}.sendTo`) || "",
+-                            })
+-                          }>
+-                          {t("send_code")}
++                              code: verificationCode,
++                            });
++                          }}>
++                          Verify
+                         </Button>
+                       </div>
+-
+-                      {form.formState.errors.steps &&
+-                        form.formState?.errors?.steps[step.stepNumber - 1]?.sendTo && (
+-                          <p className="mt-1 text-xs text-red-500">
+-                            {form.formState?.errors?.steps[step.stepNumber - 1]?.sendTo?.message || ""}
+-                          </p>
+-                        )}
+-                      {numberVerified ? (
+-                        <div className="mt-1">
+-                          <Badge variant="green">{t("number_verified")}</Badge>
+-                        </div>
+-                      ) : (
+-                        <>
+-                          <div className="mt-3 flex">
+-                            <TextField
+-                              className=" border-r-transparent"
+-                              placeholder="Verification code"
+-                              value={verificationCode}
+-                              onChange={(e) => {
+-                                setVerificationCode(e.target.value);
+-                              }}
+-                              required
+-                            />
+-                            <Button
+-                              color="secondary"
+-                              className="-ml-[3px] rounded-tl-none rounded-bl-none "
+-                              disabled={verifyPhoneNumberMutation.isLoading}
+-                              onClick={() => {
+-                                verifyPhoneNumberMutation.mutate({
+-                                  phoneNumber: form.getValues(`steps.${step.stepNumber - 1}.sendTo`) || "",
+-                                  code: verificationCode,
+-                                });
+-                              }}>
+... (truncated, 386 more lines)

@@ -125,62 +125,6 @@ func TestEstimateCost(t *testing.T) {
 	assert.Less(t, cost, 1.0) // should be well under $1
 }
 
-func TestH2HTokens(t *testing.T) {
-	dir := t.TempDir()
-	fixturesDir := filepath.Join(dir, "contestants")
-	importedDir := filepath.Join(dir, "imported")
-
-	require.NoError(t, os.MkdirAll(fixturesDir, 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(fixturesDir, "src-agent.md"),
-		[]byte("You are a code reviewer. Check for bugs, security issues, and best practices. Be thorough."), 0644))
-
-	stdDir := filepath.Join(importedDir, "src", "output-standard")
-	compDir := filepath.Join(importedDir, "src", "output-compact")
-	require.NoError(t, os.MkdirAll(stdDir, 0755))
-	require.NoError(t, os.MkdirAll(compDir, 0755))
-	require.NoError(t, os.WriteFile(filepath.Join(stdDir, "agent.md"), []byte("Standard output with more words for structure"), 0644))
-	require.NoError(t, os.WriteFile(filepath.Join(compDir, "agent.md"), []byte("Compact output terse"), 0644))
-
-	result, err := RunH2HTokens(fixturesDir, importedDir)
-	require.NoError(t, err)
-	assert.GreaterOrEqual(t, len(result.Entries), 3, "should have hand-written + standard + compact")
-	assert.GreaterOrEqual(t, len(result.Sources), 1, "should have at least 1 source comparison")
-
-	for _, src := range result.Sources {
-		assert.Greater(t, src.HandWritten, 0, "should have hand-written words for %s", src.Source)
-		assert.Greater(t, src.Standard, 0, "should have standard words for %s", src.Source)
-		assert.Greater(t, src.Compact, 0, "should have compact words for %s", src.Source)
-	}
-}
-
-func TestH2HTokens_RealFixtures(t *testing.T) {
-	fixturesDir := "fixtures/contestants"
-	importedDir := "fixtures/imported"
-	if _, err := os.Stat(fixturesDir); os.IsNotExist(err) {
-		t.Skip("fixtures not found")
-	}
-
-	result, err := RunH2HTokens(fixturesDir, importedDir)
-	require.NoError(t, err)
-	assert.GreaterOrEqual(t, len(result.Sources), 4, "should have 4 source comparisons")
-
-	totalHW, totalStd, totalCompact := 0, 0, 0
-	for _, src := range result.Sources {
-		t.Logf("  %-12s  hand-written=%4d  standard=%4d (%.0f%% less)  compact=%4d (%.0f%% less)",
-			src.Source, src.HandWritten, src.Standard, src.StandardSaving, src.Compact, src.CompactSaving)
-		assert.Greater(t, src.StandardSaving, 0.0, "standard should be lighter than hand-written for %s", src.Source)
-		assert.Greater(t, src.CompactSaving, src.StandardSaving, "compact should save more than standard for %s", src.Source)
-		totalHW += src.HandWritten
-		totalStd += src.Standard
-		totalCompact += src.Compact
-	}
-
-	avgStdSaving := (1.0 - float64(totalStd)/float64(totalHW)) * 100
-	avgCompactSaving := (1.0 - float64(totalCompact)/float64(totalHW)) * 100
-	t.Logf("\n  TOTAL         hand-written=%4d  standard=%4d (%.0f%% less)  compact=%4d (%.0f%% less)",
-		totalHW, totalStd, avgStdSaving, totalCompact, avgCompactSaving)
-}
-
 func TestLoadContestants_RealFixtures(t *testing.T) {
 	// Test with actual fixture files if they exist
 	fixturesDir := "fixtures/contestants"

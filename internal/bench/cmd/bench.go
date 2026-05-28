@@ -8,22 +8,35 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/fatih/color"
 	"github.com/mirandaguillaume/forgent/internal/bench"
 	"github.com/mirandaguillaume/forgent/internal/bench/experiment"
 	"github.com/mirandaguillaume/forgent/internal/bench/formal"
-	"github.com/mirandaguillaume/forgent/internal/builder"
 	"github.com/mirandaguillaume/forgent/internal/doctor/registry"
 	"github.com/mirandaguillaume/forgent/internal/llm"
-	"github.com/mirandaguillaume/forgent/internal/scanner"
 	yamlloader "github.com/mirandaguillaume/forgent/internal/yaml"
 	"github.com/mirandaguillaume/forgent/pkg/model"
 	"github.com/spf13/cobra"
 )
 
 func init() {
+	convertBaselineCmd := &cobra.Command{
+		Use:   "convert-baseline <text.json> <runtime.json> <out.json>",
+		Short: "Convert legacy experiment JSON files to a BaselineSnapshot for --baseline",
+		Long: `Reads pre-Epic-10 experiment result JSON files ([]TaskResultJSON) and produces
+a BaselineSnapshot compatible with forgent-bench bench --baseline.
+
+Because legacy files predate NodeViolations telemetry, ContractComplianceRate is
+proxied from GuardrailScore (fraction of guardrails respected). Step-level rates
+are derived from step completion fractions across runs.`,
+		Args: cobra.ExactArgs(3),
+		RunE: runConvertBaseline,
+	}
+	rootCmd.AddCommand(convertBaselineCmd)
+
 	benchCmd := &cobra.Command{
 		Use:   "bench <repo-path>",
 		Short: "Benchmark agent composition quality",
@@ -51,9 +64,15 @@ func init() {
 	benchCmd.Flags().String("corpus", "", "Corpus directory for InstructionBench (instruction level)")
 	benchCmd.Flags().String("golden", "", "Golden set YAML for false positive measurement (instruction level)")
 	benchCmd.Flags().String("tasks-dir", "", "Task definitions directory (experiment level)")
+	benchCmd.Flags().String("task", "", "Single task YAML workflow template (experiment level, use with --experiment-corpus)")
+	benchCmd.Flags().String("experiment-corpus", "", "Corpus directory to instantiate the --task template for each entry (experiment level)")
 	benchCmd.Flags().Int("runs", 1, "Runs per task for experiment level")
 	benchCmd.Flags().String("resume", "", "Resume from checkpoint file (empty with --output = auto-detect)")
 	benchCmd.Flags().String("retriever", "none", "Context retriever strategy for experiment level: none|prefix|ranked")
+	benchCmd.Flags().String("conditions", "", "Comma-separated conditions for swebench-experiment: text,runtime (default: text,runtime)")
+	benchCmd.Flags().Bool("agent", false, "Enable agent condition (multi-turn sequential, one LLM call per step, no DAG enforcement)")
+	benchCmd.Flags().String("baseline", "", "Path to a baseline JSON snapshot (saved by --save-baseline) for per-node delta computation. Overrides BENCH_BASELINE env var.")
+	benchCmd.Flags().String("save-baseline", "", "Save per-node compliance metrics to this path after the run (for future --baseline comparisons).")
 	rootCmd.AddCommand(benchCmd)
 }
 
@@ -82,30 +101,22 @@ func runBench(cmd *cobra.Command, args []string) error {
 		return runEvalBench(cmd, repoPath)
 	case "consistency":
 		return runConsistencyBench(cmd, repoPath)
-	case "swebench":
-		return runSWEBenchCmd(cmd, repoPath)
 	case "mutate":
 		return runMutateBench(cmd, repoPath)
 	case "h2h":
 		return runH2HBench(cmd, repoPath)
 	case "h2h-tokens":
 		return runH2HTokensBench(cmd, repoPath)
-	case "swebench-h2h":
-		return runSWEBenchH2HCmd(cmd, repoPath)
-	case "swebench-live":
-		return runSWEBenchLiveCmd(cmd, repoPath)
-	case "swebench-eval":
-		return runSWEBenchEvalCmd(cmd)
+	case "swebench-experiment":
+		return runSWEBenchExperimentCmd(cmd, repoPath)
 	case "instruction":
 		return runInstructionBench(cmd)
 	case "experiment":
-		return runExperimentBench(cmd)
-	case "report":
-		return runReportCmd(cmd, repoPath)
+		return runExperimentBench(cmd, repoPath)
 	case "all":
 		return runAllStructural(cmd, repoPath)
 	default:
-		return fmt.Errorf("unknown level %q (use 'proxy', 'agent', 'token', 'determinism', 'isomorphism', 'formal', 'eval', 'consistency', 'swebench', 'swebench-h2h', 'swebench-live', 'swebench-eval', 'mutate', 'h2h', 'h2h-tokens', 'instruction', 'experiment', or 'all')", level)
+		return fmt.Errorf("unknown level %q (use 'proxy', 'agent', 'token', 'determinism', 'isomorphism', 'formal', 'eval', 'consistency', 'swebench-experiment', 'mutate', 'h2h', 'h2h-tokens', 'instruction', 'experiment', or 'all')", level)
 	}
 }
 
@@ -400,12 +411,14 @@ func printProp(cmd *cobra.Command, pass, fail *color.Color, name string, ok bool
 }
 
 func runEvalBench(cmd *cobra.Command, repoPath string) error {
-	skillsDir, _ := cmd.Flags().GetString("skills")
-	agentsDir, _ := cmd.Flags().GetString("agents")
 	evalTasksFile, _ := cmd.Flags().GetString("eval-tasks")
+	tasksDir, _ := cmd.Flags().GetString("tasks-dir")
 
 	if evalTasksFile == "" {
 		return fmt.Errorf("--eval-tasks is required for eval level")
+	}
+	if tasksDir == "" {
+		return fmt.Errorf("--tasks-dir is required for eval level (task template for composed run)")
 	}
 
 	provider, err := resolveLLMProvider(cmd)
@@ -421,29 +434,53 @@ func runEvalBench(cmd *cobra.Command, repoPath string) error {
 		return err
 	}
 
-	// Build composed prompt
-	tmpDir, err := os.MkdirTemp("", "bench-eval-*")
+	// Load task template — pick the first code-review task (or just the first task).
+	taskDefs, err := experiment.LoadTasks(tasksDir)
 	if err != nil {
-		return err
+		return fmt.Errorf("load task template from %s: %w", tasksDir, err)
 	}
-	defer os.RemoveAll(tmpDir)
-
-	buildResult := builder.RunBuild(
-		filepath.Join(repoPath, skillsDir),
-		filepath.Join(repoPath, agentsDir),
-		tmpDir, "claude", scanner.EnrichNone)
-	if !buildResult.Success {
-		return fmt.Errorf("build failed: %s", buildResult.Error)
+	if len(taskDefs) == 0 {
+		return fmt.Errorf("no task definitions found in %s", tasksDir)
+	}
+	template := taskDefs[0]
+	for _, td := range taskDefs {
+		if td.Category == "claude-code-workflow" {
+			template = td
+			break
+		}
 	}
 
-	composedPrompt, err := readAllFiles(tmpDir)
-	if err != nil {
-		return err
+	// composedFn: inject eval input as pr_diff.patch and run the full pipeline.
+	composedFn := func(input string) (string, error) {
+		taskCopy := template
+		if taskCopy.Workspace != nil {
+			wsCopy := *taskCopy.Workspace
+			newFiles := make([]experiment.WorkspaceFile, len(wsCopy.Files))
+			copy(newFiles, wsCopy.Files)
+			for i := range newFiles {
+				if newFiles[i].Path == "pr_diff.patch" {
+					newFiles[i].Content = input
+				}
+			}
+			wsCopy.Files = newFiles
+			taskCopy.Workspace = &wsCopy
+		}
+		results, err := experiment.RunRuntimeExperiment(experiment.ExperimentConfig{
+			Tasks:    []experiment.TaskDefinition{taskCopy},
+			Provider: provider,
+		})
+		if err != nil {
+			return "", err
+		}
+		if len(results) == 0 {
+			return "", fmt.Errorf("no results from experiment pipeline")
+		}
+		return results[0].CombinedOutput, nil
 	}
 
 	monolithicPrompt := "You are a code reviewer. Review the code for bugs, security issues, performance problems, and best practice violations. Be thorough and specific."
 
-	result, err := bench.RunEval(tasks, composedPrompt, monolithicPrompt, provider)
+	result, err := bench.RunEval(tasks, composedFn, monolithicPrompt, provider)
 	if err != nil {
 		return err
 	}
@@ -505,60 +542,224 @@ func runConsistencyBench(cmd *cobra.Command, repoPath string) error {
 	return nil
 }
 
-func runSWEBenchCmd(cmd *cobra.Command, repoPath string) error {
-	skillsDir, _ := cmd.Flags().GetString("skills")
-	agentsDir, _ := cmd.Flags().GetString("agents")
-
+// runSWEBenchExperimentCmd implements --level swebench-experiment.
+// It bridges the experiment framework (text/runtime conditions via resolve-issue.yaml)
+// with the SWE-bench patch generation + harness evaluation pipeline.
+//
+// Usage:
+//
+//	forgent-bench bench . --level swebench-experiment --swe-size quick5 --task <path/to/resolve-issue.yaml>
+//	forgent-bench bench . --level swebench-experiment --swe-size lite --harness
+//	forgent-bench bench . --level swebench-experiment --swe-size lite --resume <checkpoint.jsonl>
+func runSWEBenchExperimentCmd(cmd *cobra.Command, repoPath string) error {
 	provider, err := resolveLLMProvider(cmd)
 	if err != nil {
 		return err
 	}
 
+	out := cmd.OutOrStdout()
 	bold := color.New(color.Bold)
-	bold.Fprintf(cmd.OutOrStdout(), "SWE-bench Benchmark\n")
+	bold.Fprintf(out, "SWE-bench Experiment (text vs runtime conditions)\n\n")
 
-	// Build composed prompt
-	tmpDir, err := os.MkdirTemp("", "bench-swe-*")
-	if err != nil {
-		return err
-	}
-	defer os.RemoveAll(tmpDir)
-
-	buildResult := builder.RunBuild(
-		filepath.Join(repoPath, skillsDir),
-		filepath.Join(repoPath, agentsDir),
-		tmpDir, "claude", scanner.EnrichNone)
-	if !buildResult.Success {
-		return fmt.Errorf("build failed: %s", buildResult.Error)
-	}
-
-	composedPrompt, err := readAllFiles(tmpDir)
-	if err != nil {
-		return err
-	}
-
+	// Load SWE-bench tasks from JSONL.
 	tasksPath := resolveSWETasksPath(cmd, repoPath)
-	result, err := bench.RunSWEBench(tasksPath, composedPrompt, provider)
+	sweTasks, err := bench.LoadSWETasks(tasksPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("load swebench tasks: %w", err)
+	}
+	fmt.Fprintf(out, "Tasks: %d (from %s)\n", len(sweTasks), filepath.Base(tasksPath))
+
+	// Load resolve-issue.yaml as the task template.
+	// Default location: internal/bench/experiment/tasks/resolve-issue.yaml.
+	taskFile, _ := cmd.Flags().GetString("task")
+	if taskFile == "" {
+		taskFile = filepath.Join(repoPath, "internal/bench/experiment/tasks/resolve-issue.yaml")
+	} else if !filepath.IsAbs(taskFile) {
+		taskFile = filepath.Join(repoPath, taskFile)
+	}
+	taskDir := filepath.Dir(taskFile)
+	allTasks, err := experiment.LoadTasks(taskDir)
+	if err != nil {
+		return fmt.Errorf("load task template: %w", err)
+	}
+	var template experiment.TaskDefinition
+	var found bool
+	for _, t := range allTasks {
+		if t.ID == "resolve-issue" {
+			template = t
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("resolve-issue.yaml not found in %s", taskDir)
+	}
+	fmt.Fprintf(out, "Task template: %s (%d steps, %d tool_nodes)\n",
+		template.ID, len(template.Steps), len(template.ToolNodes))
+
+	// Parse conditions from flag or default.
+	conditionsStr, _ := cmd.Flags().GetString("conditions")
+	var conditions []string
+	if conditionsStr != "" {
+		for _, c := range strings.Split(conditionsStr, ",") {
+			conditions = append(conditions, strings.TrimSpace(c))
+		}
 	}
 
-	for _, d := range result.Details {
-		status := "FAIL"
-		statusColor := color.New(color.FgRed)
-		if d.Applied {
-			status = "PASS"
-			statusColor = color.New(color.FgGreen)
+	// Resolve checkpoint.
+	resumePath, _ := cmd.Flags().GetString("resume")
+	outputPath, _ := cmd.Flags().GetString("output")
+	checkpointPath := resumePath
+	if checkpointPath == "" && outputPath != "" {
+		ext := filepath.Ext(outputPath)
+		base := outputPath
+		if ext != "" {
+			base = strings.TrimSuffix(outputPath, ext)
 		}
-		statusColor.Fprintf(cmd.OutOrStdout(), "  [%s]", status)
-		fmt.Fprintf(cmd.OutOrStdout(), " %s", d.InstanceID)
-		if d.Error != "" {
-			fmt.Fprintf(cmd.OutOrStdout(), " (%s)", d.Error)
-		}
-		fmt.Fprintln(cmd.OutOrStdout())
+		checkpointPath = base + ".checkpoint.jsonl"
+	}
+	if checkpointPath != "" {
+		fmt.Fprintf(out, "Checkpoint: %s\n", checkpointPath)
 	}
 
-	fmt.Fprintf(cmd.OutOrStdout(), "  Resolved: %d/%d (%.1f%%)\n", result.Resolved, result.Tasks, result.Rate)
+	// Harness setup.
+	harnessEnabled, _ := cmd.Flags().GetBool("harness")
+	var harnessCfg *bench.SWEHarnessConfig
+	if harnessEnabled {
+		h := bench.DefaultHarnessConfig()
+		// Update dataset name based on --swe-size.
+		sweSize, _ := cmd.Flags().GetString("swe-size")
+		switch sweSize {
+		case "lite":
+			h.DatasetName = "princeton-nlp/SWE-bench_Lite"
+		case "verified":
+			h.DatasetName = "princeton-nlp/SWE-bench_Verified"
+		case "pro":
+			h.DatasetName = "ScaleAI/SWE-bench_Pro"
+		}
+		harnessCfg = &h
+		fmt.Fprintf(out, "Harness: %s\n", h.DatasetName)
+	}
+
+	fmt.Fprintf(out, "\nRunning %d tasks", len(sweTasks))
+	if len(conditions) > 0 {
+		fmt.Fprintf(out, " × %s", strings.Join(conditions, "/"))
+	} else {
+		fmt.Fprintf(out, " × text/runtime")
+	}
+	fmt.Fprintf(out, "...\n\n")
+
+	expCfg := bench.SWEBenchExperimentConfig{
+		Tasks:         sweTasks,
+		Template:      template,
+		Provider:      provider,
+		Conditions:    conditions,
+		CheckpointPath: checkpointPath,
+		HarnessConfig:  harnessCfg,
+		StepModelOverride: resolveStepModelFactory(cmd),
+		OnProgress: func(task, condition string, result bench.SWETaskResult) {
+			status := "no patch"
+			if result.Patch != "" {
+				status = "patch"
+			}
+			if result.Applied {
+				status = "applied"
+			}
+			if result.TestPassed {
+				status = "resolved"
+			}
+			if result.Error != "" {
+				status = "error: " + result.Error
+			}
+			fmt.Fprintf(out, "  [%s/%s] %s\n", condition, status, task)
+		},
+	}
+
+	result, err := bench.RunSWEBenchExperiment(expCfg)
+	if err != nil {
+		return fmt.Errorf("swebench experiment: %w", err)
+	}
+
+	// Print non-fatal warnings (e.g. harness failures).
+	for _, w := range result.Warnings {
+		fmt.Fprintf(out, "WARN: %s\n", w)
+	}
+
+	// Print results table.
+	// "Formatted" = patch != "" (format check only, not a real git apply).
+	// "Resolved"  = TestPassed via official harness (requires --harness).
+	fmt.Fprintf(out, "\n%-12s %8s %10s %8s\n", "Condition", "Patched", "Formatted", "Resolved")
+	fmt.Fprintf(out, "%s\n", strings.Repeat("-", 44))
+	finalConditions := conditions
+	if len(finalConditions) == 0 {
+		finalConditions = []string{"text", "runtime"}
+	}
+	for _, cond := range finalConditions {
+		fmt.Fprintf(out, "%-12s %7.1f%% %9.1f%% %7.1f%%\n",
+			cond,
+			result.PatchRate(cond),
+			result.ApplyRate(cond),
+			result.ResolveRate(cond),
+		)
+	}
+
+	// Compute and print bootstrap CI for delta between first two conditions.
+	if len(finalConditions) >= 2 {
+		condA, condB := finalConditions[0], finalConditions[1]
+		resA := result.Results[condA]
+		resB := result.Results[condB]
+		if len(resA) == len(resB) && len(resA) > 0 {
+			resolvedA := make([]bool, len(resA))
+			resolvedB := make([]bool, len(resB))
+			for i := range resA {
+				if harnessEnabled {
+					resolvedA[i] = resA[i].TestPassed
+					resolvedB[i] = resB[i].TestPassed
+				} else {
+					resolvedA[i] = resA[i].Applied
+					resolvedB[i] = resB[i].Applied
+				}
+			}
+			lo, hi := experiment.BootstrapCI(resolvedA, resolvedB, 10_000)
+			var deltaA, deltaB float64
+			if harnessEnabled {
+				deltaA = result.ResolveRate(condA)
+				deltaB = result.ResolveRate(condB)
+			} else {
+				deltaA = result.ApplyRate(condA)
+				deltaB = result.ApplyRate(condB)
+			}
+			delta := deltaB - deltaA
+			metric := "formatted"
+			if harnessEnabled {
+				metric = "resolved"
+			}
+			fmt.Fprintf(out, "\nDelta %s (%s vs %s): %+.1f pp\n", metric, condB, condA, delta)
+			fmt.Fprintf(out, "Bootstrap 95%% CI: [%+.1f%%, %+.1f%%]\n", lo*100, hi*100)
+			if lo > 0 || hi < 0 {
+				fmt.Fprintf(out, "Statistically significant: YES (CI does not include 0)\n")
+			} else {
+				fmt.Fprintf(out, "Statistically significant: NO (CI includes 0)\n")
+			}
+		}
+	}
+
+	// Write predictions.jsonl per condition.
+	if outputPath != "" {
+		for _, cond := range finalConditions {
+			ext := filepath.Ext(outputPath)
+			base := outputPath
+			if ext != "" {
+				base = strings.TrimSuffix(outputPath, ext)
+			}
+			predPath := base + "-predictions-" + cond + ".jsonl"
+			if wErr := bench.WriteSWEPredictions(predPath, cond, result.Results[cond]); wErr != nil {
+				fmt.Fprintf(out, "warn: write predictions for %s: %v\n", cond, wErr)
+			} else {
+				fmt.Fprintf(out, "Predictions written: %s\n", predPath)
+			}
+		}
+	}
 
 	return nil
 }
@@ -694,6 +895,32 @@ func resolveLLMProvider(cmd *cobra.Command) (llm.Provider, error) {
 	return llm.GetProviderWithModel(providerName, apiKey, modelName)
 }
 
+// resolveStepModelFactory returns a factory that creates providers with per-step
+// model overrides. Uses the same provider name and API key as resolveLLMProvider.
+func resolveStepModelFactory(cmd *cobra.Command) func(model string) (llm.Provider, error) {
+	providerName, _ := cmd.Flags().GetString("provider")
+	if providerName == "" {
+		if resolveEnvKey("ANTHROPIC_API_KEY", "ANTHROPIC_FORGENT_API_KEY") != "" {
+			providerName = "anthropic"
+		} else if resolveEnvKey("OPENROUTER_API_KEY", "OPENROUTER_FORGENT_API_KEY") != "" {
+			providerName = "openrouter"
+		}
+	}
+	var apiKey string
+	switch providerName {
+	case "anthropic":
+		apiKey = resolveEnvKey("ANTHROPIC_API_KEY", "ANTHROPIC_FORGENT_API_KEY")
+	case "openrouter":
+		apiKey = resolveEnvKey("OPENROUTER_API_KEY", "OPENROUTER_FORGENT_API_KEY")
+	}
+	if providerName == "" || apiKey == "" {
+		return nil
+	}
+	return func(model string) (llm.Provider, error) {
+		return llm.GetProviderWithModel(providerName, apiKey, model)
+	}
+}
+
 func runMutateBench(cmd *cobra.Command, repoPath string) error {
 	bold := color.New(color.Bold)
 	bold.Fprintln(cmd.OutOrStdout(), "Mutation Testing (gremlins)")
@@ -740,444 +967,8 @@ func runMutateBench(cmd *cobra.Command, repoPath string) error {
 	return nil
 }
 
-func runSWEBenchH2HCmd(cmd *cobra.Command, repoPath string) error {
-	provider, err := resolveLLMProvider(cmd)
-	if err != nil {
-		return err
-	}
 
-	out := cmd.OutOrStdout()
-	bold := color.New(color.Bold)
-	bold.Fprintf(out, "SWE-bench Head-to-Head Benchmark (live pipeline)\n\n")
 
-	tasksPath, _ := cmd.Flags().GetString("tasks")
-	if tasksPath == "" {
-		tasksPath = resolveSWETasksPath(cmd, repoPath)
-	}
-
-	// Phase 1: Pipeline each hand-written SWE-bench agent → import → build
-	fixturesDir := resolveFixturesDir(cmd, filepath.Join(repoPath, "internal/bench/fixtures/swebench-agents"))
-	agentFiles, err := filepath.Glob(filepath.Join(fixturesDir, "*.md"))
-	if err != nil {
-		return fmt.Errorf("glob swe agent files: %w", err)
-	}
-	if len(agentFiles) == 0 {
-		return fmt.Errorf("no agent .md files found in %s", fixturesDir)
-	}
-
-	var allContestants []bench.SWEContestant
-	for _, agentPath := range agentFiles {
-		name := strings.TrimSuffix(filepath.Base(agentPath), ".md")
-		fmt.Fprintf(out, "Pipeline: %s ...", name)
-
-		pr, pErr := bench.RunPipeline(agentPath, provider)
-		if pErr != nil {
-			fmt.Fprintf(out, " FAIL (%v)\n", pErr)
-			continue
-		}
-		fmt.Fprintf(out, " ok (import %s, build %s) → %dw / %dw / %dw\n",
-			pr.ImportTime.Round(time.Millisecond), pr.BuildTime.Round(time.Millisecond),
-			pr.HandWritten.Words, pr.Standard.Words, pr.Compact.Words)
-
-		allContestants = append(allContestants,
-			bench.SWEContestant{Name: pr.HandWritten.Name, Prompt: pr.HandWritten.Prompt, Words: pr.HandWritten.Words},
-			bench.SWEContestant{Name: pr.Standard.Name, Prompt: pr.Standard.Prompt, Words: pr.Standard.Words},
-			bench.SWEContestant{Name: pr.Compact.Name, Prompt: pr.Compact.Prompt, Words: pr.Compact.Words},
-		)
-	}
-
-	if len(allContestants) == 0 {
-		return fmt.Errorf("no contestants produced — all pipelines failed")
-	}
-
-	// Phase 2: SWE-bench evaluation
-	// Detect if the real SWE-bench harness is available
-	harnessBin := "/tmp/swebench-env/bin/python"
-	useHarness := false
-	if _, statErr := os.Stat(harnessBin); statErr == nil {
-		// Verify swebench is importable
-		checkCmd := exec.Command(harnessBin, "-c", "import swebench")
-		if checkCmd.Run() == nil {
-			useHarness = true
-		}
-	}
-
-	// Pick dataset name for harness based on --swe-size
-	sweSize, _ := cmd.Flags().GetString("swe-size")
-	datasetName := "princeton-nlp/SWE-bench_Verified"
-	switch sweSize {
-	case "lite":
-		datasetName = "princeton-nlp/SWE-bench_Lite"
-	case "live":
-		datasetName = "SWE-bench-Live/SWE-bench-Live"
-	}
-
-	if useHarness {
-		bold.Fprintf(out, "Harness: swebench (Docker + real tests) ✓\n\n")
-	} else {
-		fmt.Fprintf(out, "Harness: git apply --check only (install swebench for real resolve rate)\n\n")
-	}
-
-	fmt.Fprintf(out, "%-35s %8s %8s %8s %10s %6s\n",
-		"Contestant", "Patched", "Applied", "Resolved", "Efficiency", "Words")
-	fmt.Fprintf(out, "%s\n", strings.Repeat("-", 83))
-
-	progress := func(completed, total int, c bench.SWEContestantResult) {
-		applyColor := color.New(color.FgGreen)
-		if c.ApplyRate < 30 {
-			applyColor = color.New(color.FgYellow)
-		}
-		if c.ApplyRate < 10 {
-			applyColor = color.New(color.FgRed)
-		}
-		resolveStr := "—"
-		if c.ResolveRate > 0 {
-			resolveStr = fmt.Sprintf("%.0f%%", c.ResolveRate)
-		}
-		fmt.Fprintf(out, "%-35s %7.0f%% ", c.Name, c.PatchRate)
-		applyColor.Fprintf(out, "%7.0f%%", c.ApplyRate)
-		fmt.Fprintf(out, " %8s %10.1f %6d  [%d/%d]\n",
-			resolveStr, c.Efficiency, c.Words, completed, total)
-	}
-
-	var result *bench.SWEH2HResult
-	if useHarness {
-		cfg := bench.SWEHarnessConfig{
-			PythonBin:   harnessBin,
-			DatasetName: datasetName,
-			MaxWorkers:  4,
-		}
-		result, err = bench.RunSWEBenchH2HWithHarness(allContestants, tasksPath, provider, cfg, progress)
-	} else {
-		result, err = bench.RunSWEBenchH2HWithContestants(allContestants, tasksPath, provider, progress)
-	}
-	if err != nil {
-		return err
-	}
-
-	fmt.Fprintf(out, "\n")
-	bold.Fprintf(out, "Task Details:\n")
-	for _, c := range result.Contestants {
-		fmt.Fprintf(out, "\n  %s:\n", c.Name)
-		for _, d := range c.Details {
-			status := "FAIL"
-			if d.TestPassed {
-				status = "RSLV"
-			} else if d.Applied {
-				status = "APPL"
-			} else if d.Patch != "" {
-				status = "NOAP"
-			}
-			errInfo := ""
-			if d.Error != "" && len(d.Error) > 60 {
-				errInfo = " (" + d.Error[:60] + "...)"
-			} else if d.Error != "" {
-				errInfo = " (" + d.Error + ")"
-			}
-			fmt.Fprintf(out, "    [%s] %-40s%s\n", status, d.InstanceID, errInfo)
-		}
-	}
-
-	return nil
-}
-
-func runSWEBenchLiveCmd(cmd *cobra.Command, repoPath string) error {
-	provider, err := resolveLLMProvider(cmd)
-	if err != nil {
-		return err
-	}
-
-	out := cmd.OutOrStdout()
-	bold := color.New(color.Bold)
-	bold.Fprintf(out, "SWE-bench Live Benchmark (Claude Code runtime)\n\n")
-
-	// Check Claude CLI is available
-	cfg := bench.DefaultClaudeRunConfig()
-	if err := bench.CheckClaudeInstalled(cfg.ClaudeBin); err != nil {
-		return fmt.Errorf("claude CLI not available: %w", err)
-	}
-
-	// Configure model from flags
-	modelName, _ := cmd.Flags().GetString("model")
-	cfg.Model = modelName
-
-	// Load SWE-bench tasks
-	tasksPath := resolveSWETasksPath(cmd, repoPath)
-	tasks, err := bench.LoadSWEBenchTasks(tasksPath)
-	if err != nil {
-		return fmt.Errorf("load tasks: %w", err)
-	}
-
-	// Apply size limit
-	sweSize, _ := cmd.Flags().GetString("swe-size")
-	switch sweSize {
-	case "quick5":
-		if len(tasks) > 5 {
-			tasks = tasks[:5]
-		}
-	case "sample":
-		if len(tasks) > 10 {
-			tasks = tasks[:10]
-		}
-	}
-
-	fmt.Fprintf(out, "Tasks: %d (from %s)\n", len(tasks), filepath.Base(tasksPath))
-	fmt.Fprintf(out, "Model: %s\n", cfg.Model)
-	fmt.Fprintf(out, "Budget: $%.2f per task\n\n", cfg.MaxBudgetUSD)
-
-	// Parse --only filter early to skip unnecessary work
-	onlyFlag, _ := cmd.Flags().GetString("only")
-	var allowedSet map[string]bool
-	if onlyFlag != "" {
-		allowedSet = make(map[string]bool)
-		for _, name := range strings.Split(onlyFlag, ",") {
-			allowedSet[strings.TrimSpace(name)] = true
-		}
-	}
-	wantContestant := func(name string) bool {
-		return allowedSet == nil || allowedSet[name]
-	}
-
-	// Phase 1: Load Epoch v2.0 scaffold (baseline)
-	fixturesDir := resolveFixturesDir(cmd, filepath.Join(repoPath, "internal/bench/fixtures/swebench-agents"))
-	scaffoldPath := filepath.Join(fixturesDir, "epoch-v2-scaffold.md")
-	if _, statErr := os.Stat(scaffoldPath); statErr != nil {
-		return fmt.Errorf("epoch-v2-scaffold.md not found at %s", scaffoldPath)
-	}
-
-	scaffoldData, err := os.ReadFile(scaffoldPath)
-	if err != nil {
-		return fmt.Errorf("read scaffold: %w", err)
-	}
-	scaffoldPrompt := strings.TrimSpace(string(scaffoldData))
-	scaffoldWords := len(strings.Fields(scaffoldPrompt))
-
-	var contestants []bench.ClaudeContestant
-
-	if wantContestant("epoch-v2-original") {
-		contestants = append(contestants, bench.ClaudeContestant{Name: "epoch-v2-original", Prompt: scaffoldPrompt, Words: scaffoldWords})
-		fmt.Fprintf(out, "  Epoch v2 scaffold: %d words\n", scaffoldWords)
-	}
-
-	// Phase 1a: Import via Forgent pipeline (only if imported contestants are wanted)
-	needImport := wantContestant("forgent-imported") || wantContestant("forgent-imported-compact")
-	if needImport {
-		fmt.Fprintf(out, "Phase 1a: Import Epoch v2 scaffold via Forgent pipeline...\n")
-		pr, pErr := bench.RunPipeline(scaffoldPath, provider)
-		if pErr != nil {
-			return fmt.Errorf("pipeline failed: %w", pErr)
-		}
-		fmt.Fprintf(out, "  Import: %s, Build: %s\n", pr.ImportTime.Round(time.Millisecond), pr.BuildTime.Round(time.Millisecond))
-		if wantContestant("forgent-imported") {
-			fmt.Fprintf(out, "  Forgent imported:  %d words\n", pr.Standard.Words)
-			contestants = append(contestants, bench.ClaudeContestant{Name: "forgent-imported", Prompt: pr.Standard.Prompt, Words: pr.Standard.Words})
-		}
-		if wantContestant("forgent-imported-compact") {
-			fmt.Fprintf(out, "  Forgent imported-compact: %d words\n", pr.Compact.Words)
-			contestants = append(contestants, bench.ClaudeContestant{Name: "forgent-imported-compact", Prompt: pr.Compact.Prompt, Words: pr.Compact.Words})
-		}
-	}
-
-	// Phase 1b: Build hand-crafted skills (deterministic, no LLM)
-	needHandcrafted := wantContestant("handcrafted") || wantContestant("handcrafted-compact")
-	handcraftedDir := filepath.Join(filepath.Dir(fixturesDir), "handcrafted-swe")
-	handSkillsDir := filepath.Join(handcraftedDir, "skills")
-	handAgentsDir := filepath.Join(handcraftedDir, "agents")
-	if needHandcrafted {
-		if _, statErr := os.Stat(handSkillsDir); statErr != nil {
-			return fmt.Errorf("handcrafted skills not found at %s", handSkillsDir)
-		}
-		fmt.Fprintf(out, "Phase 1b: Build hand-crafted skills...\n")
-		for _, compact := range []bool{false, true} {
-			name := "handcrafted"
-			if compact {
-				name = "handcrafted-compact"
-			}
-			if !wantContestant(name) {
-				continue
-			}
-
-			tmpOut, tErr := os.MkdirTemp("", "forgent-handcrafted-*")
-			if tErr != nil {
-				continue
-			}
-			defer os.RemoveAll(tmpOut)
-
-			br := builder.RunBuildWithOptions(handSkillsDir, handAgentsDir, tmpOut, "claude", scanner.EnrichNone, compact)
-			if !br.Success {
-				fmt.Fprintf(out, "  Warning: handcrafted build failed: %s\n", br.Error)
-				continue
-			}
-
-			// Read generated agent prompt
-			agentFiles, _ := filepath.Glob(filepath.Join(tmpOut, "agents", "*.md"))
-			if len(agentFiles) == 0 {
-				continue
-			}
-			agentData, rErr := os.ReadFile(agentFiles[0])
-			if rErr != nil {
-				continue
-			}
-			prompt := strings.TrimSpace(string(agentData))
-			words := len(strings.Fields(prompt))
-			fmt.Fprintf(out, "  %s: %d words\n", name, words)
-			contestants = append(contestants, bench.ClaudeContestant{Name: name, Prompt: prompt, Words: words})
-		}
-	}
-	fmt.Fprintf(out, "\n")
-
-	if len(contestants) == 0 {
-		return fmt.Errorf("no contestants selected (check --only flag)")
-	}
-
-	// Phase 2: Run comparison via Claude Code
-	bold.Fprintf(out, "Phase 2: Running Claude Code comparison (%d contestants x %d tasks)...\n\n", len(contestants), len(tasks))
-
-	results, err := bench.RunClaudeComparison(
-		contestants, tasks, cfg,
-		func(label string, r bench.ClaudeRunContestantResult) {
-			fmt.Fprintf(out, "  %s: %d/%d patched, %d/%d files match gold (overlap %.0f%%)\n",
-				r.Name, r.Patched, r.Tasks, r.FilesMatch, r.Tasks, r.AvgOverlap)
-		},
-	)
-	if err != nil {
-		return err
-	}
-
-	// Phase 3: Results table
-	fmt.Fprintf(out, "\n")
-	bold.Fprintf(out, "Results:\n")
-	fmt.Fprintf(out, "%-25s %6s %8s %10s %9s %6s\n", "System", "Tasks", "Patched", "FilesMatch", "Overlap", "Words")
-	fmt.Fprintf(out, "%s\n", strings.Repeat("-", 70))
-	for _, r := range results {
-		fmt.Fprintf(out, "%-25s %6d %7.0f%% %9.0f%% %8.0f%% %6d\n",
-			r.Name, r.Tasks, r.PatchRate, r.MatchRate, r.AvgOverlap, r.Words)
-	}
-
-	// Compare each Forgent variant against baseline (first contestant)
-	if len(results) >= 2 {
-		baseline := results[0]
-		fmt.Fprintf(out, "\n")
-		for _, r := range results[1:] {
-			diff := r.MatchRate - baseline.MatchRate
-			label := fmt.Sprintf("%s vs %s:", r.Name, baseline.Name)
-			if diff > 0 {
-				color.New(color.FgGreen, color.Bold).Fprintf(out, "%s +%.1f%% file match rate\n", label, diff)
-			} else if diff < 0 {
-				color.New(color.FgRed).Fprintf(out, "%s %.1f%% file match rate\n", label, diff)
-			} else {
-				fmt.Fprintf(out, "%s same file match rate\n", label)
-			}
-		}
-
-		// Detail per task (all contestants)
-		fmt.Fprintf(out, "\nTask Details:\n")
-		// Header
-		fmt.Fprintf(out, "  %-40s", "Instance")
-		for _, r := range results {
-			fmt.Fprintf(out, " %-18s", r.Name)
-		}
-		fmt.Fprintf(out, "\n  %s\n", strings.Repeat("-", 40+19*len(results)))
-		// Rows
-		for i := range tasks {
-			fmt.Fprintf(out, "  %-40s", tasks[i].InstanceID)
-			for _, r := range results {
-				fmt.Fprintf(out, " %-18s", taskLabel(r.Details, i))
-			}
-			fmt.Fprintf(out, "\n")
-			// Errors
-			for _, r := range results {
-				if i < len(r.Details) && r.Details[i].Error != "" && !r.Details[i].Applied {
-					fmt.Fprintf(out, "    %s: %s\n", r.Name, truncateBenchStr(r.Details[i].Error, 90))
-				}
-			}
-		}
-
-		fmt.Fprintf(out, "\n  Legend: EXACT=identical to gold, MATCH=right files, PARTIAL=some files, WRONG=wrong files, FAIL=no patch\n")
-	}
-
-	// Phase 4: Export predictions.jsonl for each contestant
-	fmt.Fprintf(out, "\n")
-	for _, r := range results {
-		predFile := fmt.Sprintf("predictions-%s.jsonl", strings.ReplaceAll(r.Name, "/", "_"))
-		if err := bench.WriteClaudePredictions(predFile, r.Name, r.Details); err != nil {
-			fmt.Fprintf(out, "Warning: failed to write %s: %v\n", predFile, err)
-			continue
-		}
-		bold.Fprintf(out, "Predictions: %s\n", predFile)
-	}
-
-	// Phase 5: Optionally run SWE-bench harness
-	runHarness, _ := cmd.Flags().GetBool("harness")
-	if runHarness {
-		fmt.Fprintf(out, "\n")
-		bold.Fprintf(out, "Phase 5: Running SWE-bench harness...\n")
-
-		harnessCfg := bench.DefaultHarnessConfig()
-		for _, r := range results {
-			predFile := fmt.Sprintf("predictions-%s.jsonl", strings.ReplaceAll(r.Name, "/", "_"))
-			runID := strings.ReplaceAll(r.Name, "/", "_")
-			fmt.Fprintf(out, "  Evaluating %s...", r.Name)
-
-			resolved, hErr := bench.RunHarnessEvaluation(harnessCfg, predFile, runID)
-			if hErr != nil {
-				fmt.Fprintf(out, " FAIL (%v)\n", hErr)
-				continue
-			}
-			resolveRate := float64(len(resolved)) / float64(r.Tasks) * 100
-			fmt.Fprintf(out, " %d/%d resolved (%.1f%%)\n", len(resolved), r.Tasks, resolveRate)
-		}
-	} else {
-		fmt.Fprintf(out, "\nTip: re-evaluate with harness: forgent bench . --level swebench-eval --predictions predictions-<name>.jsonl\n")
-	}
-
-	return nil
-}
-
-func runSWEBenchEvalCmd(cmd *cobra.Command) error {
-	out := cmd.OutOrStdout()
-	bold := color.New(color.Bold)
-
-	predictionsPath, _ := cmd.Flags().GetString("predictions")
-	if predictionsPath == "" {
-		return fmt.Errorf("--predictions flag is required for swebench-eval level")
-	}
-	if _, err := os.Stat(predictionsPath); err != nil {
-		return fmt.Errorf("predictions file not found: %s", predictionsPath)
-	}
-
-	bold.Fprintf(out, "SWE-bench Harness Evaluation\n\n")
-	fmt.Fprintf(out, "Predictions: %s\n", predictionsPath)
-
-	harnessCfg := bench.DefaultHarnessConfig()
-	sweSize, _ := cmd.Flags().GetString("swe-size")
-	switch sweSize {
-	case "lite":
-		harnessCfg.DatasetName = "princeton-nlp/SWE-bench_Lite"
-	case "live":
-		harnessCfg.DatasetName = "princeton-nlp/SWE-bench"
-	default:
-		harnessCfg.DatasetName = "princeton-nlp/SWE-bench_Verified"
-	}
-	fmt.Fprintf(out, "Dataset: %s\n\n", harnessCfg.DatasetName)
-
-	runID := "forgent-eval"
-	fmt.Fprintf(out, "Running harness (this may take a while)...\n")
-	resolved, err := bench.RunHarnessEvaluation(harnessCfg, predictionsPath, runID)
-	if err != nil {
-		return fmt.Errorf("harness evaluation failed: %w", err)
-	}
-
-	bold.Fprintf(out, "\nResults: %d instances resolved\n", len(resolved))
-	if len(resolved) > 0 {
-		fmt.Fprintf(out, "\nResolved instances:\n")
-		for id := range resolved {
-			fmt.Fprintf(out, "  %s\n", id)
-		}
-	}
-
-	return nil
-}
 
 func runH2HBench(cmd *cobra.Command, repoPath string) error {
 	provider, err := resolveLLMProvider(cmd)
@@ -1500,10 +1291,27 @@ func runInstructionBench(cmd *cobra.Command) error {
 	return nil
 }
 
-func runExperimentBench(cmd *cobra.Command) error {
+func runExperimentBench(cmd *cobra.Command, repoPath string) error {
 	tasksDir, _ := cmd.Flags().GetString("tasks-dir")
-	if tasksDir == "" {
-		return fmt.Errorf("--tasks-dir is required for experiment level")
+	taskFile, _ := cmd.Flags().GetString("task")
+	corpusDir, _ := cmd.Flags().GetString("experiment-corpus")
+
+	// Resolve relative paths against repoPath so the binary can be run from any directory.
+	if taskFile != "" && !filepath.IsAbs(taskFile) {
+		taskFile = filepath.Join(repoPath, taskFile)
+	}
+	if corpusDir != "" && !filepath.IsAbs(corpusDir) {
+		corpusDir = filepath.Join(repoPath, corpusDir)
+	}
+	if tasksDir != "" && !filepath.IsAbs(tasksDir) {
+		tasksDir = filepath.Join(repoPath, tasksDir)
+	}
+
+	if tasksDir == "" && taskFile == "" {
+		return fmt.Errorf("--tasks-dir or --task is required for experiment level")
+	}
+	if taskFile != "" && corpusDir == "" {
+		return fmt.Errorf("--task requires --experiment-corpus")
 	}
 
 	modelName, _ := cmd.Flags().GetString("model")
@@ -1512,6 +1320,7 @@ func runExperimentBench(cmd *cobra.Command) error {
 	resumePath, _ := cmd.Flags().GetString("resume")
 	harnessEnabled, _ := cmd.Flags().GetBool("harness")
 	retrieverFlag, _ := cmd.Flags().GetString("retriever")
+	agentEnabled, _ := cmd.Flags().GetBool("agent")
 
 	// Build third-condition retriever (nil = no third condition)
 	var thirdRetriever experiment.ContextRetriever
@@ -1530,9 +1339,18 @@ func runExperimentBench(cmd *cobra.Command) error {
 		return fmt.Errorf("experiment requires an LLM provider: %w", err)
 	}
 
-	allTasks, err := experiment.LoadTasks(tasksDir)
-	if err != nil {
-		return fmt.Errorf("load tasks: %w", err)
+	var allTasks []experiment.TaskDefinition
+	if taskFile != "" {
+		allTasks, err = experiment.LoadCorpus(taskFile, corpusDir)
+		if err != nil {
+			return fmt.Errorf("load corpus: %w", err)
+		}
+		fmt.Fprintf(os.Stderr, "Loaded %d corpus entries from %s\n", len(allTasks), corpusDir)
+	} else {
+		allTasks, err = experiment.LoadTasks(tasksDir)
+		if err != nil {
+			return fmt.Errorf("load tasks: %w", err)
+		}
 	}
 
 	// Filter tasks by --only flag
@@ -1602,6 +1420,7 @@ func runExperimentBench(cmd *cobra.Command) error {
 
 	textSkipMap := experiment.BuildSkipMap(existingEntries, "text")
 	runtimeSkipMap := experiment.BuildSkipMap(existingEntries, "runtime")
+	agentSkipMap := experiment.BuildSkipMap(existingEntries, "agent")
 	var rankedSkipMap map[string]int
 	if thirdConditionLabel != "" {
 		rankedSkipMap = experiment.BuildSkipMap(existingEntries, thirdConditionLabel)
@@ -1612,6 +1431,9 @@ func runExperimentBench(cmd *cobra.Command) error {
 	} else {
 		fmt.Fprintf(os.Stderr, "Running experiment: %d tasks, %d runs per task (per-task pairing)...\n", len(tasks), runs)
 	}
+	if agentEnabled {
+		fmt.Fprintf(os.Stderr, "Agent condition enabled: multi-turn sequential (1 LLM call/step, no DAG enforcement)\n")
+	}
 	if thirdRetriever != nil {
 		fmt.Fprintf(os.Stderr, "Third condition: %s retriever\n", thirdConditionLabel)
 	}
@@ -1621,70 +1443,115 @@ func runExperimentBench(cmd *cobra.Command) error {
 		priorRankedResults = experiment.ExtractResults(existingEntries, thirdConditionLabel)
 	}
 
-	// Per-task execution: text + runtime [+ ranked] for each task before moving to next.
-	var newTextResults, newRuntimeResults, newRankedResults []experiment.TaskResult
+	// Per-task execution: text + runtime [+ agent] [+ ranked] for each task before moving to next.
+	var newTextResults, newRuntimeResults, newAgentResults, newRankedResults []experiment.TaskResult
+	var priorAgentResults []experiment.TaskResult
+	if agentEnabled {
+		priorAgentResults = experiment.ExtractResults(existingEntries, "agent")
+	}
 
 	for i, task := range tasks {
 		fmt.Fprintf(os.Stderr, "\n── Task %d/%d: %s ──\n", i+1, len(tasks), task.ID)
 
-		// Text condition for this task
-		singleTextConfig := experiment.ExperimentConfig{
-			Tasks:       []experiment.TaskDefinition{task},
-			Provider:    provider,
-			Model:       modelName,
-			RunsPerTask: runs,
-			SkipMap:     map[string]int{task.ID: textSkipMap[task.ID]},
-			OnResult: func(r experiment.TaskResult, run int) {
-				if cpWriter != nil {
-					if err := cpWriter.Append(experiment.CheckpointEntry{
-						TaskID:    r.TaskID,
-						Condition: "text",
-						Run:       run,
-						Result:    experiment.ToResultJSON(r),
-					}); err != nil {
-						fmt.Fprintf(os.Stderr, "warn: checkpoint append text/%s/run%d: %v\n", r.TaskID, run, err)
+		// Run all conditions concurrently for this task.
+		var (
+			textRes  []experiment.TaskResult
+			rtRes    []experiment.TaskResult
+			agentRes []experiment.TaskResult
+			textErr  error
+			rtErr    error
+			agentErr error
+			mu       sync.Mutex
+		)
+		var wg sync.WaitGroup
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			cfg := experiment.ExperimentConfig{
+				Tasks:       []experiment.TaskDefinition{task},
+				Provider:    provider,
+				Model:       modelName,
+				RunsPerTask: runs,
+				SkipMap:     map[string]int{task.ID: textSkipMap[task.ID]},
+				OnResult: func(r experiment.TaskResult, run int) {
+					if cpWriter != nil {
+						mu.Lock()
+						defer mu.Unlock()
+						if err := cpWriter.Append(experiment.CheckpointEntry{TaskID: r.TaskID, Condition: "text", Run: run, Result: experiment.ToResultJSON(r)}); err != nil {
+							fmt.Fprintf(os.Stderr, "warn: checkpoint append text/%s/run%d: %v\n", r.TaskID, run, err)
+						}
 					}
-				}
-			},
-		}
-		textRes, err := experiment.RunTextExperiment(singleTextConfig)
-		newTextResults = append(newTextResults, textRes...)
-		if err != nil {
-			if errors.Is(err, experiment.ErrAPIFatal) {
-				fmt.Fprintf(os.Stderr, "  ✗ API credits/auth exhausted during text condition — saving partial results\n")
-				break
+				},
 			}
-			return fmt.Errorf("text experiment task %s: %w", task.ID, err)
+			textRes, textErr = experiment.RunTextExperiment(cfg)
+		}()
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			cfg := experiment.ExperimentConfig{
+				Tasks:             []experiment.TaskDefinition{task},
+				Provider:          provider,
+				Model:             modelName,
+				RunsPerTask:       runs,
+				SkipMap:           map[string]int{task.ID: runtimeSkipMap[task.ID]},
+				StepModelOverride: resolveStepModelFactory(cmd),
+				OnResult: func(r experiment.TaskResult, run int) {
+					if cpWriter != nil {
+						mu.Lock()
+						defer mu.Unlock()
+						if err := cpWriter.Append(experiment.CheckpointEntry{TaskID: r.TaskID, Condition: "runtime", Run: run, Result: experiment.ToResultJSON(r)}); err != nil {
+							fmt.Fprintf(os.Stderr, "warn: checkpoint append runtime/%s/run%d: %v\n", r.TaskID, run, err)
+						}
+					}
+				},
+			}
+			rtRes, rtErr = experiment.RunRuntimeExperiment(cfg)
+		}()
+
+		if agentEnabled {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				cfg := experiment.ExperimentConfig{
+					Tasks:       []experiment.TaskDefinition{task},
+					Provider:    provider,
+					Model:       modelName,
+					RunsPerTask: runs,
+					SkipMap:     map[string]int{task.ID: agentSkipMap[task.ID]},
+					Condition:   "agent",
+					OnResult: func(r experiment.TaskResult, run int) {
+						if cpWriter != nil {
+							mu.Lock()
+							defer mu.Unlock()
+							if err := cpWriter.Append(experiment.CheckpointEntry{TaskID: r.TaskID, Condition: "agent", Run: run, Result: experiment.ToResultJSON(r)}); err != nil {
+								fmt.Fprintf(os.Stderr, "warn: checkpoint append agent/%s/run%d: %v\n", r.TaskID, run, err)
+							}
+						}
+					},
+				}
+				agentRes, agentErr = experiment.RunAgentExperiment(cfg)
+			}()
 		}
 
-		// Runtime condition for this task
-		singleRTConfig := experiment.ExperimentConfig{
-			Tasks:       []experiment.TaskDefinition{task},
-			Provider:    provider,
-			Model:       modelName,
-			RunsPerTask: runs,
-			SkipMap:     map[string]int{task.ID: runtimeSkipMap[task.ID]},
-			OnResult: func(r experiment.TaskResult, run int) {
-				if cpWriter != nil {
-					if err := cpWriter.Append(experiment.CheckpointEntry{
-						TaskID:    r.TaskID,
-						Condition: "runtime",
-						Run:       run,
-						Result:    experiment.ToResultJSON(r),
-					}); err != nil {
-						fmt.Fprintf(os.Stderr, "warn: checkpoint append runtime/%s/run%d: %v\n", r.TaskID, run, err)
-					}
-				}
-			},
-		}
-		rtRes, err := experiment.RunRuntimeExperiment(singleRTConfig)
+		wg.Wait()
+
+		newTextResults = append(newTextResults, textRes...)
 		newRuntimeResults = append(newRuntimeResults, rtRes...)
-		if err != nil {
-			if errors.Is(err, experiment.ErrAPIFatal) {
-				fmt.Fprintf(os.Stderr, "  ✗ API credits/auth exhausted during runtime condition — saving partial results\n")
-				break
+		newAgentResults = append(newAgentResults, agentRes...)
+
+		// Check for fatal API errors — any condition aborting aborts the whole run.
+		for _, e := range []error{textErr, rtErr, agentErr} {
+			if errors.Is(e, experiment.ErrAPIFatal) {
+				fmt.Fprintf(os.Stderr, "  ✗ API credits/auth exhausted — saving partial results\n")
+				goto doneLoop
 			}
-			return fmt.Errorf("runtime experiment task %s: %w", task.ID, err)
+		}
+		for cond, e := range map[string]error{"text": textErr, "runtime": rtErr, "agent": agentErr} {
+			if e != nil && !errors.Is(e, experiment.ErrAPIFatal) {
+				return fmt.Errorf("%s experiment task %s: %w", cond, task.ID, e)
+			}
 		}
 
 		// Third condition (ranked/prefix) if requested
@@ -1725,6 +1592,9 @@ func runExperimentBench(cmd *cobra.Command) error {
 		}
 
 		completedMsg := fmt.Sprintf("  ✓ %s complete: %d text + %d runtime runs", task.ID, len(textRes), len(rtRes))
+		if agentEnabled {
+			completedMsg += fmt.Sprintf(" + %d agent runs", len(agentRes))
+		}
 		if thirdRetriever != nil {
 			completedMsg += fmt.Sprintf(" + %d %s runs", len(rkRes), thirdConditionLabel)
 		}
@@ -1738,17 +1608,25 @@ func runExperimentBench(cmd *cobra.Command) error {
 			dm := interim.DetectionRate
 			textComp := experiment.CompletionRatePublic(accumText)
 			rtComp := experiment.CompletionRatePublic(accumRT)
-			fmt.Fprintf(os.Stderr, "  ── Interim (%d/%d tasks) ── completion: text %.0f%% / runtime %.0f%% | detection: %d/%d caught",
-				i+1, len(tasks), textComp*100, rtComp*100, dm.AnyCaught, dm.AnyFailures)
+			interimMsg := fmt.Sprintf("  ── Interim (%d/%d tasks) ── completion: text %.0f%% / runtime %.0f%%",
+				i+1, len(tasks), textComp*100, rtComp*100)
+			if agentEnabled {
+				agentAccum := append(priorAgentResults, newAgentResults...)
+				agentComp := experiment.CompletionRatePublic(agentAccum)
+				interimMsg += fmt.Sprintf(" / agent %.0f%%", agentComp*100)
+			}
+			fmt.Fprintf(os.Stderr, "%s | detection: %d/%d caught", interimMsg, dm.AnyCaught, dm.AnyFailures)
 			if dm.AnyFailures > 0 {
 				fmt.Fprintf(os.Stderr, " (%.0f%%)", dm.AnyRate*100)
 			}
 			fmt.Fprintf(os.Stderr, "\n")
 		}
 	}
+doneLoop:
 
 	textResults := append(priorTextResults, newTextResults...)
 	runtimeResults := append(priorRuntimeResults, newRuntimeResults...)
+	agentResults := append(priorAgentResults, newAgentResults...)
 	rankedResults := append(priorRankedResults, newRankedResults...)
 
 	// Flush condition snapshots
@@ -1775,6 +1653,19 @@ func runExperimentBench(cmd *cobra.Command) error {
 			}
 		}
 
+		if len(agentResults) > 0 {
+			agJSON := make([]experiment.TaskResultJSON, len(agentResults))
+			for i, r := range agentResults {
+				agJSON[i] = experiment.ToResultJSON(r)
+			}
+			flushPath = strings.TrimSuffix(outputPath, filepath.Ext(outputPath)) + ".agent.json"
+			if data, jsonErr := json.MarshalIndent(agJSON, "", "  "); jsonErr == nil {
+				if err := os.WriteFile(flushPath, data, 0644); err != nil {
+					fmt.Fprintf(os.Stderr, "warn: flush agent snapshot to %s: %v\n", flushPath, err)
+				}
+			}
+		}
+
 		if len(rankedResults) > 0 {
 			rkJSON := make([]experiment.TaskResultJSON, len(rankedResults))
 			for i, r := range rankedResults {
@@ -1792,14 +1683,44 @@ func runExperimentBench(cmd *cobra.Command) error {
 	// Compare + report
 	fmt.Fprintf(os.Stderr, "Comparing results...\n")
 	var comparison *experiment.ComparisonResult
-	if len(rankedResults) > 0 {
+	switch {
+	case len(agentResults) > 0 && len(rankedResults) > 0:
+		// Both agent and ranked: prefer agent as the primary third condition.
+		comparison = experiment.CompareThree(textResults, runtimeResults, agentResults)
+	case len(agentResults) > 0:
+		comparison = experiment.CompareThree(textResults, runtimeResults, agentResults)
+	case len(rankedResults) > 0:
 		comparison = experiment.CompareThree(textResults, runtimeResults, rankedResults)
-	} else {
+	default:
 		comparison = experiment.Compare(textResults, runtimeResults)
 	}
 
+	// Baseline delta: flag > env var > none.
+	baselinePath, _ := cmd.Flags().GetString("baseline")
+	if baselinePath == "" {
+		baselinePath = os.Getenv("BENCH_BASELINE")
+	}
+	if baselinePath != "" {
+		if bs, bErr := experiment.LoadBaseline(baselinePath); bErr != nil {
+			fmt.Fprintf(os.Stderr, "warn: baseline unavailable (%s): %v\n", baselinePath, bErr)
+		} else {
+			experiment.ApplyBaseline(comparison.NodeMetrics, bs)
+		}
+	}
+
+	// Save baseline if requested.
+	saveBaselinePath, _ := cmd.Flags().GetString("save-baseline")
+	if saveBaselinePath != "" {
+		if sErr := experiment.SaveBaseline(saveBaselinePath, comparison, "forgent-bench run"); sErr != nil {
+			fmt.Fprintf(os.Stderr, "warn: save-baseline failed (%s): %v\n", saveBaselinePath, sErr)
+		} else {
+			fmt.Fprintf(os.Stderr, "Baseline saved to %s\n", saveBaselinePath)
+		}
+	}
+
 	report := experiment.FormatReport(comparison, experiment.ReportOpts{
-		Model: modelName,
+		Model:        modelName,
+		BaselinePath: baselinePath,
 	})
 
 	if outputPath != "" {
@@ -1816,134 +1737,101 @@ func runExperimentBench(cmd *cobra.Command) error {
 
 // readAllFiles concatenates all files in a directory tree.
 
-func runReportCmd(cmd *cobra.Command, repoPath string) error {
-	provider, err := resolveLLMProvider(cmd)
+
+
+func runConvertBaseline(_ *cobra.Command, args []string) error {
+	textPath, runtimePath, outPath := args[0], args[1], args[2]
+
+	// Parse both legacy JSON files as []TaskResultJSON.
+	readLegacy := func(path string) ([]experiment.TaskResultJSON, error) {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil, fmt.Errorf("read %s: %w", path, err)
+		}
+		var entries []experiment.TaskResultJSON
+		if err := json.Unmarshal(data, &entries); err != nil {
+			return nil, fmt.Errorf("parse %s: %w", path, err)
+		}
+		return entries, nil
+	}
+
+	textEntries, err := readLegacy(textPath)
 	if err != nil {
 		return err
 	}
-
-	out := cmd.OutOrStdout()
-	bold := color.New(color.Bold)
-	bold.Fprintf(out, "Generating Full Benchmark Report\n\n")
-
-	// Phase 1: Pipeline all agents
-	fixturesDir := resolveFixturesDir(cmd, filepath.Join(repoPath, "internal/bench/fixtures/swebench-agents"))
-	agentFiles, err := filepath.Glob(filepath.Join(fixturesDir, "*.md"))
+	runtimeEntries, err := readLegacy(runtimePath)
 	if err != nil {
-		return fmt.Errorf("glob agent files: %w", err)
+		return err
 	}
-	if len(agentFiles) == 0 {
-		return fmt.Errorf("no agent .md files found in %s", fixturesDir)
+	all := append(textEntries, runtimeEntries...)
+
+	// Accumulate per (taskID, condition): guardrail_score sum + step completion counts.
+	type key struct{ taskID, condition string }
+	type acc struct {
+		ccrSum        float64
+		runs          int
+		stepCompleted map[string]int
+		stepTotal     map[string]int
+	}
+	accs := map[key]*acc{}
+	for _, e := range all {
+		k := key{e.TaskID, e.Condition}
+		if accs[k] == nil {
+			accs[k] = &acc{
+				stepCompleted: map[string]int{},
+				stepTotal:     map[string]int{},
+			}
+		}
+		a := accs[k]
+		a.ccrSum += e.GuardrailScore // CCR proxy: 1.0 - guardrail_failure_fraction = guardrail_score
+		a.runs++
+		for _, sr := range e.StepResults {
+			a.stepTotal[sr.StepID]++
+			if sr.Completed {
+				a.stepCompleted[sr.StepID]++
+			}
+		}
 	}
 
-	var allContestants []bench.SWEContestant
-	var agentNames []string
-	for _, agentPath := range agentFiles {
-		name := strings.TrimSuffix(filepath.Base(agentPath), ".md")
-		fmt.Fprintf(out, "Pipeline: %s ...", name)
-
-		pr, pErr := bench.RunPipeline(agentPath, provider)
-		if pErr != nil {
-			fmt.Fprintf(out, " FAIL (%v)\n", pErr)
+	// Build NodeComplianceRates: task-level (for T1.3 assertion) + step-level (for per-node delta).
+	nodeRates := map[string]map[string]float64{}
+	setRate := func(nodeID, condition string, rate float64) {
+		if nodeRates[nodeID] == nil {
+			nodeRates[nodeID] = map[string]float64{}
+		}
+		nodeRates[nodeID][condition] = rate
+	}
+	for k, a := range accs {
+		if a.runs == 0 {
 			continue
 		}
-		fmt.Fprintf(out, " ok → %dw / %dw / %dw\n",
-			pr.HandWritten.Words, pr.Standard.Words, pr.Compact.Words)
-		agentNames = append(agentNames, name)
-
-		allContestants = append(allContestants,
-			bench.SWEContestant{Name: pr.HandWritten.Name, Prompt: pr.HandWritten.Prompt, Words: pr.HandWritten.Words},
-			bench.SWEContestant{Name: pr.Standard.Name, Prompt: pr.Standard.Prompt, Words: pr.Standard.Words},
-			bench.SWEContestant{Name: pr.Compact.Name, Prompt: pr.Compact.Prompt, Words: pr.Compact.Words},
-		)
+		avgCCR := a.ccrSum / float64(a.runs)
+		setRate(k.taskID, k.condition, avgCCR)
+		for stepID, total := range a.stepTotal {
+			if total == 0 {
+				continue
+			}
+			setRate(stepID, k.condition, float64(a.stepCompleted[stepID])/float64(total))
+		}
 	}
 
-	if len(allContestants) == 0 {
-		return fmt.Errorf("no contestants produced — all pipelines failed")
+	bs := experiment.BaselineSnapshot{
+		CapturedAt:          "2026-04-16",
+		Description:         "Sonnet baseline (pre-Epic-10 keyword guardrails; CCR proxied from GuardrailScore)",
+		NodeComplianceRates: nodeRates,
+	}
+	if err := experiment.WriteBaselineSnapshot(outPath, bs); err != nil {
+		return fmt.Errorf("write baseline: %w", err)
 	}
 
-	report := bench.BenchReport{
-		Timestamp: time.Now(),
-		Agents:    agentNames,
-		Errors:    make(map[string]string),
-	}
-
-	// Phase 2: Run SWE-bench
-	fmt.Fprintf(out, "\nRunning SWE-bench...")
-	tasksPath := resolveSWETasksPath(cmd, repoPath)
-	sweResult, sweErr := bench.RunSWEBenchH2HWithContestants(allContestants, tasksPath, provider, nil)
-	if sweErr != nil {
-		fmt.Fprintf(out, " FAIL (%v)\n", sweErr)
-		report.Errors["swebench"] = sweErr.Error()
-	} else {
-		fmt.Fprintf(out, " done (%d tasks)\n", sweResult.Tasks)
-		report.SWEBench = sweResult
-	}
-
-	// Phase 3: Generate report
-	md := bench.GenerateReport(report)
-	reportPath := fmt.Sprintf("bench-report-%s.md", time.Now().Format("2006-01-02"))
-	if err := os.WriteFile(reportPath, []byte(md), 0644); err != nil {
-		return fmt.Errorf("write report: %w", err)
-	}
-
-	fmt.Fprintf(out, "\n")
-	bold.Fprintf(out, "Report written to %s\n", reportPath)
-	fmt.Fprintf(out, "\n%s", md)
-
+	fmt.Printf("Baseline written to %s (%d node/condition pairs)\n", outPath, countPairs(nodeRates))
 	return nil
 }
 
-func taskLabel(details []bench.ClaudeRunResult, i int) string {
-	if i >= len(details) {
-		return "FAIL"
+func countPairs(nodeRates map[string]map[string]float64) int {
+	n := 0
+	for _, conds := range nodeRates {
+		n += len(conds)
 	}
-	d := details[i]
-	if !d.Applied {
-		return "FAIL"
-	}
-	if d.ExactMatch {
-		return "EXACT (100%)"
-	}
-	if d.FilesMatch {
-		return fmt.Sprintf("MATCH (%.0f%%)", d.FileOverlap*100)
-	}
-	if d.FileOverlap > 0 {
-		return fmt.Sprintf("PARTIAL (%.0f%%)", d.FileOverlap*100)
-	}
-	return "WRONG (0%)"
-}
-
-func truncateBenchStr(s string, maxLen int) string {
-	s = strings.ReplaceAll(s, "\n", " ")
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen] + "..."
-}
-
-func readAllFiles(dir string) (string, error) {
-	var parts []string
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || info.IsDir() {
-			return err
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		parts = append(parts, string(data))
-		return nil
-	})
-	if err != nil {
-		return "", err
-	}
-	result := ""
-	for i, p := range parts {
-		if i > 0 {
-			result += "\n\n---\n\n"
-		}
-		result += p
-	}
-	return result, nil
+	return n
 }

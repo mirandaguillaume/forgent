@@ -6,6 +6,162 @@ import (
 	"sort"
 )
 
+// ComputeNodeMetrics aggregates per-node contract compliance and Theory A/B
+// violation breakdowns across the three experimental conditions (text, runtime,
+// ranked). The ranked slice may be nil when only two conditions are present.
+//
+// For each (node, condition) pair it:
+//   - counts the runs that exercised the node (StepResults OR NodeViolations)
+//   - takes the mean ContractComplianceRate from those runs
+//   - for each ViolationType observed: computes AttemptedPct, PreventedPct,
+//     and SpontaneouslyCompliantPct across runs (fraction semantics, not counts)
+//
+// Empty or nil inputs return []NodeMetrics{} (not nil — stable for JSON marshalling).
+// Result sorted ascending by (NodeID, Condition).
+func ComputeNodeMetrics(text, runtime, ranked []TaskResult) []NodeMetrics {
+	type key struct{ nodeID, condition string }
+	type nodeAcc struct {
+		runs          int
+		complianceSum float64
+		perRunRates   []float64      // individual CCR per run, for bootstrapCI
+		vtAttempted   map[string]int // violation type → runs with ≥1 attempt
+		vtPrevented   map[string]int // violation type → runs with ≥1 prevention
+	}
+
+	accs := map[key]*nodeAcc{}
+
+	collect := func(results []TaskResult, condition string) {
+		for _, r := range results {
+			// Discover all node IDs exercised by this run.
+			nodesSeen := make(map[string]bool)
+			for _, sr := range r.StepResults {
+				nodesSeen[sr.StepID] = true
+			}
+			for _, v := range r.NodeViolations {
+				nodesSeen[v.NodeID] = true
+			}
+
+			for nodeID := range nodesSeen {
+				k := key{nodeID, condition}
+				if accs[k] == nil {
+					accs[k] = &nodeAcc{
+						vtAttempted: make(map[string]int),
+						vtPrevented: make(map[string]int),
+					}
+				}
+				a := accs[k]
+				a.runs++
+				a.complianceSum += r.ContractComplianceRate
+				a.perRunRates = append(a.perRunRates, r.ContractComplianceRate)
+
+				// One boolean per violation type per run (dedup within a run).
+				vtAttemptedThisRun := make(map[string]bool)
+				vtPreventedThisRun := make(map[string]bool)
+				for _, v := range r.NodeViolations {
+					if v.NodeID != nodeID {
+						continue
+					}
+					if v.Attempted {
+						vtAttemptedThisRun[v.ViolationType] = true
+					}
+					if v.Prevented {
+						vtPreventedThisRun[v.ViolationType] = true
+					}
+				}
+				for vt := range vtAttemptedThisRun {
+					a.vtAttempted[vt]++
+				}
+				for vt := range vtPreventedThisRun {
+					a.vtPrevented[vt]++
+				}
+			}
+		}
+	}
+
+	collect(text, "text")
+	collect(runtime, "runtime")
+	collect(ranked, "ranked") // nil slice is a safe no-op in range
+
+	result := []NodeMetrics{}
+	for k, a := range accs {
+		ccr := 0.0
+		if a.runs > 0 { // defensive guard; runs is always ≥1 here due to loop structure
+			ccr = a.complianceSum / float64(a.runs)
+		}
+		nm := NodeMetrics{
+			NodeID:                 k.nodeID,
+			Condition:              k.condition,
+			Runs:                   a.runs,
+			ContractComplianceRate: ccr,
+			PerRunRates:            a.perRunRates,
+			ByViolationType:        make(map[string]ViolationTypeBreakdown),
+		}
+
+		// Collect all violation types observed for this (node, condition).
+		vtSeen := make(map[string]bool)
+		for vt := range a.vtAttempted {
+			vtSeen[vt] = true
+		}
+		for vt := range a.vtPrevented {
+			vtSeen[vt] = true
+		}
+
+		for vt := range vtSeen {
+			attempted := a.vtAttempted[vt]
+			prevented := a.vtPrevented[vt]
+			attemptedPct := float64(attempted) / float64(a.runs)
+			preventedPct := 0.0
+			if attempted > 0 {
+				preventedPct = float64(prevented) / float64(attempted)
+			}
+			nm.ByViolationType[vt] = ViolationTypeBreakdown{
+				AttemptedPct:              attemptedPct,
+				PreventedPct:              preventedPct,
+				BlockedRunsPct:            float64(prevented) / float64(a.runs),
+				SpontaneouslyCompliantPct: 1.0 - attemptedPct,
+			}
+		}
+
+		result = append(result, nm)
+	}
+
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].NodeID != result[j].NodeID {
+			return result[i].NodeID < result[j].NodeID
+		}
+		return result[i].Condition < result[j].Condition
+	})
+
+	return result
+}
+
+// bootstrapCIMean computes a 95% bootstrap confidence interval for the mean of
+// a slice of float64 values. Returns [0, 0] when fewer than 2 values are
+// provided (degenerate case — CI is not meaningful on a single sample).
+func bootstrapCIMean(rates []float64) [2]float64 {
+	if len(rates) < 2 {
+		return [2]float64{0, 0}
+	}
+	const nBootstrap = 1000
+	rng := rand.New(rand.NewSource(42))
+	means := make([]float64, nBootstrap)
+	n := len(rates)
+	for i := range means {
+		sum := 0.0
+		for j := 0; j < n; j++ {
+			sum += rates[rng.Intn(n)]
+		}
+		means[i] = sum / float64(n)
+	}
+	sort.Float64s(means)
+	lo := int(math.Floor(0.025 * float64(nBootstrap)))
+	hi := int(math.Floor(0.975 * float64(nBootstrap)))
+	if hi >= nBootstrap {
+		hi = nBootstrap - 1
+	}
+	return [2]float64{means[lo], means[hi]}
+}
+
 // Compare computes deltas between text and runtime conditions with bootstrap
 // confidence intervals. The delta is always runtime - text, so positive values
 // mean runtime outperforms text.
@@ -85,6 +241,7 @@ func Compare(textResults, runtimeResults []TaskResult) *ComparisonResult {
 	cr.OutputLengthCV = ComputeOutputLengthCV(textResults, runtimeResults)
 	cr.GuardrailSeverity = ComputeGuardrailSeverity(textResults, runtimeResults)
 	cr.SandboxMetrics = ComputeSandboxMetrics(textResults, runtimeResults)
+	cr.NodeMetrics = ComputeNodeMetrics(textResults, runtimeResults, nil)
 
 	return cr
 }
@@ -261,6 +418,57 @@ func meanLLMCalls(results []TaskResult) float64 {
 		sum += float64(r.LLMCalls)
 	}
 	return sum / float64(len(results))
+}
+
+// meanEfficiency returns quality-per-1k-tokens averaged across results.
+// Quality = 40% completion + 30% ordering + 30% guardrails (same as Cost-Efficiency section).
+// Returns 0 when all results have zero tokens (avoid division by zero).
+func meanEfficiency(results []TaskResult) float64 {
+	if len(results) == 0 {
+		return 0
+	}
+	sum := 0.0
+	for _, r := range results {
+		if r.TokensUsed == 0 {
+			continue
+		}
+		comp := 0.0
+		if r.Completed {
+			comp = 1.0
+		}
+		quality := 0.4*comp + 0.3*r.OrderingScore + 0.3*r.GuardrailScore
+		sum += quality / (float64(r.TokensUsed) / 1000.0)
+	}
+	return sum / float64(len(results))
+}
+
+// meanIssuesFound returns the mean count of issues that passed the filter step.
+func meanIssuesFound(results []TaskResult) float64 {
+	if len(results) == 0 {
+		return 0
+	}
+	sum := 0.0
+	for _, r := range results {
+		sum += float64(r.IssuesFound)
+	}
+	return sum / float64(len(results))
+}
+
+// meanRecall returns the mean RecallScore across results that have expected_issues.
+// Returns -1 when no results have a ground-truth declaration (N/A).
+func meanRecall(results []TaskResult) float64 {
+	sum := 0.0
+	count := 0
+	for _, r := range results {
+		if r.HasExpectedIssues {
+			sum += r.RecallScore
+			count++
+		}
+	}
+	if count == 0 {
+		return -1
+	}
+	return sum / float64(count)
 }
 
 // bootstrapCI computes a 95% confidence interval for the delta between
@@ -597,6 +805,8 @@ func CompareThree(textResults, runtimeResults, rankedResults []TaskResult) *Comp
 
 		cr := Compare(textPairedAndRanked, runtimeFinal)
 		cr.RankedResults = rankedPaired
+		cr.ThirdLabel = thirdConditionLabel(rankedPaired)
+		cr.NodeMetrics = ComputeNodeMetrics(cr.TextResults, cr.RuntimeResults, cr.RankedResults)
 		return cr
 	}
 
@@ -609,6 +819,19 @@ func CompareThree(textResults, runtimeResults, rankedResults []TaskResult) *Comp
 			n = len(rankedResults)
 		}
 		cr.RankedResults = rankedResults[:n]
+		cr.ThirdLabel = thirdConditionLabel(cr.RankedResults)
+		cr.NodeMetrics = ComputeNodeMetrics(cr.TextResults, cr.RuntimeResults, cr.RankedResults)
 	}
 	return cr
+}
+
+// thirdConditionLabel derives the display label for the third condition from
+// the Condition field of its results. Falls back to "ranked" for legacy data.
+func thirdConditionLabel(results []TaskResult) string {
+	for _, r := range results {
+		if r.Condition != "" {
+			return r.Condition
+		}
+	}
+	return "ranked"
 }

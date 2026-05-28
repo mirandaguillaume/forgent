@@ -1,0 +1,14 @@
+{
+  "id": "cr-bench-grafana-107534",
+  "source_url": "https://github.com/grafana/grafana/pull/107534",
+  "original_url": "https://github.com/grafana/grafana/pull/107534",
+  "project": "grafana",
+  "pr_num": "107534",
+  "title": "Advanced Query Processing Architecture",
+  "golden_comments": [
+    {
+      "comment": "The applyTemplateVariables method is called with request.filters as the third parameter, but this parameter is not used in the corresponding test setup.",
+      "severity": "Low"
+    }
+  ]
+}

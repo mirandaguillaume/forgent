@@ -1,0 +1,18 @@
+{
+  "id": "cr-bench-keycloak-1",
+  "source_url": "https://github.com/ai-code-review-evaluation/keycloak-greptile/pull/1",
+  "original_url": "https://github.com/keycloak/keycloak/pull/41249",
+  "project": "keycloak",
+  "pr_num": "1",
+  "title": "Fixing Re-authentication with passkeys",
+  "golden_comments": [
+    {
+      "comment": "ConditionalPasskeysEnabled() called without UserModel parameter",
+      "severity": "Medium"
+    },
+    {
+      "comment": "With isConditionalPasskeysEnabled(UserModel user) requiring user != null, authenticate(...) will not call webauthnAuth.fillContextForm(context) on the initial login page where context.getUser() is still null, so conditional passkey UI will not be set up for first-time passkey login. Consider whether this should also be enabled when no user has been selected yet so ID-less passkey authentication on the initial login form continues to work.",
+      "severity": "Medium"
+    }
+  ]
+}

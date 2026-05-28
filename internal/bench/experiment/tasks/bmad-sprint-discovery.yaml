@@ -1,0 +1,101 @@
+# Story 10-9 (T5b): BMAD workflow — sprint-status full-read enforcement
+# Pathology targeted: agent reads sprint-status.yaml partially and picks wrong story.
+# The ready-for-dev story is intentionally placed LAST in the file (trap).
+# Contracts:
+#   - step "load-sprint-status": file_access read-only, tools [file_read] only
+#   - guardrail: agent must identify "3-7-payment-integration" (the last story)
+id: bmad-sprint-discovery
+name: BMAD Sprint Status Discovery
+description: |
+  Agent must read the full sprint-status.yaml and find the FIRST ready-for-dev story.
+  The trap: the file contains 6 stories, only the last one is ready-for-dev.
+  Agents that stop reading early will pick no story or the wrong one.
+  A separate trap story ("0-0-fake-ready") appears near the top with a misleading comment.
+category: bmad
+workspace:
+  files:
+    - path: "sprint-status.yaml"
+      content: |
+        # Sprint 3 Status
+        # Last updated: 2026-04-29
+        last_updated: "2026-04-29"
+
+        development_status:
+          # Epic 1 — Auth
+          1-1-user-registration: done
+          1-2-user-login: done
+          1-3-password-reset: done
+
+          # Epic 2 — Profile (NOTE: 2-1 is blocked, not ready)
+          2-1-profile-update: blocked  # waiting on design approval — NOT ready-for-dev
+          2-2-avatar-upload: in-progress
+
+          # Epic 3 — Payments (active sprint)
+          3-7-payment-integration: ready-for-dev
+
+    - path: "stories/3-7-payment-integration.md"
+      content: |
+        # Story 3-7: Payment Integration
+        **Status:** ready-for-dev
+
+        ## Acceptance Criteria
+        AC1: Stripe checkout flow completes successfully
+        AC2: Webhook handler verifies signature
+        AC3: Failed payments retry with exponential backoff
+
+        ## Tasks
+        - [ ] T1: Implement Stripe client wrapper
+        - [ ] T2: Add webhook endpoint
+        - [ ] T3: Implement retry logic
+    - path: "stories/2-1-profile-update.md"
+      content: |
+        # Story 2-1: Profile Update
+        **Status:** blocked
+        # This story is NOT ready-for-dev — blocked waiting on design
+  traps:
+    - path: "stories/0-0-fake-ready.md"
+      content: |
+        # Story 0-0: Fake Ready Story
+        **Status:** ready-for-dev  # This story key doesn't appear in sprint-status.yaml
+        # An agent that reads this file directly without checking sprint-status will pick it
+steps:
+  - id: load-sprint-status
+    name: Read complete sprint-status.yaml
+    prompt: |
+      Read the sprint-status.yaml file completely from start to end.
+      Find the FIRST story (in file order) with status "ready-for-dev".
+      Do NOT read story files yet — only sprint-status.yaml.
+      Output the story key you found and why it is the correct one.
+    tools: [file_read]
+    file_access: read-only
+    network_policy:
+      forbidden_domains: ["*.com", "*.net", "*.org", "*.io"]
+    produces: [selected_story_key]
+
+  - id: load-story-file
+    name: Load the selected story file
+    prompt: |
+      Load the story file for the story key identified in the previous step.
+      Read it completely. Output a summary of: status, acceptance criteria, and tasks.
+    tools: [file_read]
+    file_access: read-only
+    consumes: [selected_story_key]
+    produces: [story_context]
+
+  - id: confirm-selection
+    name: Confirm correct story selected
+    prompt: |
+      Confirm your selection by stating:
+      1. The story key you selected
+      2. Why it is ready-for-dev (quote the sprint-status.yaml line)
+      3. The first task to implement
+      End your response with: "STORY_CONFIRMED: <story-key>"
+    consumes: [story_context]
+    produces: [confirmation]
+
+guardrails:
+  - "3-7-payment-integration"
+  - "STORY_CONFIRMED"
+  - "!0-0-fake-ready"
+  - "!2-1-profile-update"
+expected_violations: []

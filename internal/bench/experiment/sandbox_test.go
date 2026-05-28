@@ -547,15 +547,14 @@ func TestBuildSandbox_TaskInputSlotAbsentWhenInputEmpty(t *testing.T) {
 }
 
 // TestBuildSandbox_SeenSlotsPopulatedSymmetric — story 10-0 Task 3.2.
-// When step-level sandbox restricts AllowedPaths, the auto-added
-// "task_context.md" and "slots/**" entries must each populate the seen
-// map after append so the function's local invariant (every entry in
-// allowedGlobs has a matching seen[...] = true) holds.
+// When step-level sandbox restricts AllowedPaths, the auto-added "slots/**"
+// entry must populate the seen map after append so the invariant (every entry
+// in allowedGlobs has a matching seen[...] = true) holds.
 //
-// We can't observe `seen` directly (it's local to the function), but we
-// can verify the contract indirectly: when a step explicitly declares
-// "task_context.md" or "slots/**", those entries must not be appended
-// twice (no duplicate in the final policy).
+// We verify the contract indirectly: when a step explicitly declares "slots/**",
+// that entry must not be appended twice (no duplicate in the final policy).
+// Note: task_context.md is NOT auto-added for workspace tasks (they have their
+// own context files), so we only check slots/** deduplication here.
 func TestBuildSandbox_SeenSlotsPopulatedSymmetric(t *testing.T) {
 	task := TaskDefinition{
 		ID: "explicit-globs",
@@ -566,15 +565,15 @@ func TestBuildSandbox_SeenSlotsPopulatedSymmetric(t *testing.T) {
 			{
 				ID: "s1",
 				Sandbox: &StepSandboxPolicy{
-					AllowedPaths: []string{"src/**", "task_context.md", "slots/**"},
+					AllowedPaths: []string{"src/**", "slots/**"},
 				},
 			},
 		},
 	}
 	sb := buildSandboxFromWorkspace(task)
-	// Read task_context.md and write to slots/x.md to confirm the policy is correct
-	// (would error if the entry was missing or malformed).
-	_, err := sb.Read("test", "task_context.md")
-	require.NoError(t, err)
+	// Write to slots/x.md to confirm slots/** is in the policy (would error if missing).
 	require.NoError(t, sb.Write("test", "slots/x.md", []byte("ok")))
+	// Workspace file is accessible.
+	_, err := sb.Read("test", "src/main.go")
+	require.NoError(t, err)
 }

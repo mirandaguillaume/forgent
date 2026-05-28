@@ -1,0 +1,20 @@
+PR #114390: ref(snapshots): Add shared context for snapshots react code
+  review: <!-- BUGBOT_REVIEW -->
+Cursor Bugbot has reviewed your changes and found 1 potential issue.
+
+
+
+<!-- BUGBOT_FIX_ALL -->
+<a href="https://cursor.com/open?data=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI
+PR #114378: ref(grouping): Clear old and invalid secondary grouping config options
+  review: looks good, just a small question
+PR #114371: fix(hotkey): Guard against undefined event.key and skip IME composition events
+  review: Sentry just healed itself!
+PR #114357: feat(seer): Plumb reasoning_effort through trigger_autofix_explorer
+  review: <!-- BUGBOT_REVIEW -->
+Cursor Bugbot has reviewed your changes and found 1 potential issue.
+
+
+
+<!-- BUGBOT_FIX_ALL -->
+<a href="https://cursor.com/open?data=eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI

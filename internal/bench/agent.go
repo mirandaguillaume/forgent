@@ -114,9 +114,7 @@ func extractCandidates(response string) []string {
 	// Split by newlines and commas.
 	var raw []string
 	for _, line := range strings.Split(response, "\n") {
-		for _, part := range strings.Split(line, ",") {
-			raw = append(raw, part)
-		}
+		raw = append(raw, strings.Split(line, ",")...)
 	}
 
 	var candidates []string

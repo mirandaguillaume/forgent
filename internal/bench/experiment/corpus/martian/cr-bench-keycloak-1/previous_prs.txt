@@ -1,0 +1,9 @@
+PR #27: Fixing Re-authentication with passkeys
+  inline on services/src/main/java/org/keycloak/authentication/authenticators/browser/UsernameForm.java: The method isConditionalPasskeysEnabled() is being called without any parameters, but the parent class UsernamePasswordForm defines this method with a UserModel parameter. This will cause a compilatio
+  inline on services/src/main/java/org/keycloak/authentication/authenticators/browser/WebAuthnConditionalUIAuthenticator.java: This method overrides [WebAuthnAuthenticator.shouldShowWebAuthnAuthenticators](1); it is advisable to add an Override annotation.
+```suggestion
+    // Do not show authenticators during login with cond
+  review: Your free trial has ended. If you'd like to continue receiving code reviews, you can add a payment method [here](https://app.greptile.com/review/github).
+  review: ## Pull request overview
+
+This PR fixes re-authentication with passkeys by ensuring passkeys remain available during re-authentication flows (e.g., when OIDC parameter `prompt=login` is used). The cha

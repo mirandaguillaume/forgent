@@ -73,12 +73,13 @@ Example:
 
 		header := fmt.Sprintf("%-36s", "Task")
 		for _, c := range conditions {
-			header += fmt.Sprintf(" | %-8s recall  issues", c)
+			header += fmt.Sprintf(" | %-8s    R     P    F1", c)
 		}
 		fmt.Println(header)
-		fmt.Println(strings.Repeat("-", len(header)+len(conditions)*24))
+		fmt.Println(strings.Repeat("-", len(header)+len(conditions)*26))
 
-		totals := map[string][]float64{}
+		type condTotals struct{ recall, prec, f1 []float64 }
+		totals := map[string]*condTotals{}
 
 		for _, taskID := range taskIDs {
 			meta, hasMeta := golden[taskID]
@@ -86,39 +87,80 @@ Example:
 			for _, cond := range conditions {
 				r, ok := byKey[evalKey{cond, taskID}]
 				if !ok {
-					row += fmt.Sprintf(" | %-8s  N/A     N/A", cond)
+					row += fmt.Sprintf(" | %-8s  N/A   N/A  N/A", cond)
 					continue
 				}
-				var recall float64
-				var issuesNote string
-				reviewOutput := finalStepOutput(r)
-				if hasMeta && len(meta.GoldenComments) > 0 && reviewOutput != "" {
-					found := llmJudgeRecall(judge, meta.GoldenComments, reviewOutput)
-					recall = float64(found) / float64(len(meta.GoldenComments))
-					issuesNote = fmt.Sprintf("%d/%d", found, len(meta.GoldenComments))
-					totals[cond] = append(totals[cond], recall)
-					row += fmt.Sprintf(" | %-8s  %3.0f%%  %s", cond, recall*100, issuesNote)
-				} else {
-					issuesNote = "N/A"
-					row += fmt.Sprintf(" | %-8s  N/A     %s", cond, issuesNote)
+				if !hasMeta || len(meta.GoldenComments) == 0 {
+					row += fmt.Sprintf(" | %-8s  N/A   N/A  N/A", cond)
+					continue
 				}
+
+				// CR-Bench cross-product eval when individual candidates are available (runtime).
+				// Text/agent fall back to golden-vs-full-output (no candidate list to enumerate).
+				detected := extractDetectedIssues(r)
+				var recall, prec, f1 float64
+				precStr := "N/A"
+				f1Str := "N/A"
+
+				if len(detected) > 0 {
+					// Runtime: exact CR-Bench protocol — cross-product (golden × candidate).
+					recallHits, precHits := crossProductMatch(judge, meta.GoldenComments, detected)
+					recall = float64(recallHits) / float64(len(meta.GoldenComments))
+					prec = float64(precHits) / float64(len(detected))
+					precStr = fmt.Sprintf("%3.0f%%", prec*100)
+					if recall+prec > 0 {
+						f1 = 2 * recall * prec / (recall + prec)
+						f1Str = fmt.Sprintf("%3.0f%%", f1*100)
+					}
+					if totals[cond] == nil {
+						totals[cond] = &condTotals{}
+					}
+					totals[cond].recall = append(totals[cond].recall, recall)
+					totals[cond].prec = append(totals[cond].prec, prec)
+					totals[cond].f1 = append(totals[cond].f1, f1)
+				} else {
+					// Text/agent: no candidate list — compare each golden against full output.
+					reviewOutput := finalStepOutput(r)
+					if reviewOutput == "" {
+						row += fmt.Sprintf(" | %-8s  N/A   N/A  N/A", cond)
+						continue
+					}
+					recallHits := llmJudgeRecallText(judge, meta.GoldenComments, reviewOutput)
+					recall = float64(recallHits) / float64(len(meta.GoldenComments))
+					if totals[cond] == nil {
+						totals[cond] = &condTotals{}
+					}
+					totals[cond].recall = append(totals[cond].recall, recall)
+				}
+
+				row += fmt.Sprintf(" | %-8s  %3.0f%%  %s  %s", cond, recall*100, precStr, f1Str)
 			}
 			fmt.Println(row)
 		}
 
-		fmt.Println(strings.Repeat("-", len(header)+len(conditions)*24))
-		summary := fmt.Sprintf("%-36s", "MEAN RECALL")
+		fmt.Println(strings.Repeat("-", len(header)+len(conditions)*26))
+		summary := fmt.Sprintf("%-36s", "MEAN")
 		for _, cond := range conditions {
-			vals := totals[cond]
-			if len(vals) == 0 {
-				summary += fmt.Sprintf(" | %-8s  N/A", cond)
+			t := totals[cond]
+			if t == nil || len(t.recall) == 0 {
+				summary += fmt.Sprintf(" | %-8s  N/A   N/A  N/A", cond)
 				continue
 			}
-			sum := 0.0
-			for _, v := range vals {
-				sum += v
+			meanOf := func(vs []float64) float64 {
+				s := 0.0
+				for _, v := range vs {
+					s += v
+				}
+				return s / float64(len(vs))
 			}
-			summary += fmt.Sprintf(" | %-8s  %3.0f%%  (%d tasks)", cond, sum/float64(len(vals))*100, len(vals))
+			r := meanOf(t.recall)
+			pStr, f1Str := "N/A", "N/A"
+			if len(t.prec) > 0 {
+				p := meanOf(t.prec)
+				pStr = fmt.Sprintf("%3.0f%%", p*100)
+				f1Str = fmt.Sprintf("%3.0f%%", meanOf(t.f1)*100)
+			}
+			summary += fmt.Sprintf(" | %-8s  %3.0f%%  %s  %s  (%d tasks)", cond, r*100, pStr, f1Str, len(t.recall))
 		}
 		fmt.Println(summary)
 
@@ -172,57 +214,83 @@ func resolveJudge(cmd *cobra.Command) (llm.Provider, error) {
 
 	model, _ := cmd.Flags().GetString("model")
 	if model == "" {
-		model = "claude-haiku-4-5-20251001"
+		model = "claude-sonnet-4-6"
 	}
 	return llm.GetProviderWithModel(providerName, apiKey, model)
 }
 
-// llmJudgeRecall counts how many golden comments are addressed in the output.
-func llmJudgeRecall(judge llm.Provider, comments []GoldenComment, output string) int {
-	found := 0
-	for _, gc := range comments {
-		if llmJudgeHit(judge, gc, output) {
-			found++
+// extractDetectedIssues returns the list of issues from the collect-filtered step (runtime).
+// Returns nil when no structured issue list is available (text/agent conditions).
+func extractDetectedIssues(r experiment.TaskResultJSON) []string {
+	for _, step := range r.StepResults {
+		if step.StepID != "collect-filtered" {
+			continue
 		}
+		raw := strings.TrimSpace(step.Output)
+		if raw == "" {
+			return nil
+		}
+		var items []json.RawMessage
+		if err := json.Unmarshal([]byte(raw), &items); err != nil {
+			return nil
+		}
+		var issues []string
+		for _, item := range items {
+			// item is either a plain string or {"issue":"...","score":N}
+			var s string
+			if err := json.Unmarshal(item, &s); err == nil {
+				issues = append(issues, s)
+				continue
+			}
+			var obj map[string]any
+			if err := json.Unmarshal(item, &obj); err == nil {
+				if iss, ok := obj["issue"].(string); ok {
+					issues = append(issues, iss)
+				}
+			}
+		}
+		return issues
 	}
-	return found
+	return nil
 }
 
-// llmJudgeHit uses an LLM to determine if the output addresses the golden comment.
-// Inspired by CR-Bench's CR-Evaluator — semantic matching regardless of wording.
-func llmJudgeHit(judge llm.Provider, comment GoldenComment, output string) bool {
-	const maxOutput = 4000
-	excerpt := output
-	if len(excerpt) > maxOutput {
-		excerpt = excerpt[:maxOutput]
-	}
+// judgeOnePair is the exact CR-Bench judge prompt: one golden vs one candidate.
+// Returns true when the judge considers them the same issue with confidence >= 0.5.
+func judgeOnePair(judge llm.Provider, golden GoldenComment, candidate string) bool {
+	prompt := fmt.Sprintf(`You are evaluating AI code review tools.
+Determine if the candidate issue matches the golden (expected) comment.
 
-	prompt := fmt.Sprintf(`You are a code review evaluator.
-
-GOLDEN ISSUE (severity: %s):
+Golden Comment (the issue we're looking for):
 %s
 
-REVIEW OUTPUT:
+Candidate Issue (from the tool's review):
 %s
 
-Does the review output identify or address the issue described in the GOLDEN ISSUE?
-A hit means the review mentions the same underlying bug or problem, even using different words.
-Respond with JSON only: {"hit": true} or {"hit": false}`,
-		comment.Severity, comment.Comment, excerpt)
+Instructions:
+- Determine if the candidate identifies the SAME underlying issue as the golden comment
+- Accept semantic matches - different wording is fine if it's the same problem
+- Focus on whether they point to the same bug, concern, or code issue
+
+Respond with ONLY a JSON object:
+{"reasoning": "brief explanation", "match": true/false, "confidence": 0.0-1.0}`,
+		golden.Comment, candidate)
 
 	if sp, ok := judge.(llm.StructuredProvider); ok {
 		schema := map[string]any{
 			"type": "object",
 			"properties": map[string]any{
-				"hit": map[string]any{"type": "boolean"},
+				"reasoning":  map[string]any{"type": "string"},
+				"match":      map[string]any{"type": "boolean"},
+				"confidence": map[string]any{"type": "number"},
 			},
-			"required": []string{"hit"},
+			"required":             []string{"reasoning", "match", "confidence"},
+			"additionalProperties": false,
 		}
 		result, err := sp.CompleteStructured(context.Background(), prompt, schema)
 		if err == nil {
-			if hit, ok := result["hit"].(bool); ok {
-				return hit
-			}
+			match, _ := result["match"].(bool)
+			confidence, _ := result["confidence"].(float64)
+			return match && confidence >= 0.5
 		}
 	}
 
@@ -231,7 +299,64 @@ Respond with JSON only: {"hit": true} or {"hit": false}`,
 		return false
 	}
 	resp = strings.ToLower(resp)
-	return strings.Contains(resp, `"hit":true`) || strings.Contains(resp, `"hit": true`)
+	return strings.Contains(resp, `"match":true`) || strings.Contains(resp, `"match": true`)
+}
+
+// crossProductMatch runs the CR-Bench cross-product evaluation:
+// each golden comment vs each candidate issue (one LLM call per pair).
+// Returns (recallHits, precisionHits):
+//   - recallHits: number of golden comments matched by at least one candidate
+//   - precisionHits: number of candidates that matched at least one golden
+func crossProductMatch(judge llm.Provider, goldens []GoldenComment, candidates []string) (recallHits, precisionHits int) {
+	goldenMatched := make([]bool, len(goldens))
+	candidateMatched := make([]bool, len(candidates))
+
+	for gi, golden := range goldens {
+		for ci, candidate := range candidates {
+			if judgeOnePair(judge, golden, candidate) {
+				goldenMatched[gi] = true
+				candidateMatched[ci] = true
+			}
+		}
+	}
+	for _, m := range goldenMatched {
+		if m {
+			recallHits++
+		}
+	}
+	for _, m := range candidateMatched {
+		if m {
+			precisionHits++
+		}
+	}
+	return
+}
+
+// llmJudgeRecallText counts golden comments found in a free-form text output.
+// Used for text/agent conditions where individual candidates cannot be extracted.
+func llmJudgeRecallText(judge llm.Provider, comments []GoldenComment, output string) int {
+	const maxOutput = 4000
+	excerpt := output
+	if idx := strings.LastIndex(excerpt, "### Code review"); idx != -1 {
+		excerpt = excerpt[idx:]
+	} else if idx := strings.LastIndex(excerpt, "REVIEW_DECISION"); idx != -1 {
+		start := idx - maxOutput
+		if start < 0 {
+			start = 0
+		}
+		excerpt = excerpt[start:]
+	}
+	if len(excerpt) > maxOutput {
+		excerpt = excerpt[len(excerpt)-maxOutput:]
+	}
+
+	found := 0
+	for _, gc := range comments {
+		if judgeOnePair(judge, gc, excerpt) {
+			found++
+		}
+	}
+	return found
 }
 
 // finalStepOutput returns the most relevant output for judge evaluation.

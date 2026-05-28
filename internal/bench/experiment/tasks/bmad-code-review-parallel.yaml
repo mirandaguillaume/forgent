@@ -1,0 +1,131 @@
+# Story 10-9 (T5b): BMAD code review workflow — parallel review layers
+# Pathology targeted: agent launches Blind Hunter, Edge Case Hunter, Acceptance Auditor
+# sequentially instead of in parallel. wall_clock_ms reveals the truth:
+#   - True parallel: ~1× single-reviewer time
+#   - Sequential: ~3× single-reviewer time
+# Contracts:
+#   - step "gather-context": file_access read-only, tools [file_read, bash] (git diff)
+#   - step "parallel-review": single step must produce ALL 3 findings — forces parallelism
+#   - step "triage": consumes all 3, read-only
+id: bmad-code-review-parallel
+name: BMAD Code Review — Parallel Review Layers
+description: |
+  Agent must execute the BMAD code review workflow: gather context (git diff + spec),
+  then launch 3 parallel adversarial review layers (Blind Hunter, Edge Case Hunter,
+  Acceptance Auditor) simultaneously.
+  Pathology: agents run the 3 review layers sequentially, wasting 3× the time.
+  The single-step "parallel-review" forces production of all 3 findings at once.
+  wall_clock_ms comparison between text (1 LLM call) and runtime (step-by-step)
+  reveals whether parallelism actually happened.
+category: bmad
+workspace:
+  files:
+    - path: "diff.patch"
+      content: |
+        diff --git a/pkg/auth/middleware.go b/pkg/auth/middleware.go
+        index a1b2c3d..e4f5g6h 100644
+        --- a/pkg/auth/middleware.go
+        +++ b/pkg/auth/middleware.go
+        @@ -45,6 +45,18 @@ func RequireAuth(next http.Handler) http.Handler {
+               return
+             }
+        +    // Validate token expiry
+        +    claims, err := parseJWT(token)
+        +    if err != nil {
+        +      http.Error(w, "invalid token", http.StatusUnauthorized)
+        +      return
+        +    }
+        +    if time.Now().After(claims.ExpiresAt) {
+        +      http.Error(w, "token expired", http.StatusUnauthorized)
+        +      return
+        +    }
+        +    ctx := context.WithValue(r.Context(), userKey, claims.UserID)
+        +    next.ServeHTTP(w, r.WithContext(ctx))
+        -    next.ServeHTTP(w, r)
+           })
+         }
+        +
+        +func parseJWT(token string) (*Claims, error) {
+        +    // TODO: implement actual JWT parsing
+        +    return &Claims{UserID: "mock", ExpiresAt: time.Now().Add(1 * time.Hour)}, nil
+        +}
+
+    - path: "story-spec.md"
+      content: |
+        # Story: JWT Token Validation in Auth Middleware
+
+        ## Acceptance Criteria
+        AC1: Requests with expired tokens return 401
+        AC2: Token claims are propagated via request context
+        AC3: parseJWT must use a real signing key — mock implementation is NOT acceptable
+        AC4: No timing attacks — use constant-time comparison for token validation
+
+    - path: "project-context.md"
+      content: |
+        # Project: API Gateway
+        Security policy: all JWT operations must use HMAC-SHA256 with a rotating key.
+        Forbidden: hardcoded secrets, mock JWT parsers in non-test files.
+        Pattern: context keys must be unexported types (not strings) to avoid collisions.
+
+steps:
+  - id: gather-context
+    name: Load diff, spec, and project context
+    prompt: |
+      Read the following files completely:
+      1. diff.patch — the code changes to review
+      2. story-spec.md — the acceptance criteria
+      3. project-context.md — security policy and coding standards
+
+      Summarize: lines changed, which ACs are relevant, key security constraints.
+    tools: [file_read]
+    file_access: read-only
+    network_policy:
+      forbidden_domains: ["*.com", "*.net", "*.org", "*.io"]
+    produces: [review_context]
+
+  - id: parallel-review
+    name: Three-layer adversarial review (Blind Hunter + Edge Case Hunter + Acceptance Auditor)
+    prompt: |
+      You must now produce THREE independent review perspectives in a single response.
+      Do NOT do them one at a time — produce all three simultaneously.
+
+      ## Blind Hunter (diff only — ignore spec and context)
+      Review the diff as if you have never seen the spec.
+      Find: logic errors, security issues, missing error handling.
+      Output under heading: "### Blind Hunter Findings"
+
+      ## Edge Case Hunter (diff + project context)
+      Review for: edge cases, race conditions, untested scenarios, context key collision.
+      Output under heading: "### Edge Case Hunter Findings"
+
+      ## Acceptance Auditor (diff + spec)
+      Check each AC explicitly. Flag: AC violations, missing implementation, spec deviations.
+      Output under heading: "### Acceptance Auditor Findings"
+
+      All three headings MUST appear in your response.
+    consumes: [review_context]
+    file_access: read-only
+    network_policy:
+      forbidden_domains: ["*.com", "*.net", "*.org", "*.io"]
+    produces: [blind_findings, edge_findings, acceptance_findings]
+
+  - id: triage
+    name: Triage and prioritize findings
+    prompt: |
+      Triage all findings from the three review layers.
+      Classify each as: BLOCKER / HIGH / MEDIUM / LOW.
+      A BLOCKER must prevent merge.
+      Output a deduplicated, prioritized list.
+      End with: "TRIAGE_COMPLETE: <N> blockers, <M> high, <K> medium, <L> low"
+    consumes: [blind_findings, edge_findings, acceptance_findings]
+    file_access: read-only
+    produces: [triage_report]
+
+guardrails:
+  - "Blind Hunter Findings"
+  - "Edge Case Hunter Findings"
+  - "Acceptance Auditor Findings"
+  - "TRIAGE_COMPLETE"
+  - "!TODO"
+  - "mock"
+expected_violations: []

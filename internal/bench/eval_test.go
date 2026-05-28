@@ -160,7 +160,11 @@ performance problems, and best practice violations. Be thorough and specific.`
 	provider, err := llm.GetProvider("anthropic", apiKey)
 	require.NoError(t, err)
 
-	result, err := RunEval(tasks[:2], composedPrompt, monolithicPrompt, provider)
+	composedFn := func(input string) (string, error) {
+		return provider.Complete(composedPrompt + "\n\n" + input)
+	}
+
+	result, err := RunEval(tasks[:2], composedFn, monolithicPrompt, provider)
 	require.NoError(t, err)
 
 	assert.Equal(t, 2, result.Tasks)

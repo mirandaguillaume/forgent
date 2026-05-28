@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/mirandaguillaume/forgent/pkg/schema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -190,4 +191,159 @@ func TestResolveTemplate_AcceptsSymlinkInsideBase(t *testing.T) {
 	out, err := s.ResolveTemplate(baseDir)
 	require.NoError(t, err)
 	assert.Equal(t, "## Verdict", out)
+}
+
+// ─── T1.3: FieldSchema YAML round-trip ───────────────────────────────────────
+
+func TestSlotSpec_Schema_UnmarshalYAML(t *testing.T) {
+	input := `
+produces:
+  - key: verdict
+    schema:
+      ruling:
+        type: string
+        enum: [approved, rejected]
+      rationale:
+        type: string
+        min_length: 20
+        description: "Explanation of the ruling"
+`
+	var step StepDef
+	require.NoError(t, yaml.Unmarshal([]byte(input), &step))
+	require.Len(t, step.Produces, 1)
+	s := step.Produces[0]
+	assert.Equal(t, "verdict", s.Key)
+	assert.Equal(t, schema.FieldSchema{
+		"ruling": {Type: "string", Enum: []string{"approved", "rejected"}},
+		"rationale": {Type: "string", MinLength: 20, Description: "Explanation of the ruling"},
+	}, s.Schema)
+}
+
+func TestExperimentConfig_Validate_UnknownFieldType_ReturnsError(t *testing.T) {
+	cfg := ExperimentConfig{
+		Tasks: []TaskDefinition{{
+			ID: "bad",
+			Steps: []StepDef{{
+				ID: "step1",
+				Produces: []SlotSpec{{
+					Key: "verdict",
+					Schema: schema.FieldSchema{
+						"ruling": {Type: "object"}, // invalid
+					},
+				}},
+			}},
+		}},
+		Provider:    &mockGuardrailProvider{},
+		RunsPerTask: 1,
+	}
+	err := cfg.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported type")
+	assert.Contains(t, err.Error(), "object")
+}
+
+func TestExperimentConfig_Validate_ValidFieldTypes_NoError(t *testing.T) {
+	cfg := ExperimentConfig{
+		Tasks: []TaskDefinition{{
+			ID: "ok",
+			Steps: []StepDef{{
+				ID: "step1",
+				Produces: []SlotSpec{{
+					Key: "verdict",
+					Schema: schema.FieldSchema{
+						"ruling":    {Type: "string"},
+						"score":     {Type: "number"},
+						"count":     {Type: "integer"},
+						"compliant": {Type: "boolean"},
+					},
+				}},
+			}},
+		}},
+		Provider:    &mockGuardrailProvider{},
+		RunsPerTask: 1,
+	}
+	assert.NoError(t, cfg.Validate())
+}
+
+func TestExperimentConfig_Validate_MultipleTypedProducesSlots_ReturnsError(t *testing.T) {
+	cfg := ExperimentConfig{
+		Tasks: []TaskDefinition{{
+			ID: "bad",
+			Steps: []StepDef{{
+				ID: "step1",
+				Produces: []SlotSpec{
+					{Key: "verdict", Schema: schema.FieldSchema{"ruling": {Type: "string"}}},
+					{Key: "score", Schema: schema.FieldSchema{"value": {Type: "number"}}},
+				},
+			}},
+		}},
+		Provider:    &mockGuardrailProvider{},
+		RunsPerTask: 1,
+	}
+	err := cfg.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "at most 1 is supported")
+}
+
+func TestExperimentConfig_Validate_MinLengthOnNumber_ReturnsError(t *testing.T) {
+	cfg := ExperimentConfig{
+		Tasks: []TaskDefinition{{
+			ID: "bad",
+			Steps: []StepDef{{
+				ID: "step1",
+				Produces: []SlotSpec{{
+					Key: "out",
+					Schema: schema.FieldSchema{
+						"score": {Type: "number", MinLength: 5},
+					},
+				}},
+			}},
+		}},
+		Provider:    &mockGuardrailProvider{},
+		RunsPerTask: 1,
+	}
+	err := cfg.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "min_length is only valid for type \"string\"")
+}
+
+func TestExperimentConfig_Validate_MixedTypedAndMarkdownProduces_ReturnsError(t *testing.T) {
+	cfg := ExperimentConfig{
+		Tasks: []TaskDefinition{{
+			ID: "bad",
+			Steps: []StepDef{{
+				ID: "step1",
+				Produces: []SlotSpec{
+					{Key: "typed", Schema: schema.FieldSchema{"ruling": {Type: "string"}}},
+					{Key: "doc", Template: "## Report"},
+				},
+			}},
+		}},
+		Provider:    &mockGuardrailProvider{},
+		RunsPerTask: 1,
+	}
+	err := cfg.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "mixes typed produces")
+}
+
+func TestExperimentConfig_Validate_TypedProducesWithExitWhen_ReturnsError(t *testing.T) {
+	cfg := ExperimentConfig{
+		Tasks: []TaskDefinition{{
+			ID: "bad",
+			Steps: []StepDef{{
+				ID: "step1",
+				Loop: &LoopPolicy{MaxIterations: 3, ExitWhen: ExitCriteria{OutputMarker: "DONE"}},
+				Produces: []SlotSpec{{
+					Key: "verdict",
+					Schema: schema.FieldSchema{"ruling": {Type: "string"}},
+				}},
+			}},
+		}},
+		Provider:    &mockGuardrailProvider{},
+		RunsPerTask: 1,
+	}
+	err := cfg.Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "incompatible with loop exit criteria")
 }

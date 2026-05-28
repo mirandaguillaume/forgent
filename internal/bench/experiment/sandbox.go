@@ -20,24 +20,34 @@ type SandboxPolicy struct {
 }
 
 // AccessEntry records a single sandbox operation for the audit trail.
+// Action is one of the canonical verbs across all enforcement channels:
+//   - "read" / "write" / "delete" → file permission (story 10-3)
+//   - "slot_write"                → output contract  (story 10-4)
+//   - "network"                   → network policy   (story 10-5)
+//   - "guardrail"                 → guardrail check  (story 10-6)
+//   - "slot_clear"                → upstream refresh (always Allowed=true)
+//
+// AttemptNumber is 1-indexed; 0 means recorded outside the retry loop.
 type AccessEntry struct {
-	Timestamp time.Time
-	StepID    string
-	Action    string // "read", "write", "delete"
-	Path      string
-	Allowed   bool
-	Reason    string // why denied (empty if allowed)
+	Timestamp     time.Time
+	StepID        string
+	Action        string // canonical enforcement verb (see above)
+	Path          string
+	Allowed       bool
+	Reason        string // why denied (empty if allowed)
+	AttemptNumber int    // 1-indexed retry attempt; 0 = untracked
 }
 
 // SandboxFS is a pure in-memory virtual filesystem with policy enforcement
 // and trap detection. No real filesystem is touched. Thread-safe for
 // concurrent DAG node execution.
 type SandboxFS struct {
-	mu     sync.RWMutex
-	root   map[string][]byte
-	traps  map[string]bool
-	log    []AccessEntry
-	policy SandboxPolicy
+	mu             sync.RWMutex
+	root           map[string][]byte
+	traps          map[string]bool
+	log            []AccessEntry
+	policy         SandboxPolicy
+	currentAttempt map[string]int // stepID → current 1-indexed attempt (0 = not set)
 }
 
 // NewSandboxFS creates a sandbox with initial files, trap paths, and a policy.
@@ -187,6 +197,18 @@ func (s *SandboxFS) checkDenied(path string) (string, bool) {
 	return "", true
 }
 
+// SetCurrentAttempt records the current 1-indexed attempt for a step so that
+// subsequent audit entries for that step carry the correct AttemptNumber.
+// Called at the start of each retry iteration in the runFn guardrail loop.
+func (s *SandboxFS) SetCurrentAttempt(stepID string, n int) {
+	s.mu.Lock()
+	if s.currentAttempt == nil {
+		s.currentAttempt = make(map[string]int)
+	}
+	s.currentAttempt[stepID] = n
+	s.mu.Unlock()
+}
+
 // record is a public convenience that acquires the lock. Used by ExecuteToolWithPolicy.
 func (s *SandboxFS) record(stepID, action, path string, allowed bool, reason string) {
 	s.mu.Lock()
@@ -196,13 +218,18 @@ func (s *SandboxFS) record(stepID, action, path string, allowed bool, reason str
 
 // recordLocked appends to the audit log. Caller must hold s.mu.
 func (s *SandboxFS) recordLocked(stepID, action, path string, allowed bool, reason string) {
+	attempt := 0
+	if s.currentAttempt != nil {
+		attempt = s.currentAttempt[stepID]
+	}
 	s.log = append(s.log, AccessEntry{
-		Timestamp: time.Now(),
-		StepID:    stepID,
-		Action:    action,
-		Path:      path,
-		Allowed:   allowed,
-		Reason:    reason,
+		Timestamp:     time.Now(),
+		StepID:        stepID,
+		Action:        action,
+		Path:          path,
+		Allowed:       allowed,
+		Reason:        reason,
+		AttemptNumber: attempt,
 	})
 }
 
