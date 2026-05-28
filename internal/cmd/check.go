@@ -140,9 +140,8 @@ func printCheckResult(filePath string, result checker.CheckResult, targets []str
 	for _, h := range targets {
 		score := result.Overall[h]
 		bar := complianceBar(score)
-		pct := int(math.Round(score * 100))
 		flag := complianceFlag(score)
-		fmt.Printf("    %-12s %s %d%% %s\n", h, bar, pct, flag)
+		fmt.Printf("    %-12s %s %s\n", h, bar, flag)
 	}
 	fmt.Println()
 
