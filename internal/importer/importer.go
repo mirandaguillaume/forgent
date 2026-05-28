@@ -86,8 +86,9 @@ func RunImport(opts ImportOptions) ImportResult {
 	// 3. Reverse map tools
 	genericTools := ReverseMapTools(fm.Tools, source.Framework)
 
-	// 4. Pre-classify instructions to ground the LLM prompt.
-	classification := classifier.Classify(body, source.Framework.String())
+	// 4. Pre-classify instructions with LLM for accurate facet grounding.
+	// Falls back to static classification silently if LLM fails.
+	classification, _ := classifier.ClassifyLLM(body, source.Framework.String(), opts.Provider)
 
 	// 5. Build prompt
 	prompt := BuildImportPrompt(source, fm, body, genericTools, classification)
