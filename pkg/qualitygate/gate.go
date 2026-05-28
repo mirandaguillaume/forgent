@@ -2,11 +2,20 @@
 // against format templates declared in SlotSpec contracts. When required
 // structural markers are missing, the middleware returns an error that triggers
 // the DAG's built-in retry mechanism (runWithRetry).
+//
+// Validation mode: AST structural validation — used by ValidateProduces /
+// ValidateConsumes when the template has ## or ### headings. goldmark parses
+// both template and output; invariants (heading present, section non-empty,
+// list present) are asserted.
+//
+// Templates with no headings are pass-through (no structural constraint).
+// Empty template = pass-through (NFR40 backward compatibility).
 package qualitygate
 
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/mirandaguillaume/forgent/pkg/dag"
@@ -25,31 +34,22 @@ type QualityGatePolicy struct {
 // QualityGateMiddleware returns a dag.Middleware that enforces structural format
 // contracts declared in the policy templates.
 //
-// Validation is structural (not schema parsing): markers are extracted from the
-// template (headings, bold list items) and checked for presence in the target
-// text (case-insensitive substring match).
+// Pre-check: validates inputs against ConsumesTemplate before calling next.
+// Post-check: validates output against ProducesTemplate after calling next.
 //
-// If policy is nil or both templates produce no markers, returns a no-op pass-through.
+// Consumes errors are wrapped as "consumes: <err>" so consumesRetryMiddleware
+// can distinguish them from produces errors (both share the same AST error prefixes).
+//
+// If policy is nil, returns a no-op pass-through.
 func QualityGateMiddleware(policy *QualityGatePolicy) dag.Middleware {
 	if policy == nil {
 		return passthrough
 	}
 
-	producesMarkers := extractMarkers(policy.ProducesTemplate)
-	consumesMarkers := extractMarkers(policy.ConsumesTemplate)
-
-	if len(producesMarkers) == 0 && len(consumesMarkers) == 0 {
-		return passthrough
-	}
-
 	return func(ctx context.Context, inputs map[string]any, next dag.MiddlewareFunc) (map[string]any, error) {
-		// Pre-check: validate inputs against consumes template markers.
-		if len(consumesMarkers) > 0 {
-			combined := strings.ToLower(collectStrings(inputs))
-			for _, marker := range consumesMarkers {
-				if !checkMarker(combined, marker) {
-					return nil, fmt.Errorf("quality gate: input missing expected structure %q", marker)
-				}
+		if policy.ConsumesTemplate != "" {
+			if err := ValidateConsumes(policy.ConsumesTemplate, collectStrings(inputs)); err != nil {
+				return nil, fmt.Errorf("consumes: %w", err)
 			}
 		}
 
@@ -58,13 +58,9 @@ func QualityGateMiddleware(policy *QualityGatePolicy) dag.Middleware {
 			return nil, err
 		}
 
-		// Post-check: validate output against produces template markers.
-		if len(producesMarkers) > 0 {
-			combined := strings.ToLower(collectStrings(out))
-			for _, marker := range producesMarkers {
-				if !checkMarker(combined, marker) {
-					return nil, fmt.Errorf("quality gate: output missing expected structure %q", marker)
-				}
+		if policy.ProducesTemplate != "" {
+			if err := ValidateProduces(policy.ProducesTemplate, collectStrings(out)); err != nil {
+				return nil, err
 			}
 		}
 
@@ -72,80 +68,57 @@ func QualityGateMiddleware(policy *QualityGatePolicy) dag.Middleware {
 	}
 }
 
+// ValidateProduces checks a single text against a template's output contract.
+// For templates with ## / ### headings it uses goldmark AST structural
+// validation. Flat templates (no headings) are pass-through.
+//
+// Empty template = no constraint (returns nil).
+func ValidateProduces(template, text string) error {
+	if template == "" {
+		return nil
+	}
+	reqs := extractStructuralRequirements(template)
+	if reqs == nil {
+		return nil
+	}
+	src := []byte(text)
+	return validateASTStructure(reqs, parseMarkdown(src), src)
+}
+
+// ValidateConsumes mirrors ValidateProduces for the input side.
+func ValidateConsumes(template, text string) error {
+	if template == "" {
+		return nil
+	}
+	reqs := extractStructuralRequirements(template)
+	if reqs == nil {
+		return nil
+	}
+	src := []byte(text)
+	return validateASTStructure(reqs, parseMarkdown(src), src)
+}
+
 // passthrough is a no-op middleware used when no constraints are active.
 var passthrough dag.Middleware = func(ctx context.Context, inputs map[string]any, next dag.MiddlewareFunc) (map[string]any, error) {
 	return next(ctx, inputs)
 }
 
-// extractMarkers scans a format template and returns structural markers:
-//   - Markdown headings (## Title → "## title")
-//   - Bold list items    (- **field**: ... → "- **")
-//   - Plain list items   (- item → "- ")
-//
-// Markers are lowercased and deduplicated. Returns nil for empty templates.
-func extractMarkers(tmpl string) []string {
-	if tmpl == "" {
-		return nil
-	}
-
-	var markers []string
-	seen := make(map[string]bool)
-
-	add := func(s string) {
-		if !seen[s] {
-			seen[s] = true
-			markers = append(markers, s)
-		}
-	}
-
-	hasBoldList := false
-	hasPlainList := false
-
-	for _, line := range strings.Split(tmpl, "\n") {
-		trimmed := strings.TrimSpace(line)
-		switch {
-		case strings.HasPrefix(trimmed, "## ") || strings.HasPrefix(trimmed, "### "):
-			add(strings.ToLower(trimmed))
-		case strings.HasPrefix(trimmed, "- **") || strings.HasPrefix(trimmed, "* **"):
-			if !hasBoldList {
-				hasBoldList = true
-				add("- **")
-			}
-		case strings.HasPrefix(trimmed, "- ") || strings.HasPrefix(trimmed, "* "):
-			if !hasBoldList && !hasPlainList {
-				hasPlainList = true
-				add("- ")
-			}
-		}
-	}
-
-	if len(markers) == 0 {
-		return nil
-	}
-	return markers
-}
-
-// checkMarker reports whether the combined text satisfies the marker.
-// The bold-list marker "- **" also matches "* **" since both are valid
-// Markdown bullet styles that an LLM may choose regardless of the template style.
-func checkMarker(combined, marker string) bool {
-	if strings.Contains(combined, marker) {
-		return true
-	}
-	if marker == "- **" {
-		return strings.Contains(combined, "* **")
-	}
-	return false
-}
-
 // collectStrings concatenates all string values from the output map,
-// separated by spaces. Non-string values are silently skipped.
+// sorted by key, separated by "\n\n" so markdown headings in individual
+// values remain at line-start boundaries after concatenation (required for
+// AST heading detection). Keys are sorted to make validation deterministic
+// across calls with identical inputs. Non-string values are silently skipped.
 func collectStrings(outputs map[string]any) string {
+	keys := make([]string, 0, len(outputs))
+	for k := range outputs {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
 	var b strings.Builder
-	for _, v := range outputs {
-		if s, ok := v.(string); ok {
+	for _, k := range keys {
+		if s, ok := outputs[k].(string); ok {
 			if b.Len() > 0 {
-				b.WriteByte(' ')
+				b.WriteString("\n\n")
 			}
 			b.WriteString(s)
 		}

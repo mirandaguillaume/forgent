@@ -28,9 +28,16 @@ func BudgetMiddleware(policy *BudgetPolicy) dag.Middleware {
 	}
 
 	return func(ctx context.Context, inputs map[string]any, next dag.MiddlewareFunc) (map[string]any, error) {
-		// Pre: inject max_tokens hint for the handler
+		// Pre: inject max_tokens hint for the handler.
+		// Copy inputs to avoid mutating the caller's map across retry attempts —
+		// the DAG reuses the same map reference on every runWithRetry iteration.
 		if policy.MaxTokens > 0 {
-			inputs[InputKeyMaxTokens] = policy.MaxTokens
+			copied := make(map[string]any, len(inputs)+1)
+			for k, v := range inputs {
+				copied[k] = v
+			}
+			copied[InputKeyMaxTokens] = policy.MaxTokens
+			inputs = copied
 		}
 
 		// Pre: apply guardrail-level timeout
