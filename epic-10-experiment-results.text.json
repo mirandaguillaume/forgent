@@ -1,0 +1,488 @@
+[
+  {
+    "task_id": "code-review",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 298
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 298
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 298
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 894,
+    "wall_clock_ms": 6451,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "code-review",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 261
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 261
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 261
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 784,
+    "wall_clock_ms": 5712,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "code-review",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "identify-bugs",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 250
+      },
+      {
+        "StepID": "style-review",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 250
+      },
+      {
+        "StepID": "generate-fix",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 250
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 751,
+    "wall_clock_ms": 4589,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "doc-generation",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "analyze-api",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 566
+      },
+      {
+        "StepID": "write-overview",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 566
+      },
+      {
+        "StepID": "write-examples",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 566
+      },
+      {
+        "StepID": "assemble-doc",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 566
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 2267,
+    "wall_clock_ms": 18400,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "doc-generation",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "analyze-api",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 448
+      },
+      {
+        "StepID": "write-overview",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 448
+      },
+      {
+        "StepID": "write-examples",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 448
+      },
+      {
+        "StepID": "assemble-doc",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 448
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 1793,
+    "wall_clock_ms": 10945,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "doc-generation",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "analyze-api",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 460
+      },
+      {
+        "StepID": "write-overview",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 460
+      },
+      {
+        "StepID": "write-examples",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 460
+      },
+      {
+        "StepID": "assemble-doc",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 460
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 1842,
+    "wall_clock_ms": 12925,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "refactoring",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "identify-responsibilities",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 355
+      },
+      {
+        "StepID": "design-interfaces",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 355
+      },
+      {
+        "StepID": "extract-functions",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 355
+      },
+      {
+        "StepID": "compose-pipeline",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 355
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 1423,
+    "wall_clock_ms": 7703,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "refactoring",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "identify-responsibilities",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 310
+      },
+      {
+        "StepID": "design-interfaces",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 310
+      },
+      {
+        "StepID": "extract-functions",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 310
+      },
+      {
+        "StepID": "compose-pipeline",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 310
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 1240,
+    "wall_clock_ms": 6441,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "refactoring",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "identify-responsibilities",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 360
+      },
+      {
+        "StepID": "design-interfaces",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 360
+      },
+      {
+        "StepID": "extract-functions",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 360
+      },
+      {
+        "StepID": "compose-pipeline",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 360
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 1440,
+    "wall_clock_ms": 7067,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "security-audit",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "threat-model",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 523
+      },
+      {
+        "StepID": "vulnerability-scan",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 523
+      },
+      {
+        "StepID": "remediation",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 523
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 1570,
+    "wall_clock_ms": 12282,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "security-audit",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "threat-model",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 506
+      },
+      {
+        "StepID": "vulnerability-scan",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 506
+      },
+      {
+        "StepID": "remediation",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 506
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 1519,
+    "wall_clock_ms": 11059,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "security-audit",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "threat-model",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 555
+      },
+      {
+        "StepID": "vulnerability-scan",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 555
+      },
+      {
+        "StepID": "remediation",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 555
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 1666,
+    "wall_clock_ms": 12590,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "test-generation",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "identify-cases",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 717
+      },
+      {
+        "StepID": "write-table-tests",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 717
+      },
+      {
+        "StepID": "add-property-tests",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 717
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 2153,
+    "wall_clock_ms": 16807,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "test-generation",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "identify-cases",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 716
+      },
+      {
+        "StepID": "write-table-tests",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 716
+      },
+      {
+        "StepID": "add-property-tests",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 716
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 2150,
+    "wall_clock_ms": 15592,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "test-generation",
+    "condition": "text",
+    "completed": true,
+    "step_results": [
+      {
+        "StepID": "identify-cases",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 562
+      },
+      {
+        "StepID": "write-table-tests",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 562
+      },
+      {
+        "StepID": "add-property-tests",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 562
+      }
+    ],
+    "ordering_score": 1,
+    "guardrail_score": 1,
+    "tokens_used": 1688,
+    "wall_clock_ms": 12279,
+    "llm_calls": 1
+  }
+]

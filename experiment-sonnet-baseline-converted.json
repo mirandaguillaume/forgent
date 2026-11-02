@@ -1,0 +1,94 @@
+{
+  "captured_at": "2026-04-16",
+  "description": "Sonnet baseline (pre-Epic-10 keyword guardrails; CCR proxied from GuardrailScore)",
+  "node_compliance_rates": {
+    "add-property-tests": {
+      "runtime": 1,
+      "text": 1
+    },
+    "analyze-api": {
+      "runtime": 1,
+      "text": 1
+    },
+    "assemble-doc": {
+      "runtime": 1,
+      "text": 1
+    },
+    "code-review": {
+      "runtime": 1,
+      "text": 1
+    },
+    "compose-pipeline": {
+      "runtime": 1,
+      "text": 1
+    },
+    "design-interfaces": {
+      "runtime": 1,
+      "text": 1
+    },
+    "doc-generation": {
+      "runtime": 1,
+      "text": 1
+    },
+    "extract-functions": {
+      "runtime": 1,
+      "text": 1
+    },
+    "generate-fix": {
+      "runtime": 1,
+      "text": 1
+    },
+    "identify-bugs": {
+      "runtime": 1,
+      "text": 1
+    },
+    "identify-cases": {
+      "runtime": 1,
+      "text": 1
+    },
+    "identify-responsibilities": {
+      "runtime": 1,
+      "text": 1
+    },
+    "refactoring": {
+      "runtime": 0.6666666666666666,
+      "text": 0.8888888888888888
+    },
+    "remediation": {
+      "runtime": 1,
+      "text": 1
+    },
+    "security-audit": {
+      "runtime": 0.5,
+      "text": 0.75
+    },
+    "style-review": {
+      "runtime": 1,
+      "text": 1
+    },
+    "test-generation": {
+      "runtime": 1,
+      "text": 1
+    },
+    "threat-model": {
+      "runtime": 1,
+      "text": 1
+    },
+    "vulnerability-scan": {
+      "runtime": 1,
+      "text": 1
+    },
+    "write-examples": {
+      "runtime": 1,
+      "text": 1
+    },
+    "write-overview": {
+      "runtime": 1,
+      "text": 1
+    },
+    "write-table-tests": {
+      "runtime": 1,
+      "text": 1
+    }
+  }
+}
