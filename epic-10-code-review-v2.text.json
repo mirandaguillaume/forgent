@@ -1,0 +1,128 @@
+[
+  {
+    "task_id": "code-review",
+    "condition": "text",
+    "completed": false,
+    "step_results": [
+      {
+        "StepID": "eligibility",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 712
+      },
+      {
+        "StepID": "discovery",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 712
+      },
+      {
+        "StepID": "parallel-analysis",
+        "Completed": false,
+        "Output": "",
+        "TokensUsed": 712
+      },
+      {
+        "StepID": "confidence-scoring",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 712
+      },
+      {
+        "StepID": "review-comment",
+        "Completed": false,
+        "Output": "",
+        "TokensUsed": 712
+      }
+    ],
+    "ordering_score": 0.6,
+    "guardrail_score": 1,
+    "tokens_used": 3560,
+    "wall_clock_ms": 28447,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "code-review",
+    "condition": "text",
+    "completed": false,
+    "step_results": [
+      {
+        "StepID": "eligibility",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 776
+      },
+      {
+        "StepID": "discovery",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 776
+      },
+      {
+        "StepID": "parallel-analysis",
+        "Completed": false,
+        "Output": "",
+        "TokensUsed": 776
+      },
+      {
+        "StepID": "confidence-scoring",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 776
+      },
+      {
+        "StepID": "review-comment",
+        "Completed": false,
+        "Output": "",
+        "TokensUsed": 776
+      }
+    ],
+    "ordering_score": 0.6,
+    "guardrail_score": 1,
+    "tokens_used": 3882,
+    "wall_clock_ms": 31474,
+    "llm_calls": 1
+  },
+  {
+    "task_id": "code-review",
+    "condition": "text",
+    "completed": false,
+    "step_results": [
+      {
+        "StepID": "eligibility",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 757
+      },
+      {
+        "StepID": "discovery",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 757
+      },
+      {
+        "StepID": "parallel-analysis",
+        "Completed": false,
+        "Output": "",
+        "TokensUsed": 757
+      },
+      {
+        "StepID": "confidence-scoring",
+        "Completed": true,
+        "Output": "",
+        "TokensUsed": 757
+      },
+      {
+        "StepID": "review-comment",
+        "Completed": false,
+        "Output": "",
+        "TokensUsed": 757
+      }
+    ],
+    "ordering_score": 0.6,
+    "guardrail_score": 1,
+    "tokens_used": 3785,
+    "wall_clock_ms": 31604,
+    "llm_calls": 1
+  }
+]
